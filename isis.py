@@ -19,42 +19,45 @@
 
 import os, subprocess
 
+# These definitions and the use of env= in the subprocess.run calls allow us to
+# run ISIS even though the shell that called this Python program may not be an
+# ISIS-enabled shell.
+isisroot = '/Users/rbeyer/.anaconda3/envs/isis3'
+isis3data = '/Users/rbeyer/.anaconda3/envs/isis3/data'
+isis_env = {'ISISROOT': isisroot, 
+            'ISIS3DATA': isis3data, 
+            'PATH': isisroot+'/bin/', 
+            'HOME': os.environ['HOME']} # Otherwise ISIS tries to make a ./\$HOME dir
+
 def addparams( cmd, params ):
     if params:
         for name in params:
-            cmd.append( '{}={}'.format(name, params[name])
+            cmd.append( f'{name}={params[name]}' )
     return cmd
 
 def getkey(cube, grpname, keyword):
     '''Runs ISIS3 getkey'''
-    # getkey grpname= ? keyword= ? from= ?
-    print('Running getkey')
-    path = os.environ['ISISROOT']+'/bin/getkey'
-    result = subprocess.Popen([path, "from= "+ cube, "grpname= "+ grpname, "keyword= "+keyword], stdout=subprocess.PIPE).communicate()[0].strip()
-    return result
-
-
-def hi2isis(img, to=None, **keywords)
+    cmd = ['getkey', 'from='+cube, 'grpname='+grpname, 'keyword='+keyword]
+    r = subprocess.run( cmd, env=isis_env, check=True, capture_output=True, text=True )
+    return( r.stdout.strip() )
+ 
+def hi2isis(img, to=None, **keywords):
     '''Runs ISIS3 hi2isis'''
-    print( 'Running hi2isis' )
-    path = os.environ['ISISROOT']+'/bin/hi2isis'
     if to is None:
         to = os.path.splitext( img )[0] + '.hi2isis.cub'
 
-    cmd = [path, 'from='+img, 'to='+to]
-    r = subprocess.run( addparams(cmd, keywords), check=True )
+    cmd = ['hi2isis', 'from='+img, 'to='+to]
+    subprocess.run( addparams(cmd, keywords), env=isis_env, check=True )
     return
-
-def histat( cub, to=None, **keywords )
+ 
+def histat(cub, to=None, **keywords):
     '''Runs ISIS3 histat'''
-    print( 'Running histat' )
-    path = os.environ['ISISROOT']+'/bin/histat'
-    cmd = [path, 'from='+cub]
+    cmd = ['histat', 'from='+cub]
     cmd = addparams(cmd, keywords)
     if to is None:
-        r = subprocess.run(cmd, capture_output=True, text=True check=True)
-        return(r.stderr)
+        r = subprocess.run(cmd, env=isis_env, capture_output=True, text=True, check=True)
+        return(r.stdout)
     else:
         cmd.append('to='+to)
-        r = subprocess.run(cmd, check=True)
+        subprocess.run(cmd, env=isis_env, check=True)
     return
