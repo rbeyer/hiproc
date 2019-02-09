@@ -72,7 +72,12 @@ class Histogram:
     def __contains__(self, item):
         if item in self.dictionary: return True
         else: return False
-        
+
+    def keys(self):
+        return self.dictionary.keys()
+
+    def values(self):
+        return self.dictionary.values()
 
     def parsehist(self, histfile):
         d = dict()
