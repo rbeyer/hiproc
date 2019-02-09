@@ -16,7 +16,8 @@
 # limitations under the License.
 
 
-# This program is based on EDR_Stats version 2.16.1 (2016/06/16)
+# This program is based on EDR_Stats version 2.16.1 (2016/06/16),
+# and on the Perl EDR_Stats program: ($Revision: 1.38 $ $Date: 2016/08/16 23:43:17 $)
 # by Eric Eliason and Audrie Fennema 
 # which is Copyright(C) 2004 Arizona Board of Regents, under the GNU GPL.
 #
@@ -27,7 +28,7 @@
 # emulate functionality.
 
 import argparse, csv, math, os
-import hirise, pvl
+import hirise, isis, pvl
 
 def main():
     parser = argparse.ArgumentParser( description=__doc__ )
@@ -36,6 +37,7 @@ def main():
     parser.add_argument('-o','--output', required=False, default='.EDR_Stats.cub')
     parser.add_argument('--histmax',     required=False, default=0.01 )
     parser.add_argument('--histmin',     required=False, default=99.99 )
+    parser.add_argument('-g','--gains',  required_False, default='resources/EDR_Stats_gains_config.pvl')
     parser.add_argument('-k','--keep',   required=False, default=False )
     parser.add_argument('img', metavar=".img-file" )
 
@@ -52,9 +54,9 @@ def main():
     isis.hi2isis( args.img, to=ofile_cub )
 
     # Get some info from the new cube:
-    product_id    = isis.getkey( ofile_cub, 'Archive','ProductId')
-    image_lines   = isis.getkey( ofile_cub, 'Dimensions','Lines')
-    image_samples = isis.getkey( ofile_cub, 'Dimensions','Samples')
+    product_id    = isis.getkey(ofile_cub, 'Archive', 'ProductId')
+    image_lines   = isis.getkey(ofile_cub, 'Dimensions', 'Lines')
+    image_samples = isis.getkey(ofile_cub, 'Dimensions', 'Samples')
 
     histats = parse_histat( isis.histat( ofile_cub, useoffsets=True,
                                             leftimage=0,     rightimage=1, 
@@ -65,7 +67,7 @@ def main():
 
 
     dncnt = get_dncnt( ofile_cub, args.histmin, args.histmax, keep=args.keep )
-    snr = snr( ofile_cub, gainspvl, histats ) 
+    snr = snr( ofile_cub, args.gains_config, histats ) 
     gapp = ( histats['IMAGE_MAXIMUM'] / (image_lines * image_samples) )*100.0
 
     # DB stuff
@@ -100,54 +102,59 @@ def parse_histat( pvltext ):
     d['CAL_MASK_MAXIMUM']            = p['CAL_MASK']['Maximum']
       
     # Calibration Ramp Statistics   
-    d['CAL_RAMP_MEAN']               = getkey( pvl, 'CAL_RAMP','Average' )
-    d['CAL_RAMP_STANDARD_DEVIATION'] = getkey( pvl, 'CAL_RAMP','StandardDeviation' )
-    d['CAL_RAMP_MINIMUM']            = getkey( pvl, 'CAL_RAMP','Minimum' )
-    d['CAL_RAMP_MAXIMUM']            = getkey( pvl, 'CAL_RAMP','Maximum' )
+    d['CAL_RAMP_MEAN']               = p['CAL_RAMP'],['Average']
+    d['CAL_RAMP_STANDARD_DEVIATION'] = p['CAL_RAMP'],['StandardDeviation']
+    d['CAL_RAMP_MINIMUM']            = p['CAL_RAMP'],['Minimum']
+    d['CAL_RAMP_MAXIMUM']            = p['CAL_RAMP'],['Maximum']
    
     # Image Dark Reference Statistics
-    d['IMAGE_DARK_MEAN']               = getkey( pvl, 'IMAGE_DARK','Average' )
-    d['IMAGE_DARK_STANDARD_DEVIATION'] = getkey( pvl, 'IMAGE_DARK','StandardDeviation' )
-    d['IMAGE_DARK_MINIMUM']            = getkey( pvl, 'IMAGE_DARK','Minimum' )
-    d['IMAGE_DARK_MAXIMUM']            = getkey( pvl, 'IMAGE_DARK','Maximum' )
+    d['IMAGE_DARK_MEAN']               = p['IMAGE_DARK'],['Average']
+    d['IMAGE_DARK_STANDARD_DEVIATION'] = p['IMAGE_DARK'],['StandardDeviation']
+    d['IMAGE_DARK_MINIMUM']            = p['IMAGE_DARK'],['Minimum']
+    d['IMAGE_DARK_MAXIMUM']            = p['IMAGE_DARK'],['Maximum']
 
     # Image Buffer Area
-    d['IMAGE_BUFFER_MEAN']               = getkey( pvl, 'IMAGE_BUFFER','Average' )
-    d['IMAGE_BUFFER_STANDARD_DEVIATION'] = getkey( pvl, 'IMAGE_BUFFER','StandardDeviation' )
-    d['IMAGE_BUFFER_MINIMUM']            = getkey( pvl, 'IMAGE_BUFFER','Minimum' )
-    d['IMAGE_BUFFER_MAXIMUM']            = getkey( pvl, 'IMAGE_BUFFER','Maximum' )
+    d['IMAGE_BUFFER_MEAN']               = p['IMAGE_BUFFER'],['Average']
+    d['IMAGE_BUFFER_STANDARD_DEVIATION'] = p['IMAGE_BUFFER'],['StandardDeviation']
+    d['IMAGE_BUFFER_MINIMUM']            = p['IMAGE_BUFFER'],['Minimum']
+    d['IMAGE_BUFFER_MAXIMUM']            = p['IMAGE_BUFFER'],['Maximum']
 
     # Calibration Image Dark Reference
-    d['CAL_DARK_MEAN']               = getkey( pvl, 'CAL_DARK','Average' )
-    d['CAL_DARK_STANDARD_DEVIATION'] = getkey( pvl, 'CAL_DARK','StandardDeviation' )
-    d['CAL_DARK_MINIMUM']            = getkey( pvl, 'CAL_DARK','Minimum' )
-    d['CAL_DARK_MAXIMUM']            = getkey( pvl, 'CAL_DARK','Maximum' )
+    d['CAL_DARK_MEAN']               = p['CAL_DARK'],['Average']
+    d['CAL_DARK_STANDARD_DEVIATION'] = p['CAL_DARK'],['StandardDeviation']
+    d['CAL_DARK_MINIMUM']            = p['CAL_DARK'],['Minimum']
+    d['CAL_DARK_MAXIMUM']            = p['CAL_DARK'],['Maximum']
    
     # Calibration Image Buffer Area  
-    d['CAL_BUFFER_MEAN']               = getkey( pvl, 'CAL_BUFFER','Average' )
-    d['CAL_BUFFER_STANDARD_DEVIATION'] = getkey( pvl, 'CAL_BUFFER','StandardDeviation' )
-    d['CAL_BUFFER_MINIMUM']            = getkey( pvl, 'CAL_BUFFER','Minimum' )
-    d['CAL_BUFFER_MAXIMUM']            = getkey( pvl, 'CAL_BUFFER','Maximum' )
+    d['CAL_BUFFER_MEAN']               = p['CAL_BUFFER'],['Average']
+    d['CAL_BUFFER_STANDARD_DEVIATION'] = p['CAL_BUFFER'],['StandardDeviation']
+    d['CAL_BUFFER_MINIMUM']            = p['CAL_BUFFER'],['Minimum']
+    d['CAL_BUFFER_MAXIMUM']            = p['CAL_BUFFER'],['Maximum']
    
     # Calibration Dark Ramp Area
-    d['CAL_DARK_RAMP_MEAN']               = getkey( pvl,'CAL_DARK_RAMP','Average' )
-    d['CAL_DARK_RAMP_STANDARD_DEVIATION'] = getkey( pvl,'CAL_DARK_RAMP','StandardDeviation' )
-    d['CAL_DARK_RAMP_MINIMUM']            = getkey( pvl,'CAL_DARK_RAMP','Minimum' )
-    d['CAL_DARK_RAMP_MAXIMUM']            = getkey( pvl,'CAL_DARK_RAMP','Maximum' )
+    d['CAL_DARK_RAMP_MEAN']               = p['CAL_DARK_RAMP'],['Average']
+    d['CAL_DARK_RAMP_STANDARD_DEVIATION'] = p['CAL_DARK_RAMP'],['StandardDeviation']
+    d['CAL_DARK_RAMP_MINIMUM']            = p['CAL_DARK_RAMP'],['Minimum']
+    d['CAL_DARK_RAMP_MAXIMUM']            = p['CAL_DARK_RAMP'],['Maximum']
    
     # Image Post Ramp Area
-    d['IMAGE_POST_RAMP_MEAN']               = getkey( pvl,'IMAGE_POSTRAMP','Average' )
-    d['IMAGE_POST_RAMP_STANDARD_DEVIATION'] = getkey( pvl,'IMAGE_POSTRAMP','StandardDeviation' )
-    d['IMAGE_POST_RAMP_MINIMUM']            = getkey( pvl,'IMAGE_POSTRAMP','Minimum' )
-    d['IMAGE_POST_RAMP_MAXIMUM']            = getkey( pvl,'IMAGE_POSTRAMP','Maximum' )
+    d['IMAGE_POST_RAMP_MEAN']               = p['IMAGE_POSTRAMP'],['Average']
+    d['IMAGE_POST_RAMP_STANDARD_DEVIATION'] = p['IMAGE_POSTRAMP'],['StandardDeviation']
+    d['IMAGE_POST_RAMP_MINIMUM']            = p['IMAGE_POSTRAMP'],['Minimum']
+    d['IMAGE_POST_RAMP_MAXIMUM']            = p['IMAGE_POSTRAMP'],['Maximum']
 
     return d
 
 
 def get_dncnt( cub, hmin, hmax, keep=False ):
     '''Extract DN count from the histogram of a cub file'''
+    # I'm not sure about this method.
+    # The statement above is what the original program wanted,
+    # but this is just counting the number of histogram bins
+    # that are within the boundary, not the number of DN.
+    # And the # of bins is computed by isis.hist, so ....
 
-    histfile = os.path.splitext( ofile_cub )[0] + '.hist'
+    histfile = os.path.splitext( cub )[0] + '.hist'
     if not os.path.isfile( histfile ): isis.hist( cub, histfile )
 
     c = 0
@@ -166,7 +173,7 @@ def get_dncnt( cub, hmin, hmax, keep=False ):
 def snr( cub, gainsfile, histats ):
     '''Calculate the signal to noise ratio.'''
 
-    summing = isis.getkey( cub, 'Instrument','Summing')
+    summing = isis.getkey( cub, 'Instrument', 'Summing')
     ccdchan = '{}_{}'.format( hirise.getccdchannel(cub) )
 
     gainspvl = pvl.load( gainsfile )
@@ -181,14 +188,14 @@ def snr( cub, gainsfile, histats ):
            # 150 e *Changed value to 90 e- 1/31/2012 to bring closer 
            # to HIPHOP value for read noise. SM
 
-    if( 0 == lis_pixels and img_mean > 0.0 and buf_mean > 0 ):
+    if( 0 == lis_pixels and img_mean > 0.0 and buf_mean > 0.0 ):
         s = (img_mean - buf_mean) * gain
         snr = s/math.sqrt(s + r*r)
         print( '\nCalculation of Signal/Noise Ratio:' )
-        print( '\tIMAGE_MEAN: {}'.format(img_mean) )
+        print( '\tIMAGE_MEAN:        {}'.format(img_mean) )
         print( '\tIMAGE_BUFFER_MEAN: {}'.format(buf_mean) )
-        print( '\tR (electrons/DN): {}'.format(r) )
-        print( '\tGain: {}'.format(gain) )
+        print( '\tR (electrons/DN):  {}'.format(r) )
+        print( '\tGain:              {}'.format(gain) )
         print( 'Signal/Noise ratio: {}'.format(snr) )
 
     return snr

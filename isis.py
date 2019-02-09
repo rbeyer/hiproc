@@ -49,6 +49,11 @@ def hi2isis(img, to=None, **keywords):
     cmd = ['hi2isis', 'from='+img, 'to='+to]
     subprocess.run( addparams(cmd, keywords), env=isis_env, check=True )
     return
+
+def hist( cub, to=hist, **keywords):
+    cmd = ['hist', 'from='+img, 'to='+to]
+    subprocess.run( addparams(cmd, keywords), env=isis_env, check=True )
+    return
  
 def histat(cub, to=None, **keywords):
     '''Runs ISIS3 histat'''
