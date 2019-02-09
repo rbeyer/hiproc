@@ -157,17 +157,14 @@ def get_dncnt( cub, hmin, hmax, keep=False ):
     histfile = os.path.splitext( cub )[0] + '.hist'
     if not os.path.isfile( histfile ): isis.hist( cub, histfile )
 
-    c = 0
-    with open( histfile ) as csvfile:
-        headers[]
-        for line in csvfile:
-            if 'DN,' in line: headers = line.split(',')
-        reader = csv.DictReader( csvfile, fieldnames= headers )
-        for row in reader:
-            if( row['Percent'] >= hmin and row['Percent'] <= hmax ): c += 1
+    h = isis.Histogram( histfile )
+
+    count = 0
+    for row in h:
+        if( row.Percent >= hmin and row.Percent <= hmax ): count += 1
 
     if not keep: os.remove( histfile )
-    return c
+    return count
 
 
 def snr( cub, gainsfile, histats ):

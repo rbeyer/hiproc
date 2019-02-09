@@ -17,7 +17,7 @@
 
 # Someday there might be a real interface to ISIS3 through Python.  For now, we fake it:
 
-import os, subprocess
+import collections, csv, os, subprocess
 
 # These definitions and the use of env= in the subprocess.run calls allow us to
 # run ISIS even though the shell that called this Python program may not be an
@@ -35,6 +35,68 @@ def addparams( cmd, params ):
             cmd.append( f'{name}={params[name]}' )
     return cmd
 
+
+class Histogram:
+    """A class to read and wrap the contents of the output of hist()"""
+
+    def __init__(self, histfile):
+        self.histfile = histfile
+        (self.dictionary, 
+         self.headers, 
+         self.hist_list) = self.parsehist(histfile)
+         # self.hist_list is a list of collections.namedtuple( 'HistRow', self.headers )
+        
+    def __str__(self):
+        pass
+
+    def __repr__(self):
+        return (f'{self.__class__.__name__}(\'{self.histfile}\')')
+
+    def __len__(self):
+        return len(self.hist_list)
+
+    def __getitem__(self,key):
+        #if key is integer or slice object, look in self.hist_vals
+        if isinstance(key, int):
+            return self.hist_list[key]
+
+        elif isinstance(key, slice):
+            return self.hist_list[key]
+
+        elif isinstance(key, str):
+            return self.dictionary[key]
+
+    def __iter__(self):
+        return self.hist_list
+
+    def __contains__(self, item):
+        if item in self.dictionary: return True
+        else: return False
+        
+
+    def parsehist(self, histfile):
+        d = dict()
+        headers = []
+        hist_vals= []
+        with open( histfile ) as f:
+            for line in f:
+                if ':' in line:
+                    (k,v) = line.split(':')
+                    if 'Cube' in k: d[k.strip()] = v.strip()
+                    else:           d[k.strip()] = float(v.strip())
+                    
+                if line.startswith('DN,'): 
+                    headers = line.strip().split(',')
+                    HistRow = collections.namedtuple( 'HistRow', headers )
+                    for row in map( HistRow._make, csv.reader(f, quoting=csv.QUOTE_NONNUMERIC) ):
+                        hist_vals.append( row )
+
+        return d, headers, hist_vals
+
+
+#########################################################################
+# Straight-up calls to ISIS programs below here, alphabetically arranged:
+
 def getkey(cube, grpname, keyword):
     '''Runs ISIS3 getkey'''
     cmd = ['getkey', 'from='+cube, 'grpname='+grpname, 'keyword='+keyword]
@@ -50,8 +112,8 @@ def hi2isis(img, to=None, **keywords):
     subprocess.run( addparams(cmd, keywords), env=isis_env, check=True )
     return
 
-def hist( cub, to=hist, **keywords):
-    cmd = ['hist', 'from='+img, 'to='+to]
+def hist( cub, **keywords):
+    cmd = ['hist', 'from='+cub]
     subprocess.run( addparams(cmd, keywords), env=isis_env, check=True )
     return
  

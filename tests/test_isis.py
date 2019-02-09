@@ -15,9 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest, os, sys
+import os, sys, unittest
+import shutil, urllib.request
 sys.path.append('../')
 from isis import *
+
+img = 'HiRISE_test.img'
 
 class TestParams(unittest.TestCase):
     def test_addparams(self):
@@ -30,10 +33,45 @@ class TestParams(unittest.TestCase):
         c = addparams( c, p )
         self.assertEqual( truth, c )
 
-@unittest.skip('Takes a while to run hi2isis.')
+class TestHistogram(unittest.TestCase):
+    def setUp(self):
+        self.cube = 'test_Histogram.cub'
+        self.histfile = 'test_Histogram.hist'
+        hi2isis(img, self.cube)
+        hist(self.cube, to=self.histfile)
+
+    def tearDown(self):
+        os.remove('print.prt')
+        os.remove(self.cube)
+        os.remove(self.histfile)
+
+    def test_init(self):
+        h = Histogram( self.histfile )
+
+    def test_dictlike(self):
+        h = Histogram( self.histfile )
+        self.assertEqual( self.cube, h['Cube'] )
+
+    def test_listlike(self):
+        h = Histogram( self.histfile )
+        self.assertEqual( 5, len(h[0]) )
+
+    def test_contains(self):
+        h = Histogram( self.histfile )
+        self.assertTrue( 'Std Deviation' in h )
+
+    def test_len(self):
+        h = Histogram( self.histfile )
+        self.assertEqual( 107, len(h) )
+    
+
+# @unittest.skip('Takes a while to run hi2isis.')
 class Test_hi2isis(unittest.TestCase):
     def setUp(self):
-        self.img = 'test_hi2isis.img'
+        self.img = img
+    
+    def tearDown(self):
+        os.remove( 'print.prt' )
 
     def test_hi2isis_with_to(self):
         tocube = 'test_hi2isis.cub'
@@ -42,20 +80,16 @@ class Test_hi2isis(unittest.TestCase):
         os.remove( tocube )
 
     def test_hi2isis_without_to(self):
-        tocube = 'test_hi2isis.hi2isis.cub'
+        tocube = os.path.splitext( self.img )[0] + '.hi2isis.cub'
         hi2isis( self.img )
         self.assertTrue( os.path.isfile(tocube) )
         os.remove( tocube )
 
-    def tearDown(self):
-        os.remove( 'print.prt' )
-
-@unittest.skip('Takes a while to run hi2isis.')
+#@unittest.skip('Takes a while to run hi2isis.')
 class Test_getkey(unittest.TestCase):
     def setUp(self):
-        self.img = 'test_hi2isis.img'
         self.cub = 'test_getkey.cub'
-        hi2isis( self.img, self.cub )
+        hi2isis( img, self.cub )
     
     def tearDown(self):
         os.remove( self.cub )
@@ -70,12 +104,11 @@ class Test_getkey(unittest.TestCase):
         # Pixels doesn't have InstrumentId, should fail
         self.assertRaises( subprocess.CalledProcessError, getkey, self.cub, 'Pixels', 'InstrumentId' )
 
-@unittest.skip('Takes a while to run hi2isis.')
+#@unittest.skip('Takes a while to run hi2isis.')
 class Test_histat(unittest.TestCase):
     def setUp(self):
-        self.img = 'test_hi2isis.img'
         self.cub = 'test_histat.cub'
-        hi2isis( self.img, self.cub )
+        hi2isis( img, self.cub )
     
     def tearDown(self):
         os.remove( self.cub )
@@ -90,3 +123,11 @@ class Test_histat(unittest.TestCase):
     def test_histat_without_to(self):
         s = histat( self.cub )
         self.assertTrue( s.startswith('Group = IMAGE_POSTRAMP') )
+
+
+if __name__ == '__main__':
+    if not os.path.isfile( img ):
+        print( 'Downloading test HiRISE EDR image.' )
+        urllib.request.urlretrieve( 'https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_RED5_0.IMG', img )
+
+    unittest.main()

@@ -43,24 +43,38 @@ def main():
         ofile_cub = os.path.splitext( args.img )[0] + args.output
     else: ofile_cub = args.output
 
-    # Read some stuff from HiCal.conf, could be done with pvl
+    # GetConfigurationParameters() - Read some stuff from HiCal.conf, could be done with pvl
     # Setup00 builds data structures, seems long and painful, need?
     # Setup01 - don't need - about output data routeing
-    # Setup02 - pulls from db EDR_Products, written by EDR_Stats
-    # Setup03 - gets binning information from Planned_Observations to find binning for ObsID
+    # Setup02 - db
+    #   select from HiCat.EDR_Products, written by EDR_Stats
+    # Setup03 - gets binning information to find binning for ObsID ... hmmm, alternate?
+    #   select from HiCat.Planned_Observations
     # ProcessingSwitches() sets a variety of booleans
     #
-    # above is setup
+    ### setup done ###
     #
-    # SetHiCalVersion() we don't need to record the version info of isis.hical
-    # Furrow() - yeah, need to do this
-    # Mask() - yeah
-    # HiCal()
-    # Lpfz()
-    # GainDrift()
-    # CubeNorm() - writes stuff back to EDR_Products
-    # NoiseFilter()
-    # Hidestripe() - writes to EDR_Products
+    # skip SetHiCalVersion(), we don't need to record the version info of isis.hical
+    # Furrow() - sets filenames, run isis.mask
+    #   FurrowSetup() - contains and then sets furrow_values
+    #   isis.crop
+    #   isis.handmos
+    #   isis.crop and isis.mask
+    #   isis.stats, isis.handmos, isis.trimfilter
+    # Mask()
+    #   isis.mask
+    #   isis.cubenorm
+    #   isis.mask
+    #   AnalyzeCubenormStats()
+    # HiCal() runs isis.hical
+    # Lpfz() runs isis.lowpass
+    # GainDrift() - runs external HiGainFx program
+    # CubeNorm() - isis.crop, isis.cubenorm, external Cubenorm_Filter
+    #   insert into HiCat.EDR_Products
+    #   isis.cubenorm again
+    # NoiseFilter() - external Noise_Filter
+    # Hidestripe() - isis.[hidestripe,hipass,lowpass,algebra] 
+    #   insert into HiCat.EDR_Products
 
 
 
