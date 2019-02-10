@@ -17,7 +17,7 @@
 
 # Someday there might be a real interface to ISIS3 through Python.  For now, we fake it:
 
-import collections, csv, os, subprocess
+import collections, csv, os, subprocess, sys
 
 # These definitions and the use of env= in the subprocess.run calls allow us to
 # run ISIS even though the shell that called this Python program may not be an
@@ -28,12 +28,6 @@ isis_env = {'ISISROOT': isisroot,
             'ISIS3DATA': isis3data, 
             'PATH': isisroot+'/bin/', 
             'HOME': os.environ['HOME']} # Otherwise ISIS tries to make a ./\$HOME dir
-
-def addparams( cmd, params ):
-    if params:
-        for name in params:
-            cmd.append( f'{name}={params[name]}' )
-    return cmd
 
 
 class Histogram:
@@ -100,7 +94,14 @@ class Histogram:
 
 
 #########################################################################
-# Straight-up calls to ISIS programs below here, alphabetically arranged:
+# Helper and wrapper functions for the ISIS commands.
+
+def addparams( cmd, params ):
+    '''Builds a list of strings from dictionary keys and values where the elements are "key=value".'''
+    if params:
+        for name in params:
+            cmd.append( f'{name}={params[name]}' )
+    return cmd
 
 def _run_isis_program( cmd, capture=False ):
     '''Wrapper for subprocess.run()'''
@@ -109,6 +110,29 @@ def _run_isis_program( cmd, capture=False ):
     else:
         return subprocess.run(cmd, env=isis_env, check=True)
 
+
+def _build_isis_fn( fn_name ):
+    '''This automatically builds a simple function to call an ISIS program, based on the name given.'''
+    # Define the structure of the generic function, fn:
+    def fn( fromcube, **keywords ):
+        cmd = [fn_name, 'from='+fromcube]
+        return( _run_isis_program( addparams(cmd, keywords) ) )
+    fn.__name__ = fn_name
+    fn.__doc__ = f'Runs ISIS3 {fn_name}'
+
+    # Then add it, by name to the enclosing module.
+    setattr( sys.modules[__name__], fn_name, fn)
+    # Could have also used sys.modules['isis'] if I wanted to be specific.
+       
+# Now use the builder function to automatically create functions with these names:
+_isis_programs = ['crop','hist','mask']
+# Could also reach out and grab these names from the $ISISROOT/bin/ directory.
+for p in _isis_programs:
+    _build_isis_fn( p )
+
+
+# Straight-up calls to ISIS programs below here, alphabetically arranged.
+# These I want to call differently than the default builder provides.
 
 def getkey(cube, grpname, keyword):
     '''Runs ISIS3 getkey'''
@@ -123,10 +147,6 @@ def hi2isis(img, to=None, **keywords):
     cmd = ['hi2isis', 'from='+img, 'to='+to]
     return( _run_isis_program( addparams(cmd, keywords) ) )
 
-def hist(cub, **keywords):
-    cmd = ['hist', 'from='+cub]
-    return( _run_isis_program( addparams(cmd, keywords) ) )
- 
 def histat(cub, to=None, **keywords):
     '''Runs ISIS3 histat'''
     cmd = ['histat', 'from='+cub]
@@ -136,7 +156,3 @@ def histat(cub, to=None, **keywords):
     else:
         cmd.append('to='+to)
         return( _run_isis_program( cmd ) )
-
-def mask(cub, **keywords):
-    cmd = ['mask', 'from='+cub]
-    return( _run_isis_program( addparams(cmd, keywords) ) )
