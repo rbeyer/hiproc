@@ -102,11 +102,18 @@ class Histogram:
 #########################################################################
 # Straight-up calls to ISIS programs below here, alphabetically arranged:
 
+def _run_isis_program( cmd, capture=False ):
+    '''Wrapper for subprocess.run()'''
+    if capture: 
+        return subprocess.run(cmd, env=isis_env, check=True, capture_output=True, text=True)
+    else:
+        return subprocess.run(cmd, env=isis_env, check=True)
+
+
 def getkey(cube, grpname, keyword):
     '''Runs ISIS3 getkey'''
     cmd = ['getkey', 'from='+cube, 'grpname='+grpname, 'keyword='+keyword]
-    r = subprocess.run( cmd, env=isis_env, check=True, capture_output=True, text=True )
-    return( r.stdout.strip() )
+    return( _run_isis_program( cmd, capture=True ).stdout.strip() )
  
 def hi2isis(img, to=None, **keywords):
     '''Runs ISIS3 hi2isis'''
@@ -114,22 +121,22 @@ def hi2isis(img, to=None, **keywords):
         to = os.path.splitext( img )[0] + '.hi2isis.cub'
 
     cmd = ['hi2isis', 'from='+img, 'to='+to]
-    subprocess.run( addparams(cmd, keywords), env=isis_env, check=True )
-    return
+    return( _run_isis_program( addparams(cmd, keywords) ) )
 
-def hist( cub, **keywords):
+def hist(cub, **keywords):
     cmd = ['hist', 'from='+cub]
-    subprocess.run( addparams(cmd, keywords), env=isis_env, check=True )
-    return
+    return( _run_isis_program( addparams(cmd, keywords) ) )
  
 def histat(cub, to=None, **keywords):
     '''Runs ISIS3 histat'''
     cmd = ['histat', 'from='+cub]
     cmd = addparams(cmd, keywords)
     if to is None:
-        r = subprocess.run(cmd, env=isis_env, capture_output=True, text=True, check=True)
-        return(r.stdout)
+        return( _run_isis_program( cmd, capture=True ).stdout.strip() )
     else:
         cmd.append('to='+to)
-        subprocess.run(cmd, env=isis_env, check=True)
-    return
+        return( _run_isis_program( cmd ) )
+
+def mask(cub, **keywords):
+    cmd = ['mask', 'from='+cub]
+    return( _run_isis_program( addparams(cmd, keywords) ) )
