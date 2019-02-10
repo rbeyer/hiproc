@@ -71,7 +71,7 @@ def main():
 
     dncnt = get_dncnt( ofile_cub, args.histmin, args.histmax, keep=args.keep )
     snr = calc_snr( ofile_cub, args.gains, histats ) 
-    gapp = ( histats['IMAGE_MAXIMUM'] / (int(image_lines) * int(image_samples)) )*100.0
+    gapp = ( histats['GAP_PIXELS'] / (int(image_lines) * int(image_samples)) )*100.0
 
     # DB stuff
     # add a bunch of stuff from the histats call, gapp, snr, dncnt
@@ -157,8 +157,9 @@ def get_dncnt( cub, hmin, hmax, keep=False ):
     # I'm not sure about this method.
     # The statement above is what the original program wanted,
     # but this is just counting the number of histogram bins
-    # that are within the boundary, not the number of DN.
-    # And the # of bins is computed by isis.hist, so ....
+    # that are within the boundaries, not the number of DN.
+    # And the # of bins is automatically computed by isis.hist, 
+    # so could be different for each cube.
 
     histfile = os.path.splitext( cub )[0] + '.hist'
     if not os.path.isfile( histfile ): isis.hist( cub, to=histfile )
@@ -167,7 +168,7 @@ def get_dncnt( cub, hmin, hmax, keep=False ):
 
     count = 0
     for row in h:
-        if( row.Percent >= hmin and row.Percent <= hmax ): count += 1
+        if( row.CumulativePercent >= hmin and row.CumulativePercent <= hmax ): count += 1
 
     if not keep: os.remove( histfile )
     return count
