@@ -67,7 +67,7 @@ class Histogram:
             return self.dictionary[key]
 
     def __iter__(self):
-        return self.hist_list
+        return self.hist_list.__iter__()
 
     def __contains__(self, item):
         if item in self.dictionary: return True
