@@ -35,11 +35,14 @@ def main():
     parser.add_argument('--db',          required=False, default='HiCat.db' )
     parser.add_argument('-t','--table',  required=False, default='EDR_Products')
     parser.add_argument('-o','--output', required=False, default='.EDR_Stats.cub')
-    parser.add_argument('--histmax',     required=False, default=0.01 )
-    parser.add_argument('--histmin',     required=False, default=99.99 )
-    parser.add_argument('-g','--gains',  required_False, default='resources/EDR_Stats_gains_config.pvl')
-    parser.add_argument('-k','--keep',   required=False, default=False )
-    parser.add_argument('img', metavar=".img-file" )
+    parser.add_argument('--histmin',     required=False, default=0.01 )
+    parser.add_argument('--histmax',     required=False, default=99.99 )
+    parser.add_argument('-g','--gains',  required=False, 
+               default= os.path.join( os.path.dirname(os.path.abspath(__file__)),
+                                      'resources',
+                                      'EDR_Stats_gains_config.pvl') )
+    parser.add_argument('-k','--keep', required=False, default=False, action='store_true' )
+    parser.add_argument('img', metavar="some.img-file" )
 
     args = parser.parse_args()
 
@@ -67,11 +70,14 @@ def main():
 
 
     dncnt = get_dncnt( ofile_cub, args.histmin, args.histmax, keep=args.keep )
-    snr = snr( ofile_cub, args.gains_config, histats ) 
-    gapp = ( histats['IMAGE_MAXIMUM'] / (image_lines * image_samples) )*100.0
+    snr = calc_snr( ofile_cub, args.gains, histats ) 
+    gapp = ( histats['IMAGE_MAXIMUM'] / (int(image_lines) * int(image_samples)) )*100.0
 
     # DB stuff
     # add a bunch of stuff from the histats call, gapp, snr, dncnt
+    print(f'dncnt: {dncnt}')
+    print(f'snr: {snr}')
+    print(f'gapp: {gapp}')
 
 
 def parse_histat( pvltext ):
@@ -102,46 +108,46 @@ def parse_histat( pvltext ):
     d['CAL_MASK_MAXIMUM']            = p['CAL_MASK']['Maximum']
       
     # Calibration Ramp Statistics   
-    d['CAL_RAMP_MEAN']               = p['CAL_RAMP'],['Average']
-    d['CAL_RAMP_STANDARD_DEVIATION'] = p['CAL_RAMP'],['StandardDeviation']
-    d['CAL_RAMP_MINIMUM']            = p['CAL_RAMP'],['Minimum']
-    d['CAL_RAMP_MAXIMUM']            = p['CAL_RAMP'],['Maximum']
+    d['CAL_RAMP_MEAN']               = p['CAL_RAMP']['Average']
+    d['CAL_RAMP_STANDARD_DEVIATION'] = p['CAL_RAMP']['StandardDeviation']
+    d['CAL_RAMP_MINIMUM']            = p['CAL_RAMP']['Minimum']
+    d['CAL_RAMP_MAXIMUM']            = p['CAL_RAMP']['Maximum']
    
     # Image Dark Reference Statistics
-    d['IMAGE_DARK_MEAN']               = p['IMAGE_DARK'],['Average']
-    d['IMAGE_DARK_STANDARD_DEVIATION'] = p['IMAGE_DARK'],['StandardDeviation']
-    d['IMAGE_DARK_MINIMUM']            = p['IMAGE_DARK'],['Minimum']
-    d['IMAGE_DARK_MAXIMUM']            = p['IMAGE_DARK'],['Maximum']
+    d['IMAGE_DARK_MEAN']               = p['IMAGE_DARK']['Average']
+    d['IMAGE_DARK_STANDARD_DEVIATION'] = p['IMAGE_DARK']['StandardDeviation']
+    d['IMAGE_DARK_MINIMUM']            = p['IMAGE_DARK']['Minimum']
+    d['IMAGE_DARK_MAXIMUM']            = p['IMAGE_DARK']['Maximum']
 
     # Image Buffer Area
-    d['IMAGE_BUFFER_MEAN']               = p['IMAGE_BUFFER'],['Average']
-    d['IMAGE_BUFFER_STANDARD_DEVIATION'] = p['IMAGE_BUFFER'],['StandardDeviation']
-    d['IMAGE_BUFFER_MINIMUM']            = p['IMAGE_BUFFER'],['Minimum']
-    d['IMAGE_BUFFER_MAXIMUM']            = p['IMAGE_BUFFER'],['Maximum']
+    d['IMAGE_BUFFER_MEAN']               = p['IMAGE_BUFFER']['Average']
+    d['IMAGE_BUFFER_STANDARD_DEVIATION'] = p['IMAGE_BUFFER']['StandardDeviation']
+    d['IMAGE_BUFFER_MINIMUM']            = p['IMAGE_BUFFER']['Minimum']
+    d['IMAGE_BUFFER_MAXIMUM']            = p['IMAGE_BUFFER']['Maximum']
 
     # Calibration Image Dark Reference
-    d['CAL_DARK_MEAN']               = p['CAL_DARK'],['Average']
-    d['CAL_DARK_STANDARD_DEVIATION'] = p['CAL_DARK'],['StandardDeviation']
-    d['CAL_DARK_MINIMUM']            = p['CAL_DARK'],['Minimum']
-    d['CAL_DARK_MAXIMUM']            = p['CAL_DARK'],['Maximum']
+    d['CAL_DARK_MEAN']               = p['CAL_DARK']['Average']
+    d['CAL_DARK_STANDARD_DEVIATION'] = p['CAL_DARK']['StandardDeviation']
+    d['CAL_DARK_MINIMUM']            = p['CAL_DARK']['Minimum']
+    d['CAL_DARK_MAXIMUM']            = p['CAL_DARK']['Maximum']
    
     # Calibration Image Buffer Area  
-    d['CAL_BUFFER_MEAN']               = p['CAL_BUFFER'],['Average']
-    d['CAL_BUFFER_STANDARD_DEVIATION'] = p['CAL_BUFFER'],['StandardDeviation']
-    d['CAL_BUFFER_MINIMUM']            = p['CAL_BUFFER'],['Minimum']
-    d['CAL_BUFFER_MAXIMUM']            = p['CAL_BUFFER'],['Maximum']
+    d['CAL_BUFFER_MEAN']               = p['CAL_BUFFER']['Average']
+    d['CAL_BUFFER_STANDARD_DEVIATION'] = p['CAL_BUFFER']['StandardDeviation']
+    d['CAL_BUFFER_MINIMUM']            = p['CAL_BUFFER']['Minimum']
+    d['CAL_BUFFER_MAXIMUM']            = p['CAL_BUFFER']['Maximum']
    
     # Calibration Dark Ramp Area
-    d['CAL_DARK_RAMP_MEAN']               = p['CAL_DARK_RAMP'],['Average']
-    d['CAL_DARK_RAMP_STANDARD_DEVIATION'] = p['CAL_DARK_RAMP'],['StandardDeviation']
-    d['CAL_DARK_RAMP_MINIMUM']            = p['CAL_DARK_RAMP'],['Minimum']
-    d['CAL_DARK_RAMP_MAXIMUM']            = p['CAL_DARK_RAMP'],['Maximum']
+    d['CAL_DARK_RAMP_MEAN']               = p['CAL_DARK_RAMP']['Average']
+    d['CAL_DARK_RAMP_STANDARD_DEVIATION'] = p['CAL_DARK_RAMP']['StandardDeviation']
+    d['CAL_DARK_RAMP_MINIMUM']            = p['CAL_DARK_RAMP']['Minimum']
+    d['CAL_DARK_RAMP_MAXIMUM']            = p['CAL_DARK_RAMP']['Maximum']
    
     # Image Post Ramp Area
-    d['IMAGE_POST_RAMP_MEAN']               = p['IMAGE_POSTRAMP'],['Average']
-    d['IMAGE_POST_RAMP_STANDARD_DEVIATION'] = p['IMAGE_POSTRAMP'],['StandardDeviation']
-    d['IMAGE_POST_RAMP_MINIMUM']            = p['IMAGE_POSTRAMP'],['Minimum']
-    d['IMAGE_POST_RAMP_MAXIMUM']            = p['IMAGE_POSTRAMP'],['Maximum']
+    d['IMAGE_POST_RAMP_MEAN']               = p['IMAGE_POSTRAMP']['Average']
+    d['IMAGE_POST_RAMP_STANDARD_DEVIATION'] = p['IMAGE_POSTRAMP']['StandardDeviation']
+    d['IMAGE_POST_RAMP_MINIMUM']            = p['IMAGE_POSTRAMP']['Minimum']
+    d['IMAGE_POST_RAMP_MAXIMUM']            = p['IMAGE_POSTRAMP']['Maximum']
 
     return d
 
@@ -155,7 +161,7 @@ def get_dncnt( cub, hmin, hmax, keep=False ):
     # And the # of bins is computed by isis.hist, so ....
 
     histfile = os.path.splitext( cub )[0] + '.hist'
-    if not os.path.isfile( histfile ): isis.hist( cub, histfile )
+    if not os.path.isfile( histfile ): isis.hist( cub, to=histfile )
 
     h = isis.Histogram( histfile )
 
@@ -167,11 +173,11 @@ def get_dncnt( cub, hmin, hmax, keep=False ):
     return count
 
 
-def snr( cub, gainsfile, histats ):
+def calc_snr( cub, gainsfile, histats ):
     '''Calculate the signal to noise ratio.'''
 
     summing = isis.getkey( cub, 'Instrument', 'Summing')
-    ccdchan = '{}_{}'.format( hirise.getccdchannel(cub) )
+    ccdchan = '{0[0]}_{0[1]}'.format( hirise.getccdchannel(cub) )
 
     gainspvl = pvl.load( gainsfile )
     gain = float( gainspvl['Gains'][ccdchan]['Bin'+summing] )
