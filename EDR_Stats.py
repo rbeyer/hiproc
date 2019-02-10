@@ -68,6 +68,8 @@ def main():
                                             leftbuffer=3,    rightbuffer=1,
                                             leftdark=3,      rightdark=1 ) )
 
+    histats['BINNING'] = isis.getkey(ofile_cub,'INSTRUMENT_SETTING_PARAMETERS','MRO:BINNING')
+
 
     dncnt = get_dncnt( ofile_cub, args.histmin, args.histmax, keep=args.keep )
     snr = calc_snr( ofile_cub, args.gains, histats ) 
@@ -75,6 +77,7 @@ def main():
 
     # DB stuff
     # add a bunch of stuff from the histats call, gapp, snr, dncnt
+    # get INSTRUMENT_SETTING_PARAMETERS / MRO:BINNING from cube, store as BINNING
     print(f'dncnt: {dncnt}')
     print(f'snr: {snr}')
     print(f'gapp: {gapp}')
@@ -177,11 +180,10 @@ def get_dncnt( cub, hmin, hmax, keep=False ):
 def calc_snr( cub, gainsfile, histats ):
     '''Calculate the signal to noise ratio.'''
 
-    summing = isis.getkey( cub, 'Instrument', 'Summing')
     ccdchan = '{0[0]}_{0[1]}'.format( hirise.getccdchannel(cub) )
 
     gainspvl = pvl.load( gainsfile )
-    gain = float( gainspvl['Gains'][ccdchan]['Bin'+summing] )
+    gain = float( gainspvl['Gains'][ccdchan]['Bin'+histats['binning']] )
 
     img_mean   = float( histats['IMAGE_MEAN'] )
     lis_pixels = float( histats['LOW_SATURATED_PIXELS'] )
