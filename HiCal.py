@@ -59,6 +59,7 @@ def main():
     HiGainFx_Version # single value
     HiCal_Bin1_Skip_Top_Lines # single value
     HiCal_Bin1_Skip_Bot_Lines # single value
+    HiCal_HPF_Cubenorm # single value
 
     # Setup00 builds data structures, seems long and painful, need?
     # Setup01 - don't need - about output data routeing
@@ -127,6 +128,8 @@ def main():
     isis.crop( next_file, to=crop_file, line=sl, nlines=nl )
     stats_file = os.path.splitext( args.cube )[0] + '.cubenorm.tab'
     isis.cubenorm( crop_file, stats=stats_file, format='TABLE' )
+
+    Cubenorm_Filter( stats_file, outfile, boxfilter=5, pause=True, divide=HiCal_HPF_Cubenorm )
 
     #   insert into HiCat.EDR_Products
     #   isis.cubenorm again
@@ -302,6 +305,99 @@ def HiGainFx( cube, outcube, coef_path, version ):
     isis.specadd( tfile, to=outcube, match=cube )
     return
 
+def Cubenorm_Filter( cubenorm_tab, outfile, pause=False, boxfilter=5, divide=False, chan=None)
+    '''Perform a highpass filter on the cubenorm table output of the columnar average and median values.'''
+    if boxfilter < 3: raise ValueError(f'boxfilter={boxfilter} is less than 3')
+    if not chan: chan = hirise.getccdchannel( cubenorm_tab )[1]
+
+    # Make a list to receive each column
+    valid_points = list()
+    averages     = list()
+    medians      = list()
+    other_cols   = list()
+    header       = list()
+    with open( cubenorm_tab ) as csvfile:
+        reader = csv.DictReader( csvfile, dialect=isis.cubenormDialect )
+        header = reader.fieldnames
+        for row in reader:
+            valid_points.append( row.pop('ValidPoints') )
+            averages.append(     row.pop('Average')      )
+            medians.append(      row.pop('Median')     )
+            other_cols.append( row )
+    maxvp = max( valid_points )
+
+    avgflt = Cubenorm_Filter_filter( averages, boxfilter=boxfilter, iterations=50, chan=chan, pause=pause )
+    # do stuff
+
+    with open( outfile ) as csvfile:
+        writer = csv.DictWriter( csvfile, fieldnames=header, dialect=isis.cubenormDialect )
+        writer.writeheader()
+        for (d, vp, av, md) in zip(other_cols, valid_points, averages, medians):
+            d['ValidPoints'] = vp
+            d['Average'] = av
+            d['Median'] = md
+            writer.writerow( d )
+
+def Cubenorm_Filter_filter( inlist, boxfilter, iterations, chan, pause )
+    '''This performs highpass filtering on the passed list.'''
+
+    x = inlist.copy()
+
+    left_cut = 6
+    right_cut = 6
+    ch_pause[0] = 252,515,778 # Channel 0 pause point sample locations (1st pixel = index 1)
+    ch_pause[1] = 247,510,773 # Channel 1 pause point sample locations
+    ch_width[0] = 17,17,17 # Number of pixels to cut from pause point
+    ch_width[1] = 17,17,17
+    ch_direc[0] = 'right' # Direction of cut
+    ch_direc[1] = 'left'
+
+    if 0 == chan:
+        if 511 == len(x): left_cut = 40
+        elif 255 == len(x): left_cut = 50
+    elif 1 == chan: 
+        if 511 == len(x): right_cut = 40
+        elif 255 == len(x): right_cut = 50
+    else:
+        raise ValueError(f'chan={chan} is not 0 or 1')
+
+    # zap the left edge
+    x[:(left_cut-1)] = 0
+
+    # zap the right edge
+    x[(len(x)-right_cut):] = 0
+
+    # zap the pause point pixels
+    if pause and 1023 == len(x):
+        for samp, width in zip(ch_pause[chan], ch_width[chan]):
+            if 'left' == ch_direc[chan]:
+                i1 = samp - width
+                i2 = samp - 1
+            else:
+                i1 = samp - 1
+                i2 = samp + width - 2
+
+            if i1 < 0        : i1 = 0
+            if i2 > len(x)-1 : i2 = len(x) - 1
+            x[i1:i2] = 0
+
+    # boxfilter
+    hwidth = int( boxfilter/2 )
+    for step in range(1,3):
+        for it in range(1,iterations):
+            xflt = list()
+            for i in x:
+                i1 = i - hwidth
+                if i1 < 0: i1 = 0
+                i2 = i + hwidth
+                if i2 > len(x)-1: i2 = len(x) - 1
+                xflt.append( statistics.mean( x[i1:i2] ) )
+            x = xflt.copy()
+        if step < 3:
+            frac = 0.25
+            if step >= 2: frac = 0.125
+
+    
 
 def chan_samp_setup( channel, binning )
     '''Returns a named tuple which contains a list and two numbers.'''
