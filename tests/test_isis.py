@@ -63,6 +63,25 @@ class TestHistogram(unittest.TestCase):
     def test_len(self):
         h = Histogram( self.histfile )
         self.assertEqual( 107, len(h) )
+
+class TestCubenormDialect(unittest.TestCase):
+    def setUp(self):
+        self.cube = 'test_cubenorm.cub'
+        self.statsfile = 'test_cubenorm.stats'
+        hi2isis(img, self.cube)
+        cubenorm( self.cube, stats=self.statsfile )
+
+    def tearDown(self):
+        os.remove('print.prt')
+        os.remove(self.cube)
+        os.remove(self.statsfile)
+
+    def test_cubenorm_reader(self):
+        with open( self.statsfile ) as csvfile:
+            reader = csv.reader( csvfile, dialect=cubenormDialect )
+            for row in reader:
+                self.assertEqual( 8, len(row) )
+                break
     
 
 # @unittest.skip('Takes a while to run hi2isis.')
@@ -80,7 +99,7 @@ class Test_hi2isis(unittest.TestCase):
         os.remove( tocube )
 
     def test_hi2isis_without_to(self):
-        tocube = os.path.splitext( self.img )[0] + '.hi2isis.cub'
+        tocube = os.path.splitext( self.img )[0] + '.cub'
         hi2isis( self.img )
         self.assertTrue( os.path.isfile(tocube) )
         os.remove( tocube )
@@ -116,12 +135,12 @@ class Test_histat(unittest.TestCase):
 
     def test_histat_with_to(self):
         tofile = self.cub+'.histat'
-        histat( self.cub, tofile )
+        histat( self.cub, to=tofile )
         self.assertTrue( os.path.isfile(tofile) )
         os.remove( tofile )
 
     def test_histat_without_to(self):
-        s = histat( self.cub )
+        s = histat( self.cub ).stdout
         self.assertTrue( s.startswith('Group = IMAGE_POSTRAMP') )
 
 
