@@ -138,6 +138,12 @@ for p in _isis_programs:
 # Explicit calls to ISIS programs below here, alphabetically arranged.
 # These we want to be able to call or return differently than _build_isis_fn() provides.
 
+def fx( **keywords ):
+    '''Runs ISIS3 getkey'''
+    # Feature unlike *most* ISIS programs, there is no from= argument for fx
+    cmd = ['fx']
+    return( _run_isis_program( addparams(cmd, keywords) ) )
+
 def getkey(cube, grpname, keyword):
     '''Runs ISIS3 getkey'''
     # Feature: Simplified calling (no params), and returns a string 

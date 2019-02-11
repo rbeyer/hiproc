@@ -27,7 +27,7 @@
 # different language) are based on that software but rewritten from scratch to
 # emulate functionality.
 
-import argparse, collections
+import argparse, collections, csv
 import isis, pvl
 
 def main():
@@ -55,6 +55,10 @@ def main():
     HiCal_Normalization_Maximum # single value
     HiCal_ISIS_Conf # single value
     HiCal_ISIS_Conf_Noise # single value
+    HiGainFx_Coefficient_Path # single value
+    HiGainFx_Version # single value
+    HiCal_Bin1_Skip_Top_Lines # single value
+    HiCal_Bin1_Skip_Bot_Lines # single value
 
     # Setup00 builds data structures, seems long and painful, need?
     # Setup01 - don't need - about output data routeing
@@ -78,7 +82,7 @@ def main():
     ### setup done ###
 
     if( binning > 1 and image_mean > 7000.0):
-        furrow_cube = furrow_nulling( args.cube, binning )
+        (furrows_found, furrow_cube) = furrow_nulling( args.cube, binning )
 
     noise_filter = False
     if( HiCal_Noise_Processing[ getccdchannel(args.cube) ] ):
@@ -100,11 +104,30 @@ def main():
     else:
         isis.hical( furrow_cube, **hical_args ) 
 
+    next_file = hical_file
 
-    # HiCal() runs isis.hical
-    # Lpfz() runs isis.lowpass
-    # GainDrift() - runs external HiGainFx program
-    # CubeNorm() - isis.crop, isis.cubenorm, external Cubenorm_Filter
+    if furrows_found:
+        lpfz_file = os.path.splitext( args.cube )[0] + '.lpfz.cub'
+        isis.lowpass( next_file, to=lpfz_file, lines=3, samples=3, minopt='COUNT', minimum=5, filter='OUTSIDE'
+        next_file = lpfz_file
+
+    # Perform gain-drift correction
+    if( 8 != binning ): # There is no gain fix for bin8 imaging
+        higain_file = os.path.splitext( args.cube )[0] + '.fx.cub'
+        HiGainFx( next_file, higain_file, HiGainFx_Coefficient_Path, HiGainFx_Version )
+        next_file = higain_file
+    
+    # Perform the high-pass filter cubenorm step
+    sl = HiCal_Bin1_Skip_Top_Lines/binning + 1
+    nl = image_lines - (HiCal_Bin1_Skip_Top_Lines + HiCal_Bin1_Skip_Bot_Lines)/binning
+    if nl < 2000/binning: 
+        sl = 1
+        nl = image_lines
+    crop_file = os.path.splitext( args.cube )[0] + '.crop.cub'
+    isis.crop( next_file, to=crop_file, line=sl, nlines=nl )
+    stats_file = os.path.splitext( args.cube )[0] + '.cubenorm.tab'
+    isis.cubenorm( crop_file, stats=stats_file, format='TABLE' )
+
     #   insert into HiCat.EDR_Products
     #   isis.cubenorm again
     # NoiseFilter() - external Noise_Filter
@@ -163,9 +186,9 @@ def furrow_nulling( cube, binning ):
         # Perform simple 3x3 LPFZ filter to clean up the edges along the furrow
         isis.trimfilter( furrow_fix_file, to=trim_file, 
                          lines=3, samples=3, minopt='COUNT' )
-        return trim_file
+        return (True, trim_file)
     else: 
-        return furrow_fix_file
+        return (False, furrow_fix_file)
 
 
 def mask( cube, noisefilter_min, noisefilter_max, binning ):
@@ -254,6 +277,30 @@ def analyze_cubenorm_stats( statsfile, binning ):
         maxdn *= 1.5
 
     return( mindn, maxdn )
+
+
+def HiGainFx( cube, outcube, coef_path, version ):
+    '''Perform a Gain-Drift correction on an HiIRSE Channel Image.'''
+    binning = isis.getkey( cube, 'Instrument', 'Summing' )
+    ccd =     isis.getkey( cube, 'Instrument', 'CcdId' )
+    chan =    isis.getkey( cube, 'Instrument', 'ChannelNumber' )
+
+    coef_f_path = os.path.join( coef_path, 
+                                f'HiRISE_Gain_Drift_Correction_Bin{binning}.{version}.ccv' )
+
+    with open( coef_path ) as csvfile:
+        reader = csv.DictReader(csvfile):
+            for row in reader:
+                if hirise.getccdchannel( row['CCD CH'] ) == (ccd, chan):
+                    max_line = row['Max line']
+                    a_coef = ( row['R(0)'], row['R(1)'], row['R(2)'] )
+
+    eqn = "'((F1/({0}+({1}*line)+({2}*line*line)))*(line<{3}) + (F1*(line>={3})))'".format( a_coef, max_line )
+
+    tfile = os.path.splitext( cube )[0]+'.tempfx.cub'
+    isis.fx( f1=cube, to=tfile, mode='CUBES', equation=eqn )
+    isis.specadd( tfile, to=outcube, match=cube )
+    return
 
 
 def chan_samp_setup( channel, binning )
