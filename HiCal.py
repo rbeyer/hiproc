@@ -27,7 +27,7 @@
 # different language) are based on that software but rewritten from scratch to
 # emulate functionality.
 
-import argparse, collections, csv
+import argparse, collections, csv, statistics
 import isis, pvl
 
 def main():
@@ -67,6 +67,9 @@ def main():
     #   select from HiCat.EDR_Products, written by EDR_Stats
     # Setup03 - gets binning information to find binning for ObsID ... hmmm, alternate?
     #   select from HiCat.Planned_Observations
+    bin2
+    bin4
+
     # ProcessingSwitches() sets a variety of booleans
         
     binning # select BINNING from HiCat.EDR_Products
@@ -85,11 +88,18 @@ def main():
     if( binning > 1 and image_mean > 7000.0):
         (furrows_found, furrow_cube) = furrow_nulling( args.cube, binning )
 
+    destripe_filter = False
+    if( 1 == binning and (bin2 or bin4) ): destripe_filter= True
+    elif( 2 == binning and bin4 ):         destripe_filter= True
+
     noise_filter = False
     if( HiCal_Noise_Processing[ getccdchannel(args.cube) ] ):
         if dark_std   >= HiCal_Noise_Bin_DarkPixel_STD[binning] : noise_filter = True
         if mask_std   >= HiCal_Noise_Bin_Mask_STD[binning]      : noise_filter = True
-        if lis_pixels >= HiCal_Noise_LIS_Count)                 : noise_filter = True
+        if lis_pixels >= HiCal_Noise_LIS_Count                  : noise_filter = True
+
+    zapcols = False
+    if( lis_pixels >= HiCal_Noise_LIS_Count ): zapcols = True
 
     # Run hical
     hical_file = os.path.splitext( args.cube )[0] + '.hical.cub'
@@ -126,14 +136,39 @@ def main():
         nl = image_lines
     crop_file = os.path.splitext( args.cube )[0] + '.crop.cub'
     isis.crop( next_file, to=crop_file, line=sl, nlines=nl )
-    stats_file = os.path.splitext( args.cube )[0] + '.cubenorm.tab'
+    stats_file     = os.path.splitext( args.cube )[0] + '.cubenorm.tab'
+    stats_fix_file = os.path.splitext( args.cube )[0] + '.cubenorm_fix.tab'
     isis.cubenorm( crop_file, stats=stats_file, format='TABLE' )
 
-    Cubenorm_Filter( stats_file, outfile, boxfilter=5, pause=True, divide=HiCal_HPF_Cubenorm )
+    div_flag = False
+    if 'DIVIDE' == HiCal_HPF_Cubenorm: div_flag = True
 
-    #   insert into HiCat.EDR_Products
-    #   isis.cubenorm again
+    std_final = Cubenorm_Filter( stats_file, stats_fix_file, 
+                                 boxfilter=5, pause=True, divide=div_flag )
+
+    # insert std_final into HiCat.EDR_Products HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION
+
+    # Now perform the cubnorm_plus correction
+    cubenorm_args = { 'direction':'COLUMN', 
+                      'statsource':'TABLE',
+                      'normalize':'AVERAGE', 
+                      'preserve':'FALSE' }
+    if div_flag: cubenorm_args['mode'] = 'DIVIDE'
+    else:        cubenorm_args['mode'] = 'SUBTRACT'
+    cubenorm_file = os.path.splitext( args.cube )[0] + '.cubenorm.cub'
+    isis.cubenorm( next_file, fromstats=stats_fix_file, to=f'{cubenorm_file}+SignedWord+{HiCal_Normalization_Minimum}:{HiCal_Normalization_Maximum}', **cubenorm_args )
+    next_file = cubenorm_file
+
+    # Apply the noise filter correction?
+    if noise_filter:
+        noisefilter_file = os.path.splitext( args.cube )[0] + '.noisefilter.cub'
+        NoiseFilter( next_file, output=noisefilter_file, conf=?, ident=?
+                     minimum=HiCal_Normalization_Minimum,
+                     maximum=HiCal_Normalization_Maximum, zapc=zapcols )
+        
+        
     # NoiseFilter() - external Noise_Filter
+
     # Hidestripe() - isis.[hidestripe,hipass,lowpass,algebra] 
     #   insert into HiCat.EDR_Products
 
@@ -324,21 +359,29 @@ def Cubenorm_Filter( cubenorm_tab, outfile, pause=False, boxfilter=5, divide=Fal
             averages.append(     row.pop('Average')      )
             medians.append(      row.pop('Median')     )
             other_cols.append( row )
-    maxvp = max( valid_points )
 
-    avgflt = Cubenorm_Filter_filter( averages, boxfilter=boxfilter, iterations=50, chan=chan, pause=pause )
-    # do stuff
+    avgflt = Cubenorm_Filter_filter( averages, 
+                                     boxfilter=boxfilter, iterations=50, 
+                                     chan=chan, pause=pause, vpoints=valid_points, 
+                                     divide=divide )
+    medflt = Cubenorm_Filter_filter( medians, 
+                                     boxfilter=boxfilter, iterations=50, 
+                                     chan=chan, pause=pause, vpoints=valid_points, 
+                                     divide=divide )
 
     with open( outfile ) as csvfile:
         writer = csv.DictWriter( csvfile, fieldnames=header, dialect=isis.cubenormDialect )
         writer.writeheader()
-        for (d, vp, av, md) in zip(other_cols, valid_points, averages, medians):
+        for (d, vp, av, md) in zip(other_cols, valid_points, avgflt, medflt):
             d['ValidPoints'] = vp
             d['Average'] = av
             d['Median'] = md
             writer.writerow( d )
 
-def Cubenorm_Filter_filter( inlist, boxfilter, iterations, chan, pause )
+    # Calculate the standard deviation value for the filtered average:
+    return statistics.stdev( avgflt )
+
+def Cubenorm_Filter_filter( inlist, boxfilter, iterations, chan, pause, vpoints, divide ):
     '''This performs highpass filtering on the passed list.'''
 
     x = inlist.copy()
@@ -347,8 +390,8 @@ def Cubenorm_Filter_filter( inlist, boxfilter, iterations, chan, pause )
     right_cut = 6
     ch_pause[0] = 252,515,778 # Channel 0 pause point sample locations (1st pixel = index 1)
     ch_pause[1] = 247,510,773 # Channel 1 pause point sample locations
-    ch_width[0] = 17,17,17 # Number of pixels to cut from pause point
-    ch_width[1] = 17,17,17
+    ch_width[0] =  17, 17, 17 # Number of pixels to cut from pause point
+    ch_width[1] =  17, 17, 17
     ch_direc[0] = 'right' # Direction of cut
     ch_direc[1] = 'left'
 
@@ -383,8 +426,8 @@ def Cubenorm_Filter_filter( inlist, boxfilter, iterations, chan, pause )
 
     # boxfilter
     hwidth = int( boxfilter/2 )
-    for step in range(1,3):
-        for it in range(1,iterations):
+    for step in range(1, 3):
+        for it in range(1, iterations):
             xflt = list()
             for i in x:
                 i1 = i - hwidth
@@ -393,10 +436,39 @@ def Cubenorm_Filter_filter( inlist, boxfilter, iterations, chan, pause )
                 if i2 > len(x)-1: i2 = len(x) - 1
                 xflt.append( statistics.mean( x[i1:i2] ) )
             x = xflt.copy()
-        if step < 3:
+        if step < 3: # Zap any columns that are different from the average by more then 25%
             frac = 0.25
             if step >= 2: frac = 0.125
+            for (orig, new) in zip(inlist, x):
+                if orig != 0 and new != 0:
+                    if abs(orig-new)/new > frac: new = 0
 
+    # Perform the highpass difference of divide  the original from lowpass
+    maxvp = max( vpoints )
+    for (orig, xf, vp) in zip(inlist, x, vpoints):
+        if orig != 0 and xf != 0 and vp == maxvp:
+            if divide: xf = orig/xf
+            else:      xf = orig - xf
+        else: xf = None
+  
+    # Need to patch up any of those None values with neighboring values:
+    if 0 == chan:
+        if x[-1] is None: x[-1] = int(divide)
+        for (last, this) in pairwise( reversed(x) ):
+            if this is None: this = last
+    else:
+        if x[0] is None: x[0] = int(divide)
+        for (last, this) in pairwise( x ):
+            if this is None: this = last
+
+    return(x)
+
+
+def pairwise(iterable):
+    '''s -> (s0,s1), (s1,s2), (s2, s3), ...'''
+    a, b = tee(iterable)
+    next(b, None)
+    return zip(a, b)
     
 
 def chan_samp_setup( channel, binning )
