@@ -18,62 +18,72 @@
 
 # This program is based on EDR_Stats version 2.16.1 (2016/06/16),
 # and on the Perl EDR_Stats program: ($Revision: 1.38 $ $Date: 2016/08/16 23:43:17 $)
-# by Eric Eliason and Audrie Fennema 
+# by Eric Eliason and Audrie Fennema
 # which is Copyright(C) 2004 Arizona Board of Regents, under the GNU GPL.
 #
 # Since that suite of software is under the GPL, none of it can be directly
-# incorporated in this program, since I wish to distribute this software 
+# incorporated in this program, since I wish to distribute this software
 # under the Apache 2 license.  Elements of this software (written in an entirely
 # different language) are based on that software but rewritten from scratch to
 # emulate functionality.
 
-import argparse, csv, math, os
-import hirise, isis, pvl
+import argparse
+import csv
+import math
+import pathlib
+import os
+
+import hirise
+import pvl
+import kalasiris as isis
+
 
 def main():
-    parser = argparse.ArgumentParser( description=__doc__ )
-    parser.add_argument('--db',          required=False, default='HiCat.db' )
-    parser.add_argument('-t','--table',  required=False, default='EDR_Products')
-    parser.add_argument('-o','--output', required=False, default='.EDR_Stats.cub')
-    parser.add_argument('--histmin',     required=False, default=0.01 )
-    parser.add_argument('--histmax',     required=False, default=99.99 )
-    parser.add_argument('-g','--gains',  required=False, 
-               default= os.path.join( os.path.dirname(os.path.abspath(__file__)),
-                                      'resources',
-                                      'EDR_Stats_gains_config.pvl') )
-    parser.add_argument('-k','--keep', required=False, default=False, action='store_true' )
-    parser.add_argument('img', metavar="some.img-file" )
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--db',           required=False, default='HiCat.db')
+    parser.add_argument('-t', '--table',  required=False, default='EDR_Products')
+    parser.add_argument('-o', '--output', required=False, default='.EDR_Stats.cub')
+    parser.add_argument('--histmin',      required=False, default=0.01)
+    parser.add_argument('--histmax',      required=False, default=99.99)
+    parser.add_argument('-g', '--gains',  required=False,
+                        default=os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                             'resources',
+                                             'EDR_Stats_gains_config.pvl'))
+    parser.add_argument('-k', '--keep', required=False, default=False, action='store_true')
+    parser.add_argument('img', metavar="some.img-file")
 
     args = parser.parse_args()
 
     # Need to parse a .conf file?  Not sure.
 
     ofile_cub = ''
-    if args.output.startswith('.'): 
-        ofile_cub = os.path.splitext( args.img )[0] + args.output
-    else: ofile_cub = args.output
+    if args.output.startswith('.'):
+        ofile_cub = os.path.splitext(args.img)[0] + args.output
+    else:
+        ofile_cub = args.output
 
     # Convert to .cub
-    isis.hi2isis( args.img, to=ofile_cub )
+    isis.hi2isis(args.img, to=ofile_cub)
 
     # Get some info from the new cube:
-    product_id    = isis.getkey(ofile_cub, 'Archive', 'ProductId')
-    image_lines   = isis.getkey(ofile_cub, 'Dimensions', 'Lines')
+    product_id = isis.getkey(ofile_cub, 'Archive', 'ProductId')
+    image_lines = isis.getkey(ofile_cub, 'Dimensions', 'Lines')
     image_samples = isis.getkey(ofile_cub, 'Dimensions', 'Samples')
 
-    histats = parse_histat( isis.histat( ofile_cub, useoffsets=True,
-                                            leftimage=0,     rightimage=1, 
-                                            leftcalbuffer=3, rightcalbuffer=1,
-                                            leftcaldark=3,   rightcaldark=1,
-                                            leftbuffer=3,    rightbuffer=1,
-                                            leftdark=3,      rightdark=1 ) )
+    histats = parse_histat(isis.histat(ofile_cub, useoffsets=True,
+                                       leftimage=0,     rightimage=1,
+                                       leftcalbuffer=3, rightcalbuffer=1,
+                                       leftcaldark=3,   rightcaldark=1,
+                                       leftbuffer=3,    rightbuffer=1,
+                                       leftdark=3,      rightdark=1))
 
-    histats['BINNING'] = isis.getkey(ofile_cub,'INSTRUMENT_SETTING_PARAMETERS','MRO:BINNING')
+    histats['BINNING'] = isis.getkey(ofile_cub,
+                                     'INSTRUMENT_SETTING_PARAMETERS',
+                                     'MRO:BINNING')
 
-
-    dncnt = get_dncnt( ofile_cub, args.histmin, args.histmax, keep=args.keep )
-    snr = calc_snr( ofile_cub, args.gains, histats ) 
-    gapp = ( histats['GAP_PIXELS'] / (int(image_lines) * int(image_samples)) )*100.0
+    dncnt = get_dncnt(ofile_cub, args.histmin, args.histmax, keep=args.keep)
+    snr = calc_snr(ofile_cub, args.gains, histats)
+    gapp = (histats['GAP_PIXELS'] / (int(image_lines) * int(image_samples))) * 100.0
 
     # DB stuff
     # add a bunch of stuff from the histats call, gapp, snr, dncnt
@@ -83,13 +93,13 @@ def main():
     print(f'gapp: {gapp}')
 
 
-def parse_histat( pvltext ):
+def parse_histat(pvltext):
     '''Parse the output of histat into a dictionary'''
 
-    p = pvl.loads( pvltext )
+    p = pvl.loads(pvltext)
     d = {}
 
-    # Image Area Statistics  
+    # Image Area Statistics
     d['IMAGE_MEAN']               = p['IMAGE']['Average']
     d['IMAGE_STANDARD_DEVIATION'] = p['IMAGE']['StandardDeviation']
     d['IMAGE_MINIMUM']            = p['IMAGE']['Minimum']
@@ -98,24 +108,24 @@ def parse_histat( pvltext ):
     d['LOW_SATURATED_PIXELS']     = p['IMAGE']['LisPixels']
     d['HIGH_SATURATED_PIXELS']    = p['IMAGE']['HisPixels']
 
-    # Calibration Reverse-readout Statistics   
+    # Calibration Reverse-readout Statistics
     d['CAL_REVERSE_MEAN']               = p['CAL_REVERSE']['Average']
     d['CAL_REVERSE_STANDARD_DEVIATION'] = p['CAL_REVERSE']['StandardDeviation']
     d['CAL_REVERSE_MINIMUM']            = p['CAL_REVERSE']['Minimum']
     d['CAL_REVERSE_MAXIMUM']            = p['CAL_REVERSE']['Maximum']
-   
-    # Calibration Mask Statistics   
+
+    # Calibration Mask Statistics
     d['CAL_MASK_MEAN']               = p['CAL_MASK']['Average']
     d['CAL_MASK_STANDARD_DEVIATION'] = p['CAL_MASK']['StandardDeviation']
     d['CAL_MASK_MINIMUM']            = p['CAL_MASK']['Minimum']
     d['CAL_MASK_MAXIMUM']            = p['CAL_MASK']['Maximum']
-      
-    # Calibration Ramp Statistics   
+
+    # Calibration Ramp Statistics
     d['CAL_RAMP_MEAN']               = p['CAL_RAMP']['Average']
     d['CAL_RAMP_STANDARD_DEVIATION'] = p['CAL_RAMP']['StandardDeviation']
     d['CAL_RAMP_MINIMUM']            = p['CAL_RAMP']['Minimum']
     d['CAL_RAMP_MAXIMUM']            = p['CAL_RAMP']['Maximum']
-   
+
     # Image Dark Reference Statistics
     d['IMAGE_DARK_MEAN']               = p['IMAGE_DARK']['Average']
     d['IMAGE_DARK_STANDARD_DEVIATION'] = p['IMAGE_DARK']['StandardDeviation']
@@ -133,19 +143,19 @@ def parse_histat( pvltext ):
     d['CAL_DARK_STANDARD_DEVIATION'] = p['CAL_DARK']['StandardDeviation']
     d['CAL_DARK_MINIMUM']            = p['CAL_DARK']['Minimum']
     d['CAL_DARK_MAXIMUM']            = p['CAL_DARK']['Maximum']
-   
-    # Calibration Image Buffer Area  
+
+    # Calibration Image Buffer Area
     d['CAL_BUFFER_MEAN']               = p['CAL_BUFFER']['Average']
     d['CAL_BUFFER_STANDARD_DEVIATION'] = p['CAL_BUFFER']['StandardDeviation']
     d['CAL_BUFFER_MINIMUM']            = p['CAL_BUFFER']['Minimum']
     d['CAL_BUFFER_MAXIMUM']            = p['CAL_BUFFER']['Maximum']
-   
+
     # Calibration Dark Ramp Area
     d['CAL_DARK_RAMP_MEAN']               = p['CAL_DARK_RAMP']['Average']
     d['CAL_DARK_RAMP_STANDARD_DEVIATION'] = p['CAL_DARK_RAMP']['StandardDeviation']
     d['CAL_DARK_RAMP_MINIMUM']            = p['CAL_DARK_RAMP']['Minimum']
     d['CAL_DARK_RAMP_MAXIMUM']            = p['CAL_DARK_RAMP']['Maximum']
-   
+
     # Image Post Ramp Area
     d['IMAGE_POST_RAMP_MEAN']               = p['IMAGE_POSTRAMP']['Average']
     d['IMAGE_POST_RAMP_STANDARD_DEVIATION'] = p['IMAGE_POSTRAMP']['StandardDeviation']
@@ -155,54 +165,58 @@ def parse_histat( pvltext ):
     return d
 
 
-def get_dncnt( cub, hmin, hmax, keep=False ):
+def get_dncnt(cub, hmin, hmax, keep=False):
     '''Extract DN count from the histogram of a cub file'''
     # I'm not sure about this method.
     # The statement above is what the original program wanted,
     # but this is just counting the number of histogram bins
     # that are within the boundaries, not the number of DN.
-    # And the # of bins is automatically computed by isis.hist, 
+    # And the # of bins is automatically computed by isis.hist,
     # so could be different for each cube.
 
-    histfile = os.path.splitext( cub )[0] + '.hist'
-    if not os.path.isfile( histfile ): isis.hist( cub, to=histfile )
+    histfile = Path(cub).with_suffix('.hist')
+    if not histfile.is_file():
+        isis.hist(cub, to=histfile)
 
-    h = isis.Histogram( histfile )
+    h = isis.Histogram(histfile)
 
     count = 0
     for row in h:
-        if( row.CumulativePercent >= hmin and row.CumulativePercent <= hmax ): count += 1
+        if(row.CumulativePercent >= hmin and row.CumulativePercent <= hmax):
+            count += 1
 
-    if not keep: os.remove( histfile )
+    if not keep: 
+        histfile.unlink()
     return count
 
 
-def calc_snr( cub, gainsfile, histats ):
+def calc_snr(cub, gainsfile, histats):
     '''Calculate the signal to noise ratio.'''
 
-    ccdchan = '{0[0]}_{0[1]}'.format( hirise.getccdchannel(cub) )
+    ccdchan = '{0[0]}_{0[1]}'.format(hirise.getccdchannel(cub))
 
-    gainspvl = pvl.load( gainsfile )
-    gain = float( gainspvl['Gains'][ccdchan]['Bin'+histats['binning']] )
+    gainspvl = pvl.load(gainsfile)
+    gain = float(gainspvl['Gains'][ccdchan]['Bin' + histats['binning']])
 
-    img_mean   = float( histats['IMAGE_MEAN'] )
-    lis_pixels = float( histats['LOW_SATURATED_PIXELS'] )
-    buf_mean   = float( histats['IMAGE_BUFFER_MEAN'] )
+    img_mean   = float(histats['IMAGE_MEAN'])
+    lis_pixels = float(histats['LOW_SATURATED_PIXELS'])
+    buf_mean   = float(histats['IMAGE_BUFFER_MEAN'])
 
     snr = -9999
-    r = 90 # Note from original file: 
-           # 150 e *Changed value to 90 e- 1/31/2012 to bring closer 
-           # to HIPHOP value for read noise. SM
+    r = 90
+    # Note from original file about r:
+    # 150 e *Changed value to 90 e- 1/31/2012 to bring closer
+    # to HIPHOP value for read noise. SM
 
-    if( 0 == lis_pixels and img_mean > 0.0 and buf_mean > 0.0 ):
+    if(0 == lis_pixels and img_mean > 0.0 and buf_mean > 0.0):
         s = (img_mean - buf_mean) * gain
-        snr = s/math.sqrt(s + r*r)
-        print( '\nCalculation of Signal/Noise Ratio:' )
-        print( '\tIMAGE_MEAN:        {}'.format(img_mean) )
-        print( '\tIMAGE_BUFFER_MEAN: {}'.format(buf_mean) )
-        print( '\tR (electrons/DN):  {}'.format(r) )
-        print( '\tGain:              {}'.format(gain) )
-        print( 'Signal/Noise ratio: {}'.format(snr) )
+        snr = s / math.sqrt(s + r * r)
+        print('\nCalculation of Signal/Noise Ratio:')
+        print('\tIMAGE_MEAN:        {}'.format(img_mean))
+        print('\tIMAGE_BUFFER_MEAN: {}'.format(buf_mean))
+        print('\tR (electrons/DN):  {}'.format(r))
+        print('\tGain:              {}'.format(gain))
+        print('Signal/Noise ratio: {}'.format(snr))
 
     return snr
 
