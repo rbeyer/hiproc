@@ -30,11 +30,12 @@
 import argparse
 import csv
 import math
-import pathlib
 import os
+from pathlib import Path
+
+import pvl
 
 import hirise
-import pvl
 import kalasiris as isis
 
 
@@ -58,9 +59,9 @@ def main():
 
     ofile_cub = ''
     if args.output.startswith('.'):
-        ofile_cub = os.path.splitext(args.img)[0] + args.output
+        ofile_cub = Path(args.img).with_suffix(args.output)
     else:
-        ofile_cub = args.output
+        ofile_cub = Path(args.output)
 
     # Convert to .cub
     isis.hi2isis(args.img, to=ofile_cub)
@@ -75,7 +76,7 @@ def main():
                                        leftcalbuffer=3, rightcalbuffer=1,
                                        leftcaldark=3,   rightcaldark=1,
                                        leftbuffer=3,    rightbuffer=1,
-                                       leftdark=3,      rightdark=1))
+                                       leftdark=3,      rightdark=1).stdout)
 
     histats['BINNING'] = isis.getkey(ofile_cub,
                                      'INSTRUMENT_SETTING_PARAMETERS',
@@ -185,7 +186,7 @@ def get_dncnt(cub, hmin, hmax, keep=False):
         if(row.CumulativePercent >= hmin and row.CumulativePercent <= hmax):
             count += 1
 
-    if not keep: 
+    if not keep:
         histfile.unlink()
     return count
 
@@ -198,9 +199,9 @@ def calc_snr(cub, gainsfile, histats):
     gainspvl = pvl.load(gainsfile)
     gain = float(gainspvl['Gains'][ccdchan]['Bin' + histats['binning']])
 
-    img_mean   = float(histats['IMAGE_MEAN'])
+    img_mean = float(histats['IMAGE_MEAN'])
     lis_pixels = float(histats['LOW_SATURATED_PIXELS'])
-    buf_mean   = float(histats['IMAGE_BUFFER_MEAN'])
+    buf_mean = float(histats['IMAGE_BUFFER_MEAN'])
 
     snr = -9999
     r = 90
