@@ -41,6 +41,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--db',          required=False, default='HiCat.db')
     parser.add_argument('-o', '--output', required=False, default='.HiCal.cub')
+    parser.add_argument('-c', '--conf',   required=False, default='HiCal.conf')
     parser.add_argument('-k', '--keep',   required=False, default=False)
     parser.add_argument('cube', metavar=".cub-file")
 
@@ -56,6 +57,7 @@ def main():
 
     # GetConfigurationParameters() - Read some stuff from HiCal.conf, could be
     # done with pvl:
+    conf = pvl.load(args.conf)
     HiCal_Noise_Processing  # a set of bools to indicate which channel gets noise processed
     HiCal_Noise_Bin_DarkPixel_STD  # a list of numbers, indexable by binning
     HiCal_Noise_Bin_Mask_STD  # a list of numbers, indexable by binning
@@ -187,7 +189,8 @@ def main():
     # Apply the noise filter correction?
     if noise_filter:
         noisefilter_file = in_cube.with_suffix('.noisefilter.cub')
-        NoiseFilter(next_file, output=noisefilter_file, conf=?, ident=?
+        NoiseFilter(next_file, output=noisefilter_file,
+                    conf=conf['NoiseFilter'],
                     minimum=HiCal_Normalization_Minimum,
                     maximum=HiCal_Normalization_Maximum, zapc=zapcols)
 
@@ -315,7 +318,7 @@ def analyze_cubenorm_stats(statsfile, binning):
     # # column whose std is less than or equal to $medstd + $tol;
     min_w_maxvp = list()
     max_w_maxvp = list()
-    for (vp, std, mi, ma) = zip(valid_points, std_devs, mins, maxs):
+    for (vp, std, mi, ma) in zip(valid_points, std_devs, mins, maxs):
         if(vp >= (maxvp * 0.9) and std < facstd):
             min_w_maxvp.append(mi)
             max_w_maxvp.append(ma)
@@ -348,14 +351,14 @@ def HiGainFx(cube, outcube, coef_path, version):
     ccd = isis.getkey(cube, 'Instrument', 'CcdId')
     chan = isis.getkey(cube, 'Instrument', 'ChannelNumber')
 
-    coef_f_path = coef_path / f'HiRISE_Gain_Drift_Correction_Bin{binning}.{version}.ccv'
+    coef_f_path = coef_path / f'HiRISE_Gain_Drift_Correction_Bin{binning}.{version}.csv'
 
     with open(coef_path) as csvfile:
-        reader = csv.DictReader(csvfile):
-            for row in reader:
-                if hirise.getccdchannel(row['CCD CH']) == (ccd, chan):
-                    max_line = row['Max line']
-                    a_coef = (row['R(0)'], row['R(1)'], row['R(2)'])
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            if hirise.getccdchannel(row['CCD CH']) == (ccd, chan):
+                max_line = row['Max line']
+                a_coef = (row['R(0)'], row['R(1)'], row['R(2)'])
 
     eqn = "'((F1/({0}+({1}*line)+({2}*line*line)))*(line<{3}) + (F1*(line>={3})))'".format(a_coef, max_line)
 
@@ -515,6 +518,245 @@ def pairwise(iterable):
     a, b = tee(iterable)
     next(b, None)
     return zip(a, b)
+
+
+def pause_slicer(samp: int, width: int) -> slice:
+    '''Returns a slice object which satisfies the range of indexes for a pause
+       point.
+
+       The incoming numbers for samp are 1-based pixel numbers, so must
+       subtract 1 to get a list index.
+       The width values are the number of pixels to affect, including the
+       pause point pixel.  If positive they start with the pause point pixel
+       and count 'up.'  If negative, they start with the pause point pixel
+       and count 'down.'
+    '''
+    # We don't need to protect for indices less than zero or greater than the
+    # length of the list, because slice objects can take values that would not
+    # be valid for item access.
+    s_start = None
+    s_stop = None
+    if width > 0:
+        s_start = samp - 1
+        s_stop = s_start + width
+    else:
+        s_start = samp + width
+        s_stop = samp
+    return slice(s_start, s_stop)
+
+
+def getHistVal(histogram, conf):
+    '''Return information about the histogram'''
+    lisper = 0
+    if int(histogram['Total Pixels']) - int(histogram['Null Pixels']) > 0:
+        lisper = int(histogram['Lis Pixels']) / (int(histogram['Total Pixels'])
+                                                 - int(histogram['Null Pixels'])) * 100
+    cumper = conf['NoiseFilter_HighEnd_Percent']
+    if cumper < 99.0:
+        cumper = 99.0
+
+    if lisper > conf['NoiseFilter_Hard_Tolmax']:
+        hard_high_end = conf['NoiseFilter_Hard_HighEnd_Percent']
+        if hard_high_end < 99.9:
+            hard_high_end = 99.9
+        cumper = hard_high_end
+
+    for row in histogram:
+        if row.CumulativePercent > cumper:
+            maxval = row.DN
+            break
+
+    return(lisper, maxval)
+
+
+def NoiseFilter(in_cube, output, conf, minimum=None, maximum=None, zapc=False, keep=False):
+    '''Perform salt/pepper noise removal.'''
+    binning = isis.getkey_k(in_cube, 'Instrument', 'Summing')
+    (ccd, chan) = hirise.getccdchannel(isis.getkey_k(in_cube, 'Archive', 'ProductId'))
+    isisnorm = ''
+    if minimum is not None and maximum is not None:
+        isisnorm = '+SignedWord+{}:{}'.format(minimum, maximum)
+
+    to_delete = list()
+
+    h = isis.Histogram(in_cube)
+    (LisP, MaxVal) = getHistVal(h, conf)
+
+    cn_tab = in_cube.with_suffix('.NF.cubenorm.tab')
+    to_delete.append(cn_tab)
+    isis.cubenorm(in_cube, stats=cn_tab, format_='TABLE', direction='COLUMN')
+
+    # Slightly different values from other function above, not entirely sure why.
+    # Pause point locations are 1-based pixel numbers, so -1 to get list index.
+    # With values are the number of pixels to affect, including the pause point pixel
+    ch_pause[0] = 1, 252, 515, 778  # Channel 0 pause point sample locations
+    ch_pause[1] = 247, 510, 773, 1024  # Channel 1 pause point sample locations
+    ch_width[0] = 3, 6, 6, 6  # Number of pixels to cut from pause point
+    ch_width[1] = -8, -7, -6, -3  # sign indicates direction of cut from pause point
+
+    vpnts = list()
+    other_cols = list()
+    header = list()
+    with open(cn_tab) as csvfile:
+        reader = csv.DictReader(csvfile, dialect=isis.cubenormDialect)
+        header = reader.fieldnames
+        for row in reader:
+            vpnts.append(row.pop['ValidPoints'])
+            other_cols.append(row)
+
+    max_vpnts = max(vpnts)
+    if max_vpnts <= 0:
+        max_vpnts = 1
+
+    # Create a 'unity array' (original code has two, but they're identical).
+    # Zap any columns with less then NoiseFilter_Zap_Fraction
+    norm = list()
+    for v in vpnts:
+        if(v / max_vpnts < conf['NoiseFilter_Zap_Fraction'] and zapc):
+            norm.append(0)
+        else:
+            norm.append(1)
+
+    # Determine if the pause point pixels need to be zapped
+    for samp, width in zip(ch_pause[chan], ch_width[chan]):
+        zap_slice = pause_slicer(samp, width, len(norm))
+        for i in range(zap_slice):
+            if vpnts[i] / max_vpnts < conf['NoiseFilter_Nonvalid_Fraction']:
+                norm[i] = 0
+
+    cn2_tab = in_cube.with_suffix('.NF.cubenorm2.tab')
+    to_delete.append(cn2_tab)
+    with open(cn2_tab) as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=header, dialect=isis.cubenormDialect)
+        writer.writeheader()
+        for (d, vp, n) in zip(other_cols, vpnts, norm):
+            d['ValidPoints'] = vp
+            d['Average'] = n
+            d['Median'] = n
+            d['StdDev'] = n
+            d['Minimum'] = n
+            d['Maximum'] = n
+            writer.writerow(d)
+
+    # Zap the bad colmns for the highpass and lowpass filter
+    zap_cub = in_cube.with_suffix('.NF.zap.cub')
+    to_delete.append(zap_cub)
+    isis.cubenorm(in_cube, to=zap_cub, fromstats=cn2_tab, statsource='TABLE',
+                  mode='DIVIDE', norm='AVE', preserve='FALSE')
+
+    # Perform highpass/lowpass filter vertical destripping
+    lpf_cub = in_cube.with_suffix('NF.lpf.cub')
+    to_delete.append(lpf_cub)
+    isis.lowpass(zap_cub, to=lpf_cub, lis=False,
+                 line=conf['NoiseFilter_LPF_Line'],
+                 samp=conf['NoiseFilter_LPF_Samp'],
+                 minopt='PERCENT',
+                 minimum=['NoiseFilter_LPF_Minper'],
+                 replace='NULL')
+
+    hpf_cub = in_cube.with_suffix('.NF.hpf.cub')
+    to_delete.append(hpf_cub)
+    isis.highpass(zap_cub, to=hpg_cub, minopt='PERCENT',
+                  line=conf['NoiseFilter_HPF_Line'],
+                  samp=conf['NoiseFilter_HPF_Samp'],
+                  minimum=conf['NoiseFilter_HPF_Minper'])
+
+    add_cub = in_cube.with_suffix('.NF.add.cub')
+    to_delete.append(hpf_cub)
+    isis.algebra(from_=lpf_cub, from2=hpf_cub,
+                 to=add_cub.with_suffix('.cub' + isisnorm),
+                 operator='ADD')
+
+    # Perform the 1st noise filter
+    tolmin = conf['NoiseFilter_Tolmin']
+    tolmax = conf['NoiseFilter_Tolmax']
+    if LisP >= conf['NoiseFilter_Hard_Filtering']:
+        tolmin = conf['NoiseFilter_Hard_Tolmin']
+        tolmax = conf['NoiseFilter_Hard_Tolmax']
+    flattol = h['Std Deviation'] * conf['NoiseFilter_Flattol']
+    if flattol < 0.00001:
+        flattol = 0.00001
+
+    nf1_cub = in_cube.with_suffix('.NF.noisefilter1.cub')
+    to_delete.append(nf1_cub)
+    isis.noisefilter(add_cub, to=nf1_cub.with_suffix('.cub' + isisnorm),
+                     flattol=flattol, toldef='STDDEV',
+                     low=conf['NoiseFilter_Minimum_Value'],
+                     high=MaxVal,
+                     tolmin=tolmin, tolmax=tolmax, replace='NULL',
+                     sample=conf['NoiseFilter_Noise_Samp'],
+                     line=conf['NoiseFilter_Noise_Line'],
+                     lisisnoise=True, lrsisnoise=True)
+
+    # Perform the 2nd noise filter
+    nf2_cub = in_cube.with_suffix('.NF.noisefilter2.cub')
+    to_delete.append(nf2_cub)
+    isis.noisefilter(nf1_cub, to=nf2_cub.with_suffix('.cub' + isisnorm),
+                     flattol=flattol, toldef='STDDEV',
+                     low=conf['NoiseFilter_Minimum_Value'],
+                     high=MaxVal,
+                     tolmin=tolmin, tolmax=tolmax, replace='NULL',
+                     sample=conf['NoiseFilter_Noise_Samp'],
+                     line=conf['NoiseFilter_Noise_Line'],
+                     lisisnoise=True, lrsisnoise=True)
+
+    # Perform the 3rd noise filter
+    nf3_cub = in_cube.with_suffix('.NF.noisefilter3.cub')
+    to_delete.append(nf3_cub)
+    isis.noisefilter(nf2_cub, to=nf3_cub.with_suffix('.cub' + isisnorm),
+                     flattol=flattol, toldef='STDDEV',
+                     low=conf['NoiseFilter_Minimum_Value'],
+                     high=MaxVal,
+                     tolmin=tolmin, tolmax=tolmax, replace='NULL',
+                     sample=conf['NoiseFilter_Noise_Samp'],
+                     line=conf['NoiseFilter_Noise_Line'],
+                     lisisnoise=True, lrsisnoise=True)
+
+    # Perform another highpass /lowpass filter now that the
+    # data are much cleaner
+    lpf2_cub = in_cube.with_suffix('.NF.lpf2.cub')
+    to_delete.append(lpf2_cub)
+    isis.lowpass(nf3_cub, to=lpf2_cub, null=False, hrs=False, his=False,
+                 lrs=False, lis=False,
+                 line=conf['NoiseFilter_LPF_Line'],
+                 samp=conf['NoiseFilter_LPF_Samp'],
+                 minimum=['NoiseFilter_LPF_Minper'],
+                 minopt='PERCENT', replace='NULL')
+
+    hpf2_cub = in_cube.with_suffix('.NF.hpf2.cub')
+    to_delete.append(hpf2_cub)
+    isis.highpass(nf3_cub, to=hpf2_cub, minopt='PERCENT',
+                  line=conf['NoiseFilter_HPF_Line'],
+                  samp=conf['NoiseFilter_HPF_Samp'],
+                  minimum=conf['NoiseFilter_HPF_Minper'])
+
+    if ccd.startswith('RED'):
+        add2_cub = in_cube.with_suffix('.NF.add2.cub')
+        to_delete.append(add2_cub)
+        isis.algebra(from_=lpf2_cub, from2=hpf2_cub, to=add2_cub, operator='ADD')
+        # Perform LPFZ  filters if we have a RED filter image.
+        # For IR and BG filter data, assume that the HiColorNorm pipeline
+        # step will interpolate using the BG/RED and IR/RED ratio data.
+        lowmin = int(conf['NoiseFilter_LPFZ_Line'] *
+                     conf['NoiseFilter_LPFZ_Samp'] / 3)
+        lpfz_cub = in_cube.with_suffix('.NF.lpfz.cub')
+        to_delete.append(lpfz_cub)
+        isis.lowpass(add2_cub, to=lpfz_cub.with_suffix('.cub' + isisnorm),
+                     sample=3, line=3, minopt='COUNT', minimum=1,
+                     filter_='OUTSIDE',
+                     null=True, hrs=False, his=True, lrs=True, lis=True)
+        isis.lowpass(lpfz_cub, to=output.with_suffix('.cub' + isisnorm),
+                     sample=conf['NoiseFilter_LPFZ_Samp'],
+                     line=conf['NoiseFilter_LPFZ_Line'],
+                     minopt='COUNT', minimum=lowmin, filter_='OUTSIDE',
+                     null=True, hrs=False, his=True, lrs=True, lis=True)
+    else:
+        isis.algebra(from_=lpf2_cub, from2=hpf2_cub, to=output, operator='ADD')
+
+    if keep:
+        for p in to_delete:
+            p.unlink()
+    return
 
 
 def chan_samp_setup(channel, binning):
