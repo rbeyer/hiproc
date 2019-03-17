@@ -94,11 +94,13 @@ def main():
         print('Bypassing IR10_1')
         sys.exit()
 
-    (std, diff_std) = HiCal(in_cube, out_cube, ccdchan, conf, db_stuff, keep=args.keep)
+    (std, diff_std, zapped) = HiCal(in_cube, out_cube, ccdchan,
+                                    conf, db_stuff, keep=args.keep)
 
     # insert these into HiCat.EDR_Products:
     # std as HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION
     # diff_std as DESTRIPED_DIFFERENCE_STANDARD_DEVIATION
+    # The zapped flag is new, I want to put it in the DB to use later.
 
 
 def HiCal(in_cube, out_cube, ccdchan, conf, db, keep=False):
@@ -150,13 +152,15 @@ def HiCal(in_cube, out_cube, ccdchan, conf, db, keep=False):
     crop_file = to_delete.add(next_cube.with_suffix('.crop.cub'))
     isis.crop(next_cube, to=crop_file, line=sl, nlines=nl)
 
-    stats_file = to_delete.add(next_cube.with_suffix('.cubenorm.tab'))
+    # This file needs to be kept for the next step, HiStitch.
+    stats_file = next_cube.with_suffix('.cubenorm.tab')
     stats_fix_file = to_delete.add(next_cube.with_suffix('.cubenorm_fix.tab'))
     isis.cubenorm(crop_file, stats=stats_file, format_='TABLE')
 
-    std_final = Cubenorm_Filter(stats_file, stats_fix_file,
-                                boxfilter=5, pause=True, divide=flags.divide,
-                                chan=ccdchan[1])
+    (std_final, zapped) = Cubenorm_Filter(stats_file, stats_fix_file,
+                                          boxfilter=5, pause=True,
+                                          divide=flags.divide,
+                                          chan=ccdchan[1])
 
     # Now perform the cubnorm_plus correction
     div_or_sub = {True: 'DIVIDE', False: 'SUBTRACT'}
@@ -199,7 +203,20 @@ def HiCal(in_cube, out_cube, ccdchan, conf, db, keep=False):
     if not keep:
         to_delete.unlink()
 
-    return(std_final, diff_std_dev)
+    return(std_final, diff_std_dev, zapped)
+
+
+def FurrowCheck(vpnts: list, channel: int) -> int:
+    # This function was brought forward from HiStitch, because
+    # it is more appropriate to perform the check here, and then
+    # store the result for later.
+    zap = False
+    i = -1 * channel
+
+    if vpnts[i] != max(vpnts):
+        zap = True
+
+    return zap
 
 
 def set_flags(conf, db, ccdchan: tuple, bindex: int) -> collections.namedtuple:
@@ -477,6 +494,8 @@ def Cubenorm_Filter(cubenorm_tab, outfile, pause=False,
             medians.append(row.pop('Median'))
             other_cols.append(row)
 
+    zapped = FurrowCheck(valid_points, chan)
+
     avgflt = Cubenorm_Filter_filter(averages,
                                     boxfilter=boxfilter, iterations=50,
                                     chan=chan, pause=pause, vpoints=valid_points,
@@ -496,7 +515,7 @@ def Cubenorm_Filter(cubenorm_tab, outfile, pause=False,
             writer.writerow(d)
 
     # Calculate the standard deviation value for the filtered average:
-    return statistics.stdev(avgflt)
+    return (statistics.stdev(avgflt), zapped)
 
 
 def cut_size(chan: int, length: int) -> collections.namedtuple:
