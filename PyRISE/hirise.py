@@ -93,43 +93,39 @@ class ProductID(ObservationID):
         self.ccdname = None
         self.ccdnumber = None
         self.channel = None
+
+        ccdname = None
+        ccdnumber = None
+        chan = None
+
         if len(args) == 1:
-            parsed = prodid_re.search(str(s)).groupdict()
-            phase = parsed['phase']
-            orbit = parsed['orbit']
-            lat = parsed['latesque']
-            ccd = parsed['ccd']
+            parsed = prodid_re.search(str(args[0])).groupdict()
+            args = (parsed['phase'], parsed['orbit'], parsed['latesque'])
+            (ccdname, ccdnumber) = getccdnamenumber(parsed['ccd'])
             chan = parsed['channel']
         elif len(args) == 2:
-            super().__init__(args)
-        elif len(args) == 3 or len(args) == 4:
-            if args[0] in phase_names:
-                try:
-                    ccd = getccd(args[-1])
-                    args.pop()
-                except ValueError:
-                    pass
-            last = args.pop()
-
-            try:
-                ccd = getccd(last)
-            except ValueError:
-                ccd = getccd(args.pop())
-
-            super().__init__(args)
-
-            ccd = getccd(args[2])
-            self.ccdname = getccdname(ccd)
-            self.ccdnumber = getccdnumber(ccd)
-
-            if len(args) == 4:
-                pass
+            pass
+        elif len(args) == 3:
+            if args[0] not in phase_names:
+                (ccdname, ccdnumber) = getccdnamenumber(args.pop())
+        elif len(args) == 4:
+            if args[0] not in phase_names:
+                chan = re.match(r"[01]", args.pop()).group()
+            (ccdname, ccdnumber) = getccdnamenumber(args.pop())
         elif len(args) == 5:
-            pass
+            chan = re.match(r"[01]", args.pop()).group()
+            (ccdname, ccdnumber) = getccdnamenumber(args.pop())
         elif len(args) == 6:
-            pass
+            chan = re.match(r"[01]", args.pop()).group()
+            ccdnumber = re.match(r"1??\d", args.pop()).group()
+            ccdname = getccdname(args.pop())
         else:
             raise IndexError('accepts 1 to 6 arguments')
+        super().__init__(args)
+
+        self.ccdname = ccdname
+        self.ccdnumber = ccdnumber
+        self.channel = chan
 
     def __str__(self):
         if self.ccdname and self.ccdnumber:
