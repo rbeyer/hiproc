@@ -28,6 +28,7 @@
 # emulate functionality.
 
 import argparse
+import os
 import re
 import shutil
 import sys
@@ -54,7 +55,9 @@ def main():
 
     args = parser.parse_args()
 
-    ofile_cub = set_outcube(args)
+    (pid0, pid1) = get_pids(args.cube0, args.cube1)
+
+    outcub_path = set_outcube(args.output, pid0)
 
     # GetConfigurationParameters()
     conf = pvl.load(args.conf)
@@ -72,39 +75,37 @@ def main():
     db1
 
     (truthchannel, balanceratio) = HiStitch(channel_cub['0'], channel_cub['1'],
-                                            ofile_cub,
+                                            output_path,
                                             conf['HiStitch'], db0, db1,
-                                            ccdchan,
+                                            int(pid0.ccdnumber),
                                             keep=args.keep)
 
-    # insert ObsID, ccdchan[0], truthchannel, balanceratio
+    # insert ObsID, pid0.ccdname+pid0.ccdnumber, truthchannel, balanceratio
     # into HiCat.CCD_Processing_Statistics
 
 
-def set_outcube(args) -> Path:
+def get_pids(cub_a: Path, cub_b=None) -> tuple:
+    pid_a = hirise.get_ProdID_fromfile(cub_a)
+    pid_b = None
+    if cub_b:
+        pid_b = hirise.get_ProdID_fromfile(cub_b)
+        if pid_a != pid_b:
+            raise ValueError(f'These do not appear to be channels '
+                             'from the same Observation: {args.cube0}: '
+                             '{pid_a} and {args.cube1}: {pid_b}')
+    return (pid_a, pid_b)
+
+
+def set_outcube(output: os.PathLike, pid: hirise.ProductID) -> Path:
     if args.output.startswith('.'):
-        try:
-            oid_a = hirise.ObservationID(args.cube0)
-            if args.cube1:
-                oid_b = hirise.ObservationID(args.cube1)
-                if oid_a != oid_b:
-                    raise ValueError
-            return Path(args.cube0).with_name(oid_a + args.output)
-        except ValueError:
-            # Couldn't get ObsIDs from filenames, look in the headers?
-            pid_a = isis.getkey_k(args.cube0, 'Archive', 'ProductId')
-            if args.cube1:
-                pid_b = isis.getkey_k(args.cube1, 'Archive', 'ProductId')
-                if pid_a != pid_b:
-                    raise ValueError(f'These do not appear to be channels '
-                                     'from the same Observation: {args.cub1}: '
-                                     '{pid1} and {args.cub2}: {pid2}')
-            return Path(args.cube0).with_name(pid_a + args.output)
+        stitch_prod = '{}_{}_{}_{}{}'.format(pid.phase,
+                                             pid.orbit_number,
+                                             pid.latesque,
+                                             pid.ccdname,
+                                             pid.ccdnumber)
+        return Path(output).with_name(stitch_prod + output)
     else:
-        return Path(args.output)
-
-
-def get_id_from_cube(
+        return Path(output)
 
 
 def sort_input_cubes(a_cub: os.PathLike, b_cub: os.PathLike) -> dict:
@@ -127,9 +128,7 @@ def sort_input_cubes(a_cub: os.PathLike, b_cub: os.PathLike) -> dict:
     return d
 
 
-def HiStitch(cub0, cub1, out_cub, conf, db0, db1, ccdchan, keep=False) -> tuple:
-    ccd_number = int(re.match(r"RED|IR|BG(\d+)", ccdchan[0]).group())
-
+def HiStitch(cub0, cub1, out_cub, conf, db0, db1, ccd_number: int, keep=False) -> tuple:
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
 
