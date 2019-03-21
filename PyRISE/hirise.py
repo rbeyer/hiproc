@@ -324,11 +324,27 @@ def get_ObsID_fromfile(path: os.PathLike) -> ObservationID:
     p = Path(path)
 
     try:
-        return getObsID(isis.getkey_k(p, 'Archive', 'ObservationId'))
+        return ObservationID(isis.getkey_k(p, 'Archive', 'ObservationId'))
     except CalledProcessError:
         for part in reversed(p.parts):
             try:
-                return getObsID(part)
+                return ObservationID(part)
             except ValueError:
                 continue
         raise ValueError('Could not extract a HiRISE Observation ID from ' + path)
+
+
+def get_ProdID_fromfile(path: os.PathLike) -> ProductID:
+    '''Reads the file to get the ProductID, if an ISIS cube,
+       otherwise parses the filepath.'''
+    p = Path(path)
+
+    try:
+        return ProductID(isis.getkey_k(p, 'Archive', 'ProductId'))
+    except CalledProcessError:
+        for part in reversed(p.parts):
+            try:
+                return ProductID(part)
+            except ValueError:
+                continue
+        raise ValueError('Could not extract a HiRISE Product ID from ' + path)
