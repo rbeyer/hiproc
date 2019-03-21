@@ -245,7 +245,7 @@ def HiFurrow_Fix(in_cub, out_cub, max_mean, keep=False):
     # temporary files. It will (hopefully) prevent collisions with
     # existing files and also allow for easy clean-up if keep=True
     temp_token = datetime.now().strftime('HFF-%y%m%d%H%M%S')
-    to_del = PathSet()
+    to_del = isis.PathSet()
 
     # For bin2 and bin4 imaging, specify width of furrow based on
     # image average DN range

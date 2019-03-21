@@ -41,8 +41,6 @@ import pvl
 import hirise
 import kalasiris as isis
 
-from .util import PathSet
-
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -118,7 +116,7 @@ def HiCal(in_cube, out_cube, ccdchan, conf, db, keep=False):
     flags = set_flags(hconf, db, ccdchan, b.index(db.bin))
 
     # Start processing cube files
-    to_delete = PathSet()
+    to_delete = isis.PathSet()
     next_cube = in_cube.with_suffix(f'.{temp_token}.cub')
     if(db.bin > 1 and db.image_mean > 7000.0):
         furrow_cube = to_delete.add(in_cube.with_suffix(f'.{temp_token}.ffix.cub'))
@@ -303,7 +301,7 @@ def process_this(ccdchan: tuple, flag_list: list) -> int:
 def furrow_nulling(cube, out_cube, binning, ccdchan, keep=False):
     furrows_found = False
 
-    to_del = PathSet()
+    to_del = isis.PathSet()
     fcrop_file = to_del.add(out_cube.with_sufffix('.fcrop.cub'))
 
     isis.mask(cube, mask=cube, to=out_cube, minimum=1000000, maximum=1000000)
@@ -357,7 +355,7 @@ def furrow_nulling(cube, out_cube, binning, ccdchan, keep=False):
 
 def mask(in_cube, out_cube, noisefilter_min, noisefilter_max, binning):
     '''mask out unwanted pixels'''
-    to_del = PathSet()
+    to_del = isis.PathSet()
     temp_cube = to_del.add(out_cube.with_suffix('.mask_temp.cub'))
 
     isis.mask(in_cube, mask=in_cube, to=temp_cube,
@@ -645,7 +643,7 @@ def highlow_destripe(in_cube, out_cube, conf, isisnorm='',
                      lnull=True, lhrs=True, lhis=True, llrs=True, llis=True,
                      keep=False):
     # Perform highpass/lowpass filter vertical destripping
-    to_delete = PathSet()
+    to_delete = isis.PathSet()
     lpf_cub = to_delete.add(out_cube.with_suffix('.lpf.cub'))
     isis.lowpass(in_cub, to=lpf_cub,
                  line=conf['NoiseFilter_LPF_Line'],
@@ -767,7 +765,7 @@ def NoiseFilter(in_cube, output, conf, minimum=None, maximum=None, zapc=False, k
     if minimum is not None and maximum is not None:
         isisnorm = '+SignedWord+{}:{}'.format(minimum, maximum)
 
-    to_delete = PathSet()
+    to_delete = isis.PathSet()
 
     h = isis.Histogram(in_cube)
     (LisP, MaxVal) = getHistVal(h, conf)
@@ -847,7 +845,7 @@ def Hidestripe(in_cube, out_cube, binning, minimum, maximum, hidcorr,
                line_samples, keep=False) -> str:
     # SignedWord+$HiCal_Normalization_Minimum:$HiCal_Normalization_Maximum
     to_s = '+SignedWord+{}:{}'.format(minimum, maximum)
-    to_del = PathSet()
+    to_del = isis.PathSet()
     if 1 == binning:
         temp_cub = to_del.add(out_cube.with_suffix('.hd.cub'))
         isis.hidestripe(in_cube, to=temp_cub + to_s, parity='EVEN', correction=hidcorr)
