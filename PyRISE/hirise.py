@@ -39,7 +39,7 @@ obsid_re = re.compile(fr"(?<!\w){obsid_core_re.pattern}(?!\d)")
 
 ccd_name_re = re.compile(r"RED|IR|BG")
 ccd_re = re.compile(r"RED\d|IR1[0-1]|BG1[2-3]")
-chan_re = re.compile(r"(P?<channel>[01])")
+chan_re = re.compile(r"(?P<channel>[01])")
 ccdchan_re = re.compile(fr"(?P<ccd>{ccd_re.pattern})_(?P<channel>[0-1])")
 prodid_re = re.compile(fr"(?<!\w){obsid_core_re.pattern}_?(?P<ccd>{ccd_re.pattern})?_?(?P<channel>[0-1])?(?!\d)")
 
@@ -58,7 +58,7 @@ class ObservationID:
             else:
                 raise ValueError('{} did not match regex: {}'.format(args[0], obsid_re.pattern))
         elif len(args) == 2:
-            (phase, orbit, lat) = None, args
+            (phase, orbit, lat) = None, *args
         elif len(args) == 3:
             (phase, orbit, lat) = args
         else:
@@ -126,21 +126,30 @@ class ProductID(ObservationID):
             else:
                 raise ValueError('{} did not match regex: '
                                  '{}'.format(args[0], prodid_re.pattern))
-        # elif len(items) == 2:
-        #     pass
+        elif len(items) == 2:
+            pass
         elif len(items) == 3:
             if items[0] not in phase_names:
                 (ccdname, ccdnumber) = getccdnamenumber(items.pop())
         elif len(items) == 4:
             if items[0] not in phase_names:
-                chan = _match_chan(items.pop())
-            (ccdname, ccdnumber) = getccdnamenumber(items.pop())
+                (ccdname, ccdnumber, chan) = _namenumchan(items[-2], items[-1])
+                items.pop()
+                items.pop()
+            else:
+                (ccdname, ccdnumber) = getccdnamenumber(items.pop())
         elif len(items) == 5:
-            chan = _match_chan(items.pop())
-            (ccdname, ccdnumber) = getccdnamenumber(items.pop())
+            if items[0] not in phase_names:
+                chan = _match_chan(items.pop())
+                ccdnumber = _match_num(items.pop())
+                ccdname = getccdname(items.pop())
+            else:
+                (ccdname, ccdnumber, chan) = _namenumchan(items[-2], items[-1])
+                items.pop()
+                items.pop()
         elif len(items) == 6:
             chan = _match_chan(items.pop())
-            ccdnumber = re.match(r"1??\d", items.pop()).group()
+            ccdnumber = _match_num(items.pop())
             ccdname = getccdname(items.pop())
         else:
             raise IndexError('accepts 1 to 6 arguments')
@@ -153,8 +162,10 @@ class ProductID(ObservationID):
     def __str__(self):
         if self.ccdname and self.ccdnumber:
             ccd = self.ccdname + self.ccdnumber
-            return '_'.join(self.phase, self.orbit_number, self.latesque,
-                            ccd, self.channel)
+            if self.channel:
+                ccd += '_' + self.channel
+            return '_'.join([self.phase, self.orbit_number, self.latesque,
+                            ccd])
         else:
             return super().__str__()
 
@@ -163,11 +174,32 @@ class ProductID(ObservationID):
 
 
 def _match_chan(s: str):
-    matched = chan_re.match(s)
+    matched = chan_re.fullmatch(s)
     if matched:
         return matched.group()
     else:
         return None
+
+
+def _match_num(s: str):
+    matched = re.fullmatch(r"1?\d", s)
+    if matched:
+        return matched.group()
+    else:
+        return None
+
+
+def _namenumchan(one: str, two: str) -> tuple:
+    ccdname = None
+    ccdnumber = None
+    chan = None
+    try:
+        (ccdname, ccdnumber) = getccdnamenumber(one)
+        chan = _match_chan(two)
+    except ValueError:
+        ccdname = getccdname(one)
+        ccdnumber = _match_num(two)
+    return (ccdname, ccdnumber, chan)
 
 
 def parseObsID(s: str) -> tuple:
@@ -181,24 +213,10 @@ def parseObsID(s: str) -> tuple:
 
 def parseProdID(s: str) -> tuple:
     '''Parses a string to find the first occurence of a valid ProductID'''
-    match = prodid_re.search(str(s))
-    if(match):
-        matched = list(filter(lambda x: x is not None, match.groups()))
-        if len(matched) == 3:
-            return tuple(matched)
-        elif len(matched) == 4:
-            if matched[1] not in phase_names:
-                raise ValueError('{} did not match regex: {}'.format(s, prodid_re.pattern))
-            else:
-                (name, number) = getccdnamenumber(matched[2])
-                return tuple([*matched[:3], name, number, matched[3]])
-        elif len(matched) == 5:
-            (name, number) = getccdnamenumber(matched[3])
-            return tuple([*matched[:3], name, number, matched[4]])
-        else:
-            raise RunTimeError('Did not expect this many match elements.')
-    else:
-        raise ValueError('{} did not match regex: {}'.format(s, prodid_re.pattern))
+    pid = ProductID(s)
+    items = [pid.phase, pid.orbit_number, pid.latesque,
+             pid.ccdname, pid.ccdnumber, pid.channel]
+    return tuple(filter(lambda x: x is not None, items))
 
 
 def prev_phase(s: str) -> str:
@@ -278,7 +296,7 @@ def getccdnumber(s: str) -> str:
     '5' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').'''
     match = ccd_re.search(s)
     if match:
-        return re.search(fr"\d+", match.group()).group()
+        return re.search(r"\d{1,2}", match.group()).group()
     else:
         raise ValueError(f'{s} did not match regex: {ccd_re.pattern}')
 
