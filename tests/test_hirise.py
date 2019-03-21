@@ -17,7 +17,7 @@
 
 import itertools
 import unittest
-# from pathlib import Path
+from pathlib import Path
 
 from PyRISE import hirise
 
@@ -341,3 +341,37 @@ class TestGetters(unittest.TestCase):
     def test_getProdID(self):
         s = 'This is a Prod ID: ESP_034783_1850_RED5_0'
         self.assertEqual('ESP_034783_1850_RED5_0', hirise.getProdID(s))
+
+
+class TestFromFile(unittest.TestCase):
+
+    # HiRISE_img = Path('test-resources') / 'PSP_010502_2090_RED5_0.img'
+
+    def setUp(self):
+        d = Path('test-resources')
+        self.paths = ((d / 'PSP_010502_2090_RED5_0.EDR_Stats.cub',
+                       'PSP_010502_2090', 'PSP_010502_2090_RED5_0'),
+                      (d / 'test.cub',
+                       'PSP_010502_2090', 'PSP_010502_2090_RED5_0'),
+                      (Path('PSP_010502_2090_RED5.fake'),
+                       'PSP_010502_2090', 'PSP_010502_2090_RED5'))
+
+    def test_get_ObsID(self):
+        for t in self.paths:
+            with self.subTest(path=t[0], ObsID=t[1]):
+                oid = hirise.get_ObsID_fromfile(t[0])
+                self.assertEqual(t[1], str(oid))
+
+    def test_get_ObsID_fail(self):
+        p = Path('Not-a-file')
+        self.assertRaises(ValueError, hirise.get_ObsID_fromfile, p)
+
+    def test_get_ProdID(self):
+        for t in self.paths:
+            with self.subTest(path=t[0], ProdID=t[2]):
+                oid = hirise.get_ProdID_fromfile(t[0])
+                self.assertEqual(t[2], str(oid))
+
+    def test_get_ProdID_fail(self):
+        p = Path('Not-a-file')
+        self.assertRaises(ValueError, hirise.get_ProdID_fromfile, p)

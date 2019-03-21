@@ -17,7 +17,11 @@
 
 import os
 import re
+import subprocess
 from itertools import repeat
+from pathlib import Path
+
+import kalasiris as isis
 
 phase_names = ('INT', 'CAL', 'ATL', 'KSC', 'LAU', 'CRU', 'APR', 'AEB',
                'TRA', 'PSP',  # 'REL'
@@ -104,11 +108,7 @@ class ObservationID:
 class ProductID(ObservationID):
     """A class for HiRISE Product IDs."""
 
-    def __init__(self, *args):
-        self.ccdname = None
-        self.ccdnumber = None
-        self.channel = None
-
+    def __init__(self, *args):  # noqa: C901
         ccdname = None
         ccdnumber = None
         chan = None
@@ -325,13 +325,14 @@ def get_ObsID_fromfile(path: os.PathLike) -> ObservationID:
 
     try:
         return ObservationID(isis.getkey_k(p, 'Archive', 'ObservationId'))
-    except CalledProcessError:
+    except subprocess.CalledProcessError:
         for part in reversed(p.parts):
             try:
                 return ObservationID(part)
             except ValueError:
                 continue
-        raise ValueError('Could not extract a HiRISE Observation ID from ' + path)
+        raise ValueError('Could not extract a HiRISE Observation ID from ' +
+                         str(path))
 
 
 def get_ProdID_fromfile(path: os.PathLike) -> ProductID:
@@ -341,10 +342,11 @@ def get_ProdID_fromfile(path: os.PathLike) -> ProductID:
 
     try:
         return ProductID(isis.getkey_k(p, 'Archive', 'ProductId'))
-    except CalledProcessError:
+    except subprocess.CalledProcessError:
         for part in reversed(p.parts):
             try:
                 return ProductID(part)
             except ValueError:
                 continue
-        raise ValueError('Could not extract a HiRISE Product ID from ' + path)
+        raise ValueError('Could not extract a HiRISE Product ID from ' +
+                         str(path))

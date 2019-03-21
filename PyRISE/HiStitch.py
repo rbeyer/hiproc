@@ -34,8 +34,8 @@ import shutil
 import sys
 from pathlib import Path
 
-import hirise
 import kalasiris as isis
+import hirise
 
 
 def main():
@@ -113,16 +113,16 @@ def sort_input_cubes(a_cub: os.PathLike, b_cub: os.PathLike) -> dict:
 
     d = {'0': None, '1': None}
 
-    a_chan = getkey_k(a_cub, 'Instrument', 'ChannelNumber')
-    b_chan = getkey_k(b_cub, 'Instrument', 'ChannelNumber')
+    a_chan = isis.getkey_k(a_cub, 'Instrument', 'ChannelNumber')
+    b_chan = isis.getkey_k(b_cub, 'Instrument', 'ChannelNumber')
 
     try:
         d[a_chan] = Path(a_cub)
         d[b_chan] = Path(b_cub)
         for k, v in d.items():
             if v is None:
-                raise RuntimeError(f'These have the same channel: {cube1_chan}.')
-    except KeyError:
+                raise RuntimeError(f'These have the same channel: {k}.')
+    except KeyError as err:
         raise RuntimeError(f'This file had a channel other than 0 or 1: {err}')
 
     return d
