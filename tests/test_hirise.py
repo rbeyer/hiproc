@@ -15,11 +15,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import itertools
+import shutil
 import unittest
 from pathlib import Path
 
+import kalasiris as isis
+
 from PyRISE import hirise
+from .utils import resource_check as rc
+
+# Hardcoding this, but I sure would like a better solution.
+HiRISE_img = Path('test-resources') / 'PSP_010502_2090_RED5_0.img'
+img = HiRISE_img
+
+
+class TestResources(unittest.TestCase):
+    '''Establishes that the test image exists.'''
+
+    def test_resources(self):
+        (truth, test) = rc(img)
+        self.assertEqual(truth, test)
 
 
 class TestInternal(unittest.TestCase):
@@ -348,13 +365,23 @@ class TestFromFile(unittest.TestCase):
     # HiRISE_img = Path('test-resources') / 'PSP_010502_2090_RED5_0.img'
 
     def setUp(self):
-        d = Path('test-resources')
-        self.paths = ((d / 'PSP_010502_2090_RED5_0.EDR_Stats.cub',
+        named_cube = img.with_suffix('.cub')
+        isis.hi2isis(img, to=named_cube)
+        noname_cube = named_cube.with_name('noname.cub')
+        shutil.copyfile(named_cube, noname_cube)
+
+        self.paths = ((named_cube,
                        'PSP_010502_2090', 'PSP_010502_2090_RED5_0'),
-                      (d / 'test.cub',
+                      (noname_cube,
                        'PSP_010502_2090', 'PSP_010502_2090_RED5_0'),
                       (Path('PSP_010502_2090_RED5.fake'),
                        'PSP_010502_2090', 'PSP_010502_2090_RED5'))
+
+    def tearDown(self):
+        with contextlib.suppress(FileNotFoundError):
+            for p in self.paths:
+                p[0].unlink()
+            Path('print.prt').unlink()
 
     def test_get_ObsID(self):
         for t in self.paths:

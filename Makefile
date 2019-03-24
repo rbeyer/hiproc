@@ -60,7 +60,6 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr htmlcov/
 	rm -fr .pytest_cache
 	rm -fr test-resources
-	rm -fr test-ISIS3DATA
 
 lint: ## check style with flake8
 	flake8 kalasiris tests
@@ -68,7 +67,7 @@ lint: ## check style with flake8
 test: test-resources ## run tests quickly with the default Python
 	python setup.py test
 
-test-resources: test-ISIS3DATA ## Download what we need for testing
+test-resources: ## Download what we need for testing
 	mkdir test-resources
 	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_RED5_0.IMG test-resources/PSP_010502_2090_RED5_0.img
 
