@@ -37,7 +37,7 @@ from pathlib import Path
 
 import pvl
 
-import hirise
+import PyRISE.hirise as hirise
 import kalasiris as isis
 
 
@@ -69,9 +69,9 @@ def main():
     else:
         ofile_cub = Path(args.output)
 
-    (histats, dncnt, snr, gapp) = EDR_Stats(args.img, ofile_cub,
+    (histats, dncnt, snr, gapp) = EDR_Stats(args.img, ofile_cub, args.gains,
                                             args.histmin, args.histmax,
-                                            args.gains, keep=args.keep)
+                                            keep=args.keep)
 
     # DB stuff
     # add a bunch of stuff from the histats call, gapp, snr, dncnt to
@@ -83,7 +83,7 @@ def main():
     #     print(f'{k}: {v}')
 
 
-def EDR_Stats(img, out_cube, histmin, histmax, gains_file, keep=False):
+def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99, keep=False):
     try:
         logging.info('The LUT for this file is: ' + str(check_lut(img)))
     except KeyError as err:
@@ -117,7 +117,7 @@ def EDR_Stats(img, out_cube, histmin, histmax, gains_file, keep=False):
     return(histats, dncnt, snr, gapp)
 
 
-def parse_histat(pvltext):
+def parse_histat(pvltext: str) -> dict:
     '''Parse the output of histat into a dictionary'''
 
     p = pvl.loads(pvltext)
@@ -189,7 +189,7 @@ def parse_histat(pvltext):
     return d
 
 
-def get_dncnt(cub, hmin, hmax, keep=False):
+def get_dncnt(cub, hmin=0.01, hmax=99.99, keep=False) -> int:
     '''Extract DN count from the histogram of a cub file'''
     # I'm not sure about this method.
     # The statement above is what the original program wanted,
@@ -215,7 +215,7 @@ def get_dncnt(cub, hmin, hmax, keep=False):
     return count
 
 
-def calc_snr(cub, gainsfile, histats, binning):
+def calc_snr(cub, gainsfile, histats, binning) -> float:
     '''Calculate the signal to noise ratio.'''
 
     ccdchan = '{0[0]}_{0[1]}'.format(hirise.getccdchannel(str(cub)))
@@ -250,7 +250,7 @@ def check_lut(img: os.PathLike):
     '''Checks whether a stored look up table (LUT) matches a known LUT.'''
     # Original author of this function was Robert King, in December 2006.
 
-    img_pvl = pvl.load(img)
+    img_pvl = pvl.load(str(img))
     lut_type = img_pvl['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_TABLE_TYPE']
     if 'STORED' in lut_type:
         lut = dict()
