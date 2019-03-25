@@ -28,11 +28,11 @@
 # emulate functionality.
 
 import argparse
-import csv
 import hashlib
 import logging
 import math
 import os
+import shelve
 from pathlib import Path
 
 import pvl
@@ -43,7 +43,7 @@ import kalasiris as isis
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    # parser.add_argument('--db',           required=False, default='HiCat.db')
+    parser.add_argument('--db',           required=False, default='.HiCat')
     # parser.add_argument('-t', '--table',  required=False, default='EDR_Products')
     parser.add_argument('-o', '--output', required=False, default='.EDR_Stats.cub')
     parser.add_argument('--histmin',      required=False, default=0.01)
@@ -69,21 +69,28 @@ def main():
     else:
         ofile_cub = Path(args.output)
 
-    (histats, dncnt, snr, gapp) = EDR_Stats(args.img, ofile_cub, args.gains,
-                                            args.histmin, args.histmax,
-                                            keep=args.keep)
+    histats = EDR_Stats(args.img, ofile_cub, args.gains,
+                        args.histmin, args.histmax,
+                        keep=args.keep)
 
     # DB stuff
-    # add a bunch of stuff from the histats call, gapp, snr, dncnt to
-    # HiCat.EDR_Products
-    print(f'dncnt: {dncnt}')
-    print(f'snr: {snr}')
-    print(f'gapp: {gapp}')
+    # add the contents of histats to HiCat.EDR_Products
     # for k, v in histats.items():
     #     print(f'{k}: {v}')
 
+    db_path = ''
+    if args.db.startswith('.'):
+        db_path = Path(args.img).with_suffix(args.db)
+    else:
+        db_path = Path(args.db)
 
-def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99, keep=False):
+    db = shelve.open(str(db_path))
+    db.update(histats)
+    db.close()
+
+
+def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
+              keep=False) -> dict:
     try:
         logging.info('The LUT for this file is: ' + str(check_lut(img)))
     except KeyError as err:
@@ -93,11 +100,6 @@ def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99, keep=False
     # Convert to .cub
     isis.hi2isis(img, to=out_cube)
 
-    # Get some info from the new cube:
-    product_id = isis.getkey_k(out_cube, 'Archive', 'ProductId')
-    image_lines = isis.getkey_k(out_cube, 'Dimensions', 'Lines')
-    image_samples = isis.getkey_k(out_cube, 'Dimensions', 'Samples')
-
     histats = parse_histat(isis.histat(out_cube, useoffsets=True,
                                        leftimage=0,     rightimage=1,
                                        leftcalbuffer=3, rightcalbuffer=1,
@@ -105,16 +107,22 @@ def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99, keep=False
                                        leftbuffer=3,    rightbuffer=1,
                                        leftdark=3,      rightdark=1).stdout)
 
-    binning = isis.getkey_k(out_cube, 'Instrument', 'Summing')
+    # Get some info from the new cube:
+    # product_id = isis.getkey_k(out_cube, 'Archive', 'ProductId')
+    histats['IMAGE_LINES'] = isis.getkey_k(out_cube, 'Dimensions', 'Lines')
+    histats['LINE_SAMPLES'] = isis.getkey_k(out_cube, 'Dimensions', 'Samples')
+    histats['BINNING'] = isis.getkey_k(out_cube, 'Instrument', 'Summing')
 
-    dncnt = get_dncnt(out_cube, histmin, histmax, keep=keep)
-    snr = calc_snr(out_cube, gains_file, histats, binning)
-    gapp = (histats['GAP_PIXELS'] / (int(image_lines) * int(image_samples))) * 100.0
+    histats['STD_DN_LEVELS'] = get_dncnt(out_cube, histmin, histmax, keep=keep)
+    histats['IMAGE_SIGNAL_TO_NOISE_RATIO'] = calc_snr(out_cube, gains_file, histats)
+    histats['GAP_PIXELS_PERCENT'] = (histats['GAP_PIXELS'] /
+                                     (int(histats['IMAGE_LINES']) *
+                                      int(histats['LINE_SAMPLES']))) * 100.0
 
     tdi_bin_check(out_cube, histats)
     lut_check(out_cube, histats)
 
-    return(histats, dncnt, snr, gapp)
+    return(histats)
 
 
 def parse_histat(pvltext: str) -> dict:
@@ -215,13 +223,13 @@ def get_dncnt(cub, hmin=0.01, hmax=99.99, keep=False) -> int:
     return count
 
 
-def calc_snr(cub, gainsfile, histats, binning) -> float:
+def calc_snr(cub: os.PathLike, gainsfile: os.PathLike, histats: dict) -> float:
     '''Calculate the signal to noise ratio.'''
 
     ccdchan = '{0[0]}_{0[1]}'.format(hirise.getccdchannel(str(cub)))
 
     gainspvl = pvl.load(str(gainsfile))
-    gain = float(gainspvl['Gains'][ccdchan]['Bin' + binning])
+    gain = float(gainspvl['Gains'][ccdchan]['Bin' + histats['BINNING']])
 
     img_mean = float(histats['IMAGE_MEAN'])
     lis_pixels = float(histats['LOW_SATURATED_PIXELS'])

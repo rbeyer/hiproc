@@ -58,11 +58,8 @@ class TestEDR_Stats(unittest.TestCase):
             Path('print.prt').unlink()
 
     def test_EDR_stats(self):
-        (h, d, s, g) = edr.EDR_Stats(img, self.outfile, gains)
+        h = edr.EDR_Stats(img, self.outfile, gains)
         self.assertIsInstance(h, dict)
-        self.assertIsInstance(d, int)
-        self.assertIsInstance(s, float)
-        self.assertIsInstance(g, float)
 
 
 class TestNeedHiCube(unittest.TestCase):
@@ -86,8 +83,8 @@ class TestNeedHiCube(unittest.TestCase):
 
     def test_calc_snr(self):
         histats = edr.parse_histat(isis.histat(self.hicube).stdout)
-        binning = isis.getkey_k(self.hicube, 'Instrument', 'Summing')
-        s = edr.calc_snr(self.hicube, gains, histats, binning)
+        histats['BINNING'] = isis.getkey_k(self.hicube, 'Instrument', 'Summing')
+        s = edr.calc_snr(self.hicube, gains, histats)
         self.assertAlmostEqual(s, 291.80442197)
 
     def test_tdi_bin_check(self):
