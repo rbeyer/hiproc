@@ -1,0 +1,5 @@
+#!/usr/bin/env python
+
+import PyRISE.EDR_Stats as edr
+
+edr.main()
