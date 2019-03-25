@@ -108,7 +108,7 @@ def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
                                        leftdark=3,      rightdark=1).stdout)
 
     # Get some info from the new cube:
-    # product_id = isis.getkey_k(out_cube, 'Archive', 'ProductId')
+    histats['PRODUCT_ID'] = isis.getkey_k(out_cube, 'Archive', 'ProductId')
     histats['IMAGE_LINES'] = isis.getkey_k(out_cube, 'Dimensions', 'Lines')
     histats['LINE_SAMPLES'] = isis.getkey_k(out_cube, 'Dimensions', 'Samples')
     histats['BINNING'] = isis.getkey_k(out_cube, 'Instrument', 'Summing')
