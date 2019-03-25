@@ -50,7 +50,7 @@ class TestCheckLUT(unittest.TestCase):
 class TestEDR_Stats(unittest.TestCase):
 
     def setUp(self):
-        self.outfile = img.with_suffix('.cub')
+        self.outfile = img.with_suffix('.TestEDR_Stats.cub')
 
     def tearDown(self):
         with contextlib.suppress(FileNotFoundError):
@@ -68,7 +68,7 @@ class TestEDR_Stats(unittest.TestCase):
 class TestNeedHiCube(unittest.TestCase):
 
     def setUp(self):
-        self.hicube = img.with_suffix('.cub')
+        self.hicube = img.with_suffix('.TestNeedHiCube.cub')
         isis.hi2isis(img, to=self.hicube)
 
     def tearDown(self):
