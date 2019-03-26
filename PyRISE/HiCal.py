@@ -179,8 +179,8 @@ def HiCal(in_cube: os.PathLike, out_cube: os.Pathlike, ccdchan: tuple,
     if(db['BINNING'] != '8'):  # There is no gain fix for bin8 imaging
         higain_file = to_delete.add(next_cube.with_suffix('.fx.cub'))
         HiGainFx(next_cube, higain_file,
-                 hconf['HiGainFx_Coefficient_Path'],
-                 hconf['HiGainFx_Version'])
+                 conf['HiGainFx']['HiGainFx_Coefficient_Path'],
+                 conf['HiGainFx']['HiGainFx_Version'])
         next_cube = higain_file
 
     # Perform the high-pass filter cubenorm steps
@@ -638,16 +638,24 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
     return(mindn, maxdn)
 
 
-def HiGainFx(cube: os.PathLike, outcube: os.PathLike, coef_path: os.PathLike,
-             version: str, keep=False) -> None:
+def HiGainFx(cube: os.PathLike, outcube: os.PathLike,
+             coef_path: os.PathLike, version: str,
+             keep=False) -> None:
     '''Perform a Gain-Drift correction on an HiIRSE Channel Image.'''
     binning = isis.getkey(cube, 'Instrument', 'Summing')
     ccd = isis.getkey(cube, 'Instrument', 'CcdId')
     chan = isis.getkey(cube, 'Instrument', 'ChannelNumber')
 
-    coef_f_path = Path(coef_path) / f'HiRISE_Gain_Drift_Correction_Bin{binning}.{version}.csv'
+    coef_dir = Path(coef_path)
 
-    with open(coef_f_path) as csvfile:
+    if not coef_dir.exists() or not coef_dir.is_dir():
+        coef_dir = Path(__file__).resolve().parent.parent / 'resources'
+        logging.warning('The HiGainFx coefficient directory {} could not be '
+                        'found, using {} instead.'.format(coef_path, coef_dir))
+
+    coef_p = Path(coef_dir) / f'HiRISE_Gain_Drift_Correction_Bin{binning}.{version}.csv'
+
+    with open(coef_p) as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             if hirise.getccdchannel(row['CCD CH']) == (ccd, chan):
@@ -669,7 +677,8 @@ def Cubenorm_Filter(cubenorm_tab: os.PathLike, outfile: os.PathLike, pause=False
     '''Perform a highpass filter on the cubenorm table output of the columnar average and median values.'''
     if boxfilter < 3:
         raise ValueError(f'boxfilter={boxfilter} is less than 3')
-    if not chan:
+
+    if chan is None:
         chan = hirise.getccdchannel(Path(cubenorm_tab).name)[1]
 
     # Make a list to receive each column
@@ -904,7 +913,7 @@ def NoiseFilter_noisefilter(from_cube: os.PathLike, to_cube: os.PathLike,
                      lisisnoise=True, lrsisnoise=True)
 
 
-def NoiseFilter_cubenorm_edit(in_tab: Path, out_tab: Path) -> None:
+def NoiseFilter_cubenorm_edit(in_tab: Path, out_tab: Path, conf: dict) -> None:
     '''This function zaps the relevent pixels in the cubenorm output and
        creates an edited cubenorm file.'''
     # Slightly different values from other function, not entirely sure why.
@@ -933,14 +942,15 @@ def NoiseFilter_cubenorm_edit(in_tab: Path, out_tab: Path) -> None:
     # Zap any columns with less then NoiseFilter_Zap_Fraction
     norm = [1] * len(vpnts)
     for i, v in enumerate(vpnts):
-        if(zapc and v / max_vpnts < conf['NoiseFilter_Zap_Fraction']):
+        if(zapc and v / max_vpnts < float(conf['NoiseFilter_Zap_Fraction'])):
             norm[i] = 0
 
     # Determine if the pause point pixels need to be zapped
     for samp, width in zip(ch_pause[chan], ch_width[chan]):
         zap_slice = pause_slicer(samp, width)
         for i in range(zap_slice):
-            if vpnts[i] / max_vpnts < conf['NoiseFilter_Nonvalid_Fraction']:
+            if(vpnts[i] / max_vpnts <
+               float(conf['NoiseFilter_Nonvalid_Fraction'])):
                 norm[i] = 0
 
     with open(out_tab) as csvfile:
@@ -975,9 +985,9 @@ def NoiseFilter(in_cube: os.PathLike, output: os.PathLike, conf: dict,
     isis.cubenorm(in_cube, stats=cn_tab, format_='TABLE', direction='COLUMN')
 
     cn2_tab = to_delete.add(output.with_suffix('.cn2.tab'))
-    NoiseFilter_cubenorm_edit(cn_tab, cn2_tab)
+    NoiseFilter_cubenorm_edit(cn_tab, cn2_tab, conf)
 
-    # Zap the bad colmns for the highpass and lowpass filter
+    # Zap the bad columns for the highpass and lowpass filter
     zap_cub = to_delete.add(output.with_suffix('.zap.cub'))
     isis.cubenorm(in_cube, to=zap_cub, fromstats=cn2_tab, statsource='TABLE',
                   mode='DIVIDE', norm='AVE', preserve='FALSE')
@@ -987,12 +997,12 @@ def NoiseFilter(in_cube: os.PathLike, output: os.PathLike, conf: dict,
     highlow_destripe(zap_cub, add_cub, conf, isisnorm, llis=False, keep=keep)
 
     # Perform the 1st noise filter
-    tolmin = conf['NoiseFilter_Tolmin']
-    tolmax = conf['NoiseFilter_Tolmax']
-    if LisP >= conf['NoiseFilter_Hard_Filtering']:
-        tolmin = conf['NoiseFilter_Hard_Tolmin']
-        tolmax = conf['NoiseFilter_Hard_Tolmax']
-    flattol = h['Std Deviation'] * conf['NoiseFilter_Flattol']
+    tolmin = float(conf['NoiseFilter_Tolmin'])
+    tolmax = float(conf['NoiseFilter_Tolmax'])
+    if LisP >= float(conf['NoiseFilter_Hard_Filtering']):
+        tolmin = float(conf['NoiseFilter_Hard_Tolmin'])
+        tolmax = float(conf['NoiseFilter_Hard_Tolmax'])
+    flattol = float(h['Std Deviation']) * float(conf['NoiseFilter_Flattol'])
     if flattol < 0.00001:
         flattol = 0.00001
 
@@ -1021,8 +1031,8 @@ def NoiseFilter(in_cube: os.PathLike, output: os.PathLike, conf: dict,
         # Perform LPFZ  filters if we have a RED filter image.
         # For IR and BG filter data, assume that the HiColorNorm pipeline
         # step will interpolate using the BG/RED and IR/RED ratio data.
-        lowmin = int(conf['NoiseFilter_LPFZ_Line'] *
-                     conf['NoiseFilter_LPFZ_Samp'] / 3)
+        lowmin = int(int(conf['NoiseFilter_LPFZ_Line']) *
+                     int(conf['NoiseFilter_LPFZ_Samp']) / 3)
         lpfz_cub = to_delete.add(output.with_suffix('.lpfz.cub'))
         isis.lowpass(add2_cub, to=lpfz_cub.with_suffix('.cub' + isisnorm),
                      sample=3, line=3, minopt='COUNT', minimum=1,
