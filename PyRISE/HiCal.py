@@ -30,7 +30,9 @@
 import argparse
 import collections
 import csv
+import logging
 import re
+import shelve
 import statistics
 import sys
 from datetime import datetime
@@ -38,70 +40,105 @@ from pathlib import Path
 
 import pvl
 
-import hirise
+import PyRISE.hirise as hirise
 import kalasiris as isis
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--db',            required=False, default='HiCat.db')
+    parser.add_argument('--db',            required=False, default='.HiCat')
     parser.add_argument('-o', '--output',  required=False, default='.HiCal.cub')
-    parser.add_argument('-c', '--conf',    required=False, default='HiCal.conf')
-    parser.add_argument('-k', '--keep',    required=False, default=False)
+    parser.add_argument('-c', '--conf',    required=False,
+                        default=Path(__file__).resolve().parent.parent /
+                        'resources' / 'HiCal.conf')
+    parser.add_argument('--bin2',       required=False, action='store_true', default=None)
+    parser.add_argument('--nobin2',     required=False, action='store_false',
+                        default=None, dest='bin2')
+    parser.add_argument('--bin4',       required=False, action='store_true', default=None)
+    parser.add_argument('--nobin4',     required=False, action='store_false',
+                        default=None, dest='bin4')
+    parser.add_argument('-l', '--log',  required=False, default='WARNING')
+    parser.add_argument('-k', '--keep', required=False, default=False)
     parser.add_argument('cube', metavar=".cub-file")
 
     args = parser.parse_args()
 
+    if isinstance(args.log, int):
+        log_level = args.log
+    else:
+        log_level = getattr(logging, args.log.upper(), logging.WARNING)
+        logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+
     in_cube = Path(args.cube)
 
+    out_cube = ''
     if args.output.startswith('.'):
         out_cube = in_cube.with_suffix(args.output)
     else:
         out_cube = Path(args.output)
 
+    db_path = ''
+    if args.db.startswith('.'):
+        db_path = Path(args.img).with_suffix(args.db)
+    else:
+        db_path = Path(args.db)
+
     # Get Configuration Parameters
-    conf = pvl.load(args.conf)
+    conf = pvl.load(str(args.conf))
+    conf_check(conf)
 
-    # Setup00 builds data structures, seems long and painful, need?
-    # Setup01 - don't need - about output data routeing
-    # Setup02 - db
-    #   select from HiCat.EDR_Products, written by EDR_Stats
-    # Setup03 - gets binning information to find binning for ObsID ... hmmm, alternate?
-    #   select from HiCat.Planned_Observations
-    bin2  # boolean
-    bin4  # boolean
+    # The original Perl Setup00() builds data structures that we don't need.
+    # The original Perl Setup01() set up data routing and did filename checking
+    # that we don't need here.
 
-    # These come from selections on HiCat.EDR_Products
-    binning  # BINNING
-    mask_std  # CAL_MASK_STANDARD_DEVIATION
-    dark_std  # IMAGE_DARK_STANDARD_DEVIATION
-    lis_pixels  # LOW_SATURATED_PIXELS
-    image_lines  # IMAGE_LINES
-    line_samples  # LINE_SAMPLES
-    image_mean  # select IMAGE_MEAN from HiCat.EDR_Products
-    image_buffer_mean  # IMAGE_BUFFER_MEAN
+    # The original Perl Setup02() read from the HiCat.EDR_Products table, but
+    # we'll just open the shelf:
+    db = shelve.open(str(db_path))
 
-    # setup done
+    pid = hirse.get_ProdID_fromfile(in_cube)
+    if str(pid) != db['PRODUCT_ID']:
+        print('The Product ID in the file ({}) does not match the one in the '
+              'database ({}).'.format(str(pid), db['PRODUCT_ID']))
+        sys.exit()
 
-    ccdchan = hirise.getccdchannel(in_cube)
+    # The original Perl Setup03 queried the HiCat.Planned_Observations table to
+    # get all of the possible binning values for CCDs in this CCD's
+    # observation.  We now accomplish the same thing with check_destripe()
+    # farther down.
 
-    lis_per = db.lis_pixels / (db.image_lines * db.line_samples) * 100.0
-
+    # The original Perl ProcessingSwitches() set various flags.  That
+    # functionality is now broken up and spread out to the check_destripe()
+    # function, the set_flags() function, and the if statement below that
+    # checks HiCal_Bypass_IR10_1
+    ccdchan = (pid.get_ccd(), pid.channel)
+    lis_per = float(db['LOW_SATURATED_PIXELS']) / (int(db['IMAGE_LINES']) *
+                                                   int(db['LINE_SAMPLES'])) * 100.0
     if (ccdchan == ('IR10', '1') and
-       lis_per > conf['HiCal']['HiCal_bypass']):
+       lis_per > conf['HiCal']['HiCal_Bypass_IR10_1']):
         print('Bypassing IR10_1')
         sys.exit()
 
-    (std, diff_std, zapped) = HiCal(in_cube, out_cube, ccdchan,
-                                    conf, db_stuff, keep=args.keep)
+    destripe_filter = check_destripe(in_cube, int(db['BINNING']),
+                                     args.bin2, args.bin4)
 
-    # insert these into HiCat.EDR_Products:
-    # std as HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION
-    # diff_std as DESTRIPED_DIFFERENCE_STANDARD_DEVIATION
-    # The zapped flag is new, I want to put it in the DB to use later.
+    # The original Perl SetHiCalVersion() placed the HiCal version into the
+    # db, but since we're not interested in persistance, we can ignore it.
+
+    # All the setup is done, start processing:
+    (std, diff_std, zapped) = HiCal(in_cube, out_cube, ccdchan, conf, db,
+                                    destripe=destripe_filter, keep=args.keep)
+
+    db['HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION'] = std
+    db['DESTRIPED_DIFFERENCE_STANDARD_DEVIATION'] = diff_std
+    db['zapped'] = zapped
+    # The zapped flag is not in the original code, I'm putting it in
+    # to the DB to use in a later step.
+
+    db.close()
 
 
-def HiCal(in_cube, out_cube, ccdchan, conf, db, keep=False):
+def HiCal(in_cube: os.PathLike, out_cube: os.Pathlike, ccdchan: tuple,
+          conf: dict, db: dict, destripe=False, keep=False) -> tuple:
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
 
@@ -113,21 +150,22 @@ def HiCal(in_cube, out_cube, ccdchan, conf, db, keep=False):
     # existing files and also allow for easy clean-up if keep=True
     temp_token = datetime.now().strftime('HiCal-%y%m%d%H%M%S')
 
-    flags = set_flags(hconf, db, ccdchan, b.index(db.bin))
+    flags = set_flags(hconf, db, ccdchan, b.index(int(db['BINNING'])))
 
     # Start processing cube files
     to_delete = isis.PathSet()
     next_cube = in_cube.with_suffix(f'.{temp_token}.cub')
-    if(db.bin > 1 and db.image_mean > 7000.0):
+    if(int(db['BINNING']) > 1 and float(db['IMAGE_MEAN']) > 7000.0):
         furrow_cube = to_delete.add(in_cube.with_suffix(f'.{temp_token}.ffix.cub'))
-        furrows_found = furrow_nulling(in_cube, furrow_cube, db.bin, ccdchan)
+        furrows_found = furrow_nulling(in_cube, furrow_cube, int(db['BINNING']), ccdchan)
         next_cube = furrow_cube
 
     # Run hical
-    lis_per = db.lis_pixels / (db.image_lines * db.line_samples) * 100.0
+    lis_per = int(db['LOW_SATURATED_PIXELS']) / (int(db['IMAGE_LINES']) *
+                                                 int(db['LINE_SAMPLES'])) * 100.0
     hical_file = to_delete.add(next_cube.with_suffix('.hical.cub'))
     run_hical(next_cube, hical_file, hconf,
-              lis_per, db.image_buffer_mean, db.bin,
+              lis_per, float(db['IMAGE_BUFFER_MEAN']), int(db['BINNING']),
               flags.noise_filter)
     next_cube = hical_file
 
@@ -138,7 +176,7 @@ def HiCal(in_cube, out_cube, ccdchan, conf, db, keep=False):
         next_cube = lpfz_file
 
     # Perform gain-drift correction
-    if(db.bin != 8):  # There is no gain fix for bin8 imaging
+    if(db['BINNING'] != '8'):  # There is no gain fix for bin8 imaging
         higain_file = to_delete.add(next_cube.with_suffix('.fx.cub'))
         HiGainFx(next_cube, higain_file,
                  hconf['HiGainFx_Coefficient_Path'],
@@ -185,13 +223,13 @@ def HiCal(in_cube, out_cube, ccdchan, conf, db, keep=False):
 
     # Hidestripe() - isis.[hidestripe,hipass,lowpass,algebra]
     diff_std_dev = None
-    if flags.destripe_filter:
+    if destripe:
         hidestripe_file = to_delete.add(next_cube.with_suffix('.hd.cub'))
-        diff_std_dev = Hidestripe(next_cube, hidestripe_file, db.bin,
+        diff_std_dev = Hidestripe(next_cube, hidestripe_file, int(db['BINNING']),
                                   hconf['HiCal_Normalization_Minimum'],
                                   hconf['HiCal_Normalization_Maximum'],
                                   hconf['HiCal_Hidestripe_Correction'],
-                                  db.line_samples, keep=keep)
+                                  int(db['LINE_SAMPLES']), keep=keep)
         next_cube = hidestripe_file
 
     # Create final output file
@@ -217,55 +255,200 @@ def FurrowCheck(vpnts: list, channel: int) -> int:
     return zap
 
 
-def set_flags(conf, db, ccdchan: tuple, bindex: int) -> collections.namedtuple:
+def conf_check(conf: dict) -> None:
+    '''Various checks on parameters in the configuration.'''
+
+    conf_check_strings('HiCal_Clean_EDR_Stats', ('DELETE', 'KEEP'),
+                       conf['HiCal']['HiCal_Clean_EDR_Stats'])
+
+    conf_check_strings('HiCal_HPF_Cubenorm', ('DIVIDE', 'SUBTRACT'),
+                       conf['HiCal']['HiCal_HPF_Cubenorm'])
+
+    conf_check_count('HiCal_Noise_Processing', 28, 'CCD/channel',
+                     conf['HiCal']['HiCal_Noise_Processing'])
+
+    conf_check_bounds('HiCal_Bypass_IR10_1', (0.0, 100.0),
+                      conf['HiCal']['HiCal_Bypass_IR10_1'])
+
+    conf_check_count('HiCal_Noise_Bin_DarkPixel_STD', 5, 'possible bin mode',
+                     conf['HiCal']['HiCal_Noise_Bin_DarkPixel_STD'])
+
+    conf_check_count('HiCal_Noise_Bin_Mask_STD', 5, 'possible bin mode',
+                     conf['HiCal']['HiCal_Noise_Bin_Mask_STD'])
+
+    conf_check_bounds('HiCal_Normalization_Minimum', (-16384.0, 16364.0),
+                      conf['HiCal']['HiCal_Normalization_Minimum'])
+
+    conf_check_bounds('HiCal_Normalization_Maximum', (-16384.0, 16384.0),
+                      conf['HiCal']['HiCal_Normalization_Maximum'])
+
+    conf_check_strings('HiCal_Hidestripe_Correction', ('ADD', 'MULTIPLE'),
+                       conf['HiCal']['HiCal_Hidestripe_Correction'])
+
+    conf_check_bounds('HiCal_Minimum_Percent', (0.0001, 2.0),
+                      conf['HiCal']['HiCal_Minimum_Percent'])
+
+    conf_check_bounds('HiCal_Maximum_Percent', (98.0, 99.9999),
+                      conf['HiCal']['HiCal_Maximum_Percent'])
+
+    # There are checks for HiCal_Jpeg_Quality, HiCal_Thumb_Samples, and
+    # HiCal_Browse_Samples in the original Perl that aren't relevant here,
+    # ignoring.  There are also empty string checks, but if there's nothing
+    # in a parameter, it will error when it gets used in the code, so no need
+    # to check here.
+    return
+
+
+def conf_check_strings(conf_name: str, choices: tuple, conf_value: str) -> None:
+    for v in choices:
+        if v == conf_value:
+            break
+    else:
+        choices_string = ''
+        KeyError('The {} parameter can be {}, but was {}'.format(conf_name,
+                                                                 str(choices),
+                                                                 conf_value))
+    return
+
+
+def conf_check_count(conf_name: str, count: int, what: str, conf_value: str) -> None:
+    if len(conf_value.split(', ')) != count:
+        KeyError('The {} parameter must have {} entries, one for each {}, '
+                 'but it was {}'.format(conf_name, str(count), what, conf_value))
+    return
+
+
+def conf_check_bounds(conf_name: str, bounds: tuple, conf_value: str) -> None:
+    if float(conf_value) < bounds[0] or float(conf_value) > bounds[1]:
+        KeyError('The {} parameter must be between {} and {} inclusive, '
+                 'but was {}'.format(conf_name, *bounds, conf_value))
+    return
+
+
+def check_destripe(cube: os.PathLike, mybinning: int, bin2=None, bin4=None) -> bool:
+    '''Determines whether to run the destripe filtering based on whether *any*
+       of the CCDs in an observation were bin 2 or bin 4.
+
+       Without a database, we must either rely on the incoming bin2 and bin4
+       arguments, or scour the directory that the input cube file is in, and
+       read the cube labels present to try and find the information.
+    '''
+    destripe_filter = False
+
+    if bin2 is None and mybinning == 2:
+        bin2 = True
+
+    if bin4 is None and mybinning == 4:
+        bin4 = True
+
+    warn_message = None
+    if((mybinning == 1 or mybinning == 2) and
+       (bin2 is None or bin4 is None)):
+        binnings = get_bins_fromfiles(cube)
+        powered_count = len(filter(lambda x: x == 'On',
+                                   isis.getkey_k(cube, 'Instrument',
+                                                 'PoweredCpmmFlag').split(',')))
+        if bin2 is None and '2' in binnings.values():
+            bin2 = True
+
+        if bin4 is None and '4' in binnings.values():
+            bin4 = True
+
+        if len(binnings) < powered_count:
+            warn_message = ('Expecting to find {} CCD files, but '
+                            'found {}, as a consequence, cannot '
+                            'determine if the missing CCDs might have '
+                            'been bin 2 or bin 4.  hidestripe will not '
+                            'be applied to this image.')
+            warn_message.format(powered_count, len(binnings))
+
+    bin2 = bool(bin2)
+    bin4 = bool(bin4)
+
+    if((1 == mybinning and (bin2 or bin4)) or (2 == mybinning and bin4)):
+        destripe_filter = True
+    elif warn_message is not None:
+        logging.warning(warn_message)
+
+    return destripe_filter
+
+
+def get_bins_fromfiles(cube: os.PathLike) -> dict:
+    '''Extract summing values from all cubes in the input cube's directory
+       that belong to the same Observation.
+    '''
+    bins = dict()
+    pid = hirise.get_ProdID_fromfile(cube)
+    for path in cube.parent.glob('*.cub'):
+        try:
+            p = hirise.get_ProdID_fromfile(path)
+            if((pid.phase, pid.orbit_number, pid.latesque) ==
+               (p.phase, p.orbit_number, p.latesque)):
+                ccd = p.get_ccd()
+                if ccd in bins:
+                    continue
+                else:
+                    bins[ccd] = isis.getkey_k(path, 'Instrument', 'Summing')
+        except ValueError:
+            # Couldn't extract a Product ID from a cube, ignore.
+            continue
+        except AttributeError:
+            # Product ID doesn't have a CCD, ignore.
+            continue
+    return bins
+
+
+def set_flags(conf: dict, db: dict, ccdchan: tuple, bindex: int) -> collections.namedtuple:
     '''Set various processing flags based on various configuration
     parameters.'''
-    HiCalFlags = collections.namedtuple('HiCalFlags', ['destripe_filter',
-                                                       'noise_filter',
+    HiCalFlags = collections.namedtuple('HiCalFlags', ['noise_filter',
                                                        'zapcols',
                                                        'divide'])
-    destripe_filter = False
-    if(1 == db.bin and (db.bin2 or db.bin4)):
-        destripe_filter = True
-    elif(2 == db.bin and db.bin4):
-        destripe_filter = True
 
     noise_filter = False
     if ((process_this(ccdchan, conf['HiCal_Noise_Processing'])) and
-        ((db.dark_std >=
-          conf['HiCal_Noise_Bin_DarkPixel_STD'][bindex]) or
-         (db.mask_std >=
-          conf['HiCal_Noise_Bin_Mask_STD'][bindex]) or
-         (db.lis_pixels >= conf['HiCal_Noise_LIS_Count']))):
+        ((float(db['IMAGE_DARK_STANDARD_DEVIATION']) >=
+          float(conf['HiCal_Noise_Bin_DarkPixel_STD'].split(', ')[bindex])) or
+         (float(db['CAL_MASK_STANDARD_DEVIATION']) >=
+          float(conf['HiCal_Noise_Bin_Mask_STD'].split(', ')[bindex])) or
+         (int(db['LOW_SATURATED_PIXELS']) >= int(conf['HiCal_Noise_LIS_Count'])))):
         noise_filter = True
 
     zapcols = False
-    if(lis_pixels >= conf['HiCal_Noise_LIS_Count']):
+    if(int(db['LOW_SATURATED_PIXELS']) >= int(conf['HiCal_Noise_LIS_Count'])):
         zapcols = True
 
     divide = False
     if 'DIVIDE' == conf['HiCal_HPF_Cubenorm']:
         divide = True
+    elif 'SUBTRACT' == conf['HiCal_HPF_Cubenorm']:
+        divide = False
+    else:
+        raise KeyError('The HiCal_HPF_Cubenorm keyword can be DIVIDE or '
+                       'SUBTRACT, but was {}'.format(conf['HiCal_HPF_Cubenorm']))
 
-    return HiCalFlags(destripe_filter, noise_filter, zapcols, divide)
+    return HiCalFlags(noise_filter, zapcols, divide)
 
 
 def set_lines(conf, db) -> collections.namedtuple:
     '''Determine the right values for the start lines and number of lines.'''
     Lines = collections.namedtuple('Lines', ['start', 'number'])
 
-    sl = conf['HiCal_Bin1_Skip_Top_Lines'] / db.bin + 1
-    nl = db.image_lines - (hconf['HiCal_Bin1_Skip_Top_Lines'] +
-                           hconf['HiCal_Bin1_Skip_Bot_Lines']) / db.bin
-    if nl < 2000 / db.bin:
+    # The original Perl code doesn't force sl and nl back into ints, so we
+    # won't here, either, so sl and nl could be floats
+    sl = int(conf['HiCal_Bin1_Skip_Top_Lines']) / int(db['BINNING']) + 1
+    nl = int(db['IMAGE_LINES']) - (int(conf['HiCal_Bin1_Skip_Top_Lines']) +
+                                   int(conf['HiCal_Bin1_Skip_Bot_Lines'])) / int(db['BINNING'])
+    if nl < 2000 / int(db['BINNING']):
         sl = 1
-        nl = db.image_lines
+        nl = int(db['IMAGE_LINES'])
 
     return Lines(sl, nl)
 
 
-def run_hical(in_cube, hical_cub, hconf,
-              lis_per, image_buffer_mean, binning, noise_filter):
+def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike, hconf: dict,
+              lis_per: float, image_buffer_mean: float, binning: int,
+              noise_filter: bool) -> None:
 
     to_s = '{}+SignedWord+{}:{}'.format(hical_cub,
                                         hconf['HiCal_Normalization_Minimum'],
@@ -292,13 +475,14 @@ def run_hical(in_cube, hical_cub, hconf,
 
 def process_this(ccdchan: tuple, flag_list: list) -> int:
     if len(flag_list) != 28:
-        raise IndexError('the list must have 28 elements')
-    ccd_number = int(re.match(r"RED|IR|BG(\d+)", ccdchan[0]).group())
+        raise IndexError('The list must have 28 elements')
+    ccd_number = int(hirise.getccdnumber(ccdchan[0]))
     i = (2 * ccd_number) + int(ccdchan[1])
-    return flag_list[i]
+    return int(flag_list[i])
 
 
-def furrow_nulling(cube, out_cube, binning, ccdchan, keep=False):
+def furrow_nulling(cube: os.PathLike, out_cube: os.PathLike, binning: int,
+                   ccdchan: tuple, keep=False) -> bool:
     furrows_found = False
 
     to_del = isis.PathSet()
@@ -333,13 +517,14 @@ def furrow_nulling(cube, out_cube, binning, ccdchan, keep=False):
 
     else:
         # finally, check to see if any furrow pixels were zapped.
-        # The original code checked on the fist iteration, this
+        # The original Perl code checked on the fist iteration, this
         # mechanism checks on the last, not sure if there was anything
         # magical about the first, or maybe we should do it each time?
         fscrop_stats = pvl.loads(isis.stats(fscrop_file).stdout)
         fsmask_stats = pvl.loads(isis.stats(fsmask_file).stdout)
 
-        if fsmask_stats['Results']['NullPixels'] > fscrop_stats['Results']['NullPixels']:
+        if(int(fsmask_stats['Results']['NullPixels']) >
+           int(fscrop_stats['Results']['NullPixels'])):
             furrows_found = True
             # Perform simple 3x3 LPFZ filter to clean up the edges along the furrow
             trim_file = out_cube.with_sufffix('.trim.cub')
@@ -353,7 +538,8 @@ def furrow_nulling(cube, out_cube, binning, ccdchan, keep=False):
     return furrows_found
 
 
-def mask(in_cube, out_cube, noisefilter_min, noisefilter_max, binning):
+def mask(in_cube: os.PathLike, out_cube: os.PathLike, noisefilter_min: float,
+         noisefilter_max: float, binning: int, keep=False) -> None:
     '''mask out unwanted pixels'''
     to_del = isis.PathSet()
     temp_cube = to_del.add(out_cube.with_suffix('.mask_temp.cub'))
@@ -376,7 +562,7 @@ def mask(in_cube, out_cube, noisefilter_min, noisefilter_max, binning):
     return
 
 
-def analyze_cubenorm_stats(statsfile, binning):
+def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
     with open(statsfile) as csvfile:
         valid_points = list()
         std_devs = list()
@@ -423,8 +609,16 @@ def analyze_cubenorm_stats(statsfile, binning):
             max_w_maxvp.append(ma)
 
     # The original code sorts these min and max_w_maxvp arrays,
-    # but then ignores this sorting.  To get that original
-    # behavior, comment out these two lines:
+    # but then ignores this sorting by not using the sorted arrays.
+    # I believe this to be an error, so I'm going to print out these
+    # arrays and see how far from 'sorted' they are:
+    print('min_w_maxvp')
+    print(min_w_maxvp)
+    print('max_w_maxvp')
+    print(max_w_maxvp)
+    sys.exit()
+
+    # To get that original behavior, comment out these two lines:
     min_w_maxvp.sort()
     max_w_maxvp.sort()
 
@@ -444,15 +638,16 @@ def analyze_cubenorm_stats(statsfile, binning):
     return(mindn, maxdn)
 
 
-def HiGainFx(cube, outcube, coef_path, version, keep=False):
+def HiGainFx(cube: os.PathLike, outcube: os.PathLike, coef_path: os.PathLike,
+             version: str, keep=False) -> None:
     '''Perform a Gain-Drift correction on an HiIRSE Channel Image.'''
     binning = isis.getkey(cube, 'Instrument', 'Summing')
     ccd = isis.getkey(cube, 'Instrument', 'CcdId')
     chan = isis.getkey(cube, 'Instrument', 'ChannelNumber')
 
-    coef_f_path = coef_path / f'HiRISE_Gain_Drift_Correction_Bin{binning}.{version}.csv'
+    coef_f_path = Path(coef_path) / f'HiRISE_Gain_Drift_Correction_Bin{binning}.{version}.csv'
 
-    with open(coef_path) as csvfile:
+    with open(coef_f_path) as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             if hirise.getccdchannel(row['CCD CH']) == (ccd, chan):
@@ -469,13 +664,13 @@ def HiGainFx(cube, outcube, coef_path, version, keep=False):
     return
 
 
-def Cubenorm_Filter(cubenorm_tab, outfile, pause=False,
-                    boxfilter=5, divide=False, chan=None):
+def Cubenorm_Filter(cubenorm_tab: os.PathLike, outfile: os.PathLike, pause=False,
+                    boxfilter=5, divide=False, chan=None) -> tuple:
     '''Perform a highpass filter on the cubenorm table output of the columnar average and median values.'''
     if boxfilter < 3:
         raise ValueError(f'boxfilter={boxfilter} is less than 3')
     if not chan:
-        chan = hirise.getccdchannel(cubenorm_tab)[1]
+        chan = hirise.getccdchannel(Path(cubenorm_tab).name)[1]
 
     # Make a list to receive each column
     valid_points = list()
@@ -519,22 +714,23 @@ def Cubenorm_Filter(cubenorm_tab, outfile, pause=False,
 def cut_size(chan: int, length: int) -> collections.namedtuple:
     '''Determine the appropriate values for the cut sizes.'''
     Cut = collections.namedtuple('Cut', ['left', 'right'])
-    c = Cut(6, 6)
+    left = 6
+    right = 6
 
     if 0 == chan:
         if 511 == length:
-            c.left = 40
+            left = 40
         elif 255 == length:
-            c.left = 50
+            left = 50
     elif 1 == chan:
         if 511 == length:
-            c.right = 40
+            right = 40
         elif 255 == length:
-            c.right = 50
+            right = 50
     else:
         raise ValueError(f'chan={chan} is not 0 or 1')
 
-    return c
+    return Cut(left, right)
 
 
 def Cubenorm_Filter_filter_boxfilter(inlist: list, origlist: list, boxfilter: int) -> list:
@@ -557,7 +753,9 @@ def Cubenorm_Filter_filter_boxfilter(inlist: list, origlist: list, boxfilter: in
     return x
 
 
-def Cubenorm_Filter_filter(inlist, boxfilter, iterations, chan, pause, vpoints, divide):
+def Cubenorm_Filter_filter(inlist: list, boxfilter: int, iterations: int,
+                           chan: int, pause: bool, vpoints: list,
+                           divide: bool) -> list:
     '''This performs highpass filtering on the passed list.'''
 
     x = inlist.copy()
@@ -639,9 +837,10 @@ def pause_slicer(samp: int, width: int) -> slice:
     return slice(s_start, s_stop)
 
 
-def highlow_destripe(in_cube, out_cube, conf, isisnorm='',
+def highlow_destripe(in_cube: os.PathLike, out_cube: os.PathLike,
+                     conf: dict, isisnorm='',
                      lnull=True, lhrs=True, lhis=True, llrs=True, llis=True,
-                     keep=False):
+                     keep=False) -> None:
     # Perform highpass/lowpass filter vertical destripping
     to_delete = isis.PathSet()
     lpf_cub = to_delete.add(out_cube.with_suffix('.lpf.cub'))
@@ -667,7 +866,7 @@ def highlow_destripe(in_cube, out_cube, conf, isisnorm='',
     return
 
 
-def getHistVal(histogram, conf):
+def getHistVal(histogram: isis.Histogram, conf: dict) -> tuple:
     '''Return information about the histogram'''
     lisper = 0
     if int(histogram['Total Pixels']) - int(histogram['Null Pixels']) > 0:
@@ -691,8 +890,9 @@ def getHistVal(histogram, conf):
     return(lisper, maxval)
 
 
-def NoiseFilter_noisefilter(from_cube, to_cube, flattol, conf,
-                            maxval, tolmin, tolmax):
+def NoiseFilter_noisefilter(from_cube: os.PathLike, to_cube: os.PathLike,
+                            flattol: float, conf: dict, maxval: float,
+                            tolmin: float, tolmax: float) -> None:
     '''Convenience function for the repeated noisefiltering.'''
     isis.noisefilter(from_cub, to=to_cube, flattol=flattol,
                      low=conf['NoiseFilter_Minimum_Value'],
@@ -704,7 +904,7 @@ def NoiseFilter_noisefilter(from_cube, to_cube, flattol, conf,
                      lisisnoise=True, lrsisnoise=True)
 
 
-def NoiseFilter_cubenorm_edit(in_tab: Path, out_tab: Path):
+def NoiseFilter_cubenorm_edit(in_tab: Path, out_tab: Path) -> None:
     '''This function zaps the relevent pixels in the cubenorm output and
        creates an edited cubenorm file.'''
     # Slightly different values from other function, not entirely sure why.
@@ -757,7 +957,8 @@ def NoiseFilter_cubenorm_edit(in_tab: Path, out_tab: Path):
     return
 
 
-def NoiseFilter(in_cube, output, conf, minimum=None, maximum=None, zapc=False, keep=False):
+def NoiseFilter(in_cube: os.PathLike, output: os.PathLike, conf: dict,
+                minimum=None, maximum=None, zapc=False, keep=False) -> None:
     '''Perform salt/pepper noise removal.'''
     binning = isis.getkey_k(in_cube, 'Instrument', 'Summing')
     (ccd, chan) = hirise.getccdchannel(isis.getkey_k(in_cube, 'Archive', 'ProductId'))
@@ -841,8 +1042,9 @@ def NoiseFilter(in_cube, output, conf, minimum=None, maximum=None, zapc=False, k
     return
 
 
-def Hidestripe(in_cube, out_cube, binning, minimum, maximum, hidcorr,
-               line_samples, keep=False) -> str:
+def Hidestripe(in_cube: os.PathLike, out_cube: os.PathLike, binning: int,
+               minimum: float, maximum: float, hidcorr: float,
+               line_samples: int, keep=False) -> float:
     # SignedWord+$HiCal_Normalization_Minimum:$HiCal_Normalization_Maximum
     to_s = '+SignedWord+{}:{}'.format(minimum, maximum)
     to_del = isis.PathSet()
@@ -866,7 +1068,7 @@ def Hidestripe(in_cube, out_cube, binning, minimum, maximum, hidcorr,
     # filter and cube after hidestripe
     diff_cube = to_del.add(out_cube.with_suffix('.diff.cub'))
     isis.algebra(from_=out_cube, from2=in_cube, to=diff_cube, operator='subtract')
-    stddev = pvl.loads(isis.stats(diff_cube).stdout)['Results']['StandardDeviation']
+    stddev = float(pvl.loads(isis.stats(diff_cube).stdout)['Results']['StandardDeviation'])
 
     if not keep:
         to_delete.unlink()
@@ -874,28 +1076,28 @@ def Hidestripe(in_cube, out_cube, binning, minimum, maximum, hidcorr,
     return stddev
 
 
-def chan_samp_setup(channel, binning):
+def chan_samp_setup(channel: int, binning: int) -> ChanSamp:
     '''Returns a named tuple which contains a list and two numbers.'''
     samp = dict()
     # samp[chan][binning]
-    samp['0']['2'] = 1,  2,  3,  4,  5,  6,  7,  8,  9, 10
-    samp['1']['2'] = 512, 511, 510, 509, 508, 507, 506, 505, 504, 503
-    samp['0']['4'] = 1,  2,  3,  4,  5,  6
-    samp['1']['4'] = 256, 255, 254, 253, 252, 251
+    samp[0][2] = 1,  2,  3,  4,  5,  6,  7,  8,  9, 10
+    samp[1][2] = 512, 511, 510, 509, 508, 507, 506, 505, 504, 503
+    samp[0][4] = 1,  2,  3,  4,  5,  6
+    samp[1][4] = 256, 255, 254, 253, 252, 251
 
     ssamp = dict()
     # ssamp[chan][binning]
-    ssamp['0']['2'] = 11
-    ssamp['1']['2'] = 1
-    ssamp['0']['4'] = 7
-    ssamp['1']['4'] = 1
+    ssamp[0][2] = 11
+    ssamp[1][2] = 1
+    ssamp[0][4] = 7
+    ssamp[1][4] = 1
 
     nsamp = dict()
     # nsamp[chan][binning]
-    nsamp['0']['2'] = 502
-    nsamp['1']['2'] = 502
-    nsamp['0']['4'] = 250
-    nsamp['1']['4'] = 250
+    nsamp[0][2] = 502
+    nsamp[1][2] = 502
+    nsamp[0][4] = 250
+    nsamp[1][4] = 250
 
     ChanSamp = collections.namedtuple('ChanSamp', ['samp', 'ssamp', 'nsamp'])
 
@@ -903,39 +1105,39 @@ def chan_samp_setup(channel, binning):
     return c
 
 
-def furrow_setup(ccd, binning):
+def furrow_setup(ccd: str, binning: int):
     '''Returns the right tuple of furrow.'''
     # Expect to call the returned dict like this: d[ccd][binning]
     # Assume each channel for each CCD will have the same threshold
     d = dict()
-    d['RED0']['2'] = 8000, 8100,  8700,  9200,  9600, 10000, 12000, 12000, 12000, 12000
-    d['RED0']['4'] = 8000, 9000,  9500,  9900,  9900, 10000
-    d['RED1']['2'] = 7200, 7200,  7800,  8400,  9000,  9500, 12000, 12000, 12000, 12000
-    d['RED1']['4'] = 8000, 8100,  9200,  9600,  9800, 10000
-    d['RED2']['2'] = 7800, 7800,  8400,  9000,  9600, 10000, 12000, 12000, 12000, 12000
-    d['RED2']['4'] = 8000, 8700,  9500,  9800,  9900, 10000
-    d['RED3']['2'] = 7800, 8100,  8300,  9200,  9600, 10000, 12000, 12000, 12000, 12000
-    d['RED3']['4'] = 7900, 9200,  9700,  9900, 10000, 10500
-    d['RED4']['2'] = 7800, 7800,  8300,  9000,  9500,  9900, 12000, 12000, 12000, 12000
-    d['RED4']['4'] = 8000, 8700,  9700, 10000, 10300, 10600
-    d['RED5']['2'] = 7900, 8200,  8600,  9200,  9600, 10000, 12000, 12000, 12000, 12000
-    d['RED5']['4'] = 8000, 9300,  9700,  9900, 10200, 10700
-    d['RED6']['2'] = 7500, 7500,  8100,  8500,  9200, 10000, 12000, 12000, 12000, 12000
-    d['RED6']['4'] = 8000, 8400,  9700, 10000, 10500, 10700
-    d['RED7']['2'] = 7600, 8300,  8900,  9400,  9900, 11000, 12000, 12000, 12000, 12000
-    d['RED7']['4'] = 7700, 9600, 10000, 10200, 11000, 12000
-    d['RED8']['2'] = 7200, 7200,  7900,  8500,  9000,  9400, 12000, 12000, 12000, 12000
-    d['RED8']['4'] = d['RED7']['4']
-    d['RED9']['2'] = 7600, 8300,  8600,  9200,  9600, 10000, 12000, 12000, 12000, 12000
-    d['RED9']['4'] = 8000, 8800,  9200,  9400,  9800, 10500
-    d['IR10']['2'] = d['RED0']['2']
-    d['IR10']['4'] = 7600, 8300,  9000, 10000, 10500, 12000
-    d['IR11']['2'] = d['RED0']['2']
-    d['IR11']['4'] = d['IR10']['4']
-    d['BG12']['2'] = d['RED0']['2']
-    d['BG12']['4'] = d['IR10']['4']
-    d['BG13']['2'] = d['RED0']['2']
-    d['BG13']['4'] = d['IR10']['4']
+    d['RED0'][2] = 8000, 8100,  8700,  9200,  9600, 10000, 12000, 12000, 12000, 12000
+    d['RED0'][4] = 8000, 9000,  9500,  9900,  9900, 10000
+    d['RED1'][2] = 7200, 7200,  7800,  8400,  9000,  9500, 12000, 12000, 12000, 12000
+    d['RED1'][4] = 8000, 8100,  9200,  9600,  9800, 10000
+    d['RED2'][2] = 7800, 7800,  8400,  9000,  9600, 10000, 12000, 12000, 12000, 12000
+    d['RED2'][4] = 8000, 8700,  9500,  9800,  9900, 10000
+    d['RED3'][2] = 7800, 8100,  8300,  9200,  9600, 10000, 12000, 12000, 12000, 12000
+    d['RED3'][4] = 7900, 9200,  9700,  9900, 10000, 10500
+    d['RED4'][2] = 7800, 7800,  8300,  9000,  9500,  9900, 12000, 12000, 12000, 12000
+    d['RED4'][4] = 8000, 8700,  9700, 10000, 10300, 10600
+    d['RED5'][2] = 7900, 8200,  8600,  9200,  9600, 10000, 12000, 12000, 12000, 12000
+    d['RED5'][4] = 8000, 9300,  9700,  9900, 10200, 10700
+    d['RED6'][2] = 7500, 7500,  8100,  8500,  9200, 10000, 12000, 12000, 12000, 12000
+    d['RED6'][4] = 8000, 8400,  9700, 10000, 10500, 10700
+    d['RED7'][2] = 7600, 8300,  8900,  9400,  9900, 11000, 12000, 12000, 12000, 12000
+    d['RED7'][4] = 7700, 9600, 10000, 10200, 11000, 12000
+    d['RED8'][2] = 7200, 7200,  7900,  8500,  9000,  9400, 12000, 12000, 12000, 12000
+    d['RED8'][4] = d['RED7'][4]
+    d['RED9'][2] = 7600, 8300,  8600,  9200,  9600, 10000, 12000, 12000, 12000, 12000
+    d['RED9'][4] = 8000, 8800,  9200,  9400,  9800, 10500
+    d['IR10'][2] = d['RED0'][2]
+    d['IR10'][4] = 7600, 8300,  9000, 10000, 10500, 12000
+    d['IR11'][2] = d['RED0'][2]
+    d['IR11'][4] = d['IR10'][4]
+    d['BG12'][2] = d['RED0'][2]
+    d['BG12'][4] = d['IR10'][4]
+    d['BG13'][2] = d['RED0'][2]
+    d['BG13'][4] = d['IR10'][4]
 
     return d[ccd][binning]
 
