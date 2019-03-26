@@ -172,6 +172,13 @@ class ProductID(ObservationID):
     def __repr__(self):
         return (f'{self.__class__.__name__}(\'{self.__str__()}\')')
 
+    def get_ccd(self) -> str:
+        try:
+            return self.ccdname + self.ccdnumber
+        except TypeError:
+            raise AttributeError('This Product ID, {}, does not have a ccdname '
+                                 'or ccdnumber'.format(str(self)))
+
 
 def _match_chan(s: str):
     matched = chan_re.fullmatch(s)

@@ -285,6 +285,11 @@ class TestProdID(unittest.TestCase):
         pid = hirise.ProductID(s)
         self.assertEqual("ProductID('ESP_034783_1850_RED5_0')", repr(pid))
 
+    def test_get_ccd(self):
+        s = 'This is a Prod ID: ESP_034783_1850_RED5_0'
+        pid = hirise.ProductID(s)
+        self.assertEqual(pid.get_ccd(), 'RED5')
+
 
 class TestStrings(unittest.TestCase):
 
