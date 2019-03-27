@@ -29,10 +29,10 @@
 
 import argparse
 import hashlib
+import json
 import logging
 import math
 import os
-import shelve
 from pathlib import Path
 
 import pvl
@@ -43,7 +43,7 @@ import kalasiris as isis
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--db',           required=False, default='.HiCat')
+    parser.add_argument('--db',           required=False, default='.HiCat.json')
     # parser.add_argument('-t', '--table',  required=False, default='EDR_Products')
     parser.add_argument('-o', '--output', required=False, default='.EDR_Stats.cub')
     parser.add_argument('--histmin',      required=False, default=0.01)
@@ -84,9 +84,8 @@ def main():
     else:
         db_path = Path(args.db)
 
-    db = shelve.open(str(db_path))
-    db.update(histats)
-    db.close()
+    with open(db_path, 'w') as f:
+        json.dump(histats, f, indent=0, sort_keys=True)
 
 
 def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
@@ -109,9 +108,9 @@ def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
 
     # Get some info from the new cube:
     histats['PRODUCT_ID'] = isis.getkey_k(out_cube, 'Archive', 'ProductId')
-    histats['IMAGE_LINES'] = isis.getkey_k(out_cube, 'Dimensions', 'Lines')
-    histats['LINE_SAMPLES'] = isis.getkey_k(out_cube, 'Dimensions', 'Samples')
-    histats['BINNING'] = isis.getkey_k(out_cube, 'Instrument', 'Summing')
+    histats['IMAGE_LINES'] = int(isis.getkey_k(out_cube, 'Dimensions', 'Lines'))
+    histats['LINE_SAMPLES'] = int(isis.getkey_k(out_cube, 'Dimensions', 'Samples'))
+    histats['BINNING'] = int(isis.getkey_k(out_cube, 'Instrument', 'Summing'))
 
     histats['STD_DN_LEVELS'] = get_dncnt(out_cube, histmin, histmax, keep=keep)
     histats['IMAGE_SIGNAL_TO_NOISE_RATIO'] = calc_snr(out_cube, gains_file, histats)
@@ -229,7 +228,7 @@ def calc_snr(cub: os.PathLike, gainsfile: os.PathLike, histats: dict) -> float:
     ccdchan = '{0[0]}_{0[1]}'.format(hirise.getccdchannel(str(cub)))
 
     gainspvl = pvl.load(str(gainsfile))
-    gain = float(gainspvl['Gains'][ccdchan]['Bin' + histats['BINNING']])
+    gain = float(gainspvl['Gains'][ccdchan]['Bin' + str(histats['BINNING'])])
 
     img_mean = float(histats['IMAGE_MEAN'])
     lis_pixels = float(histats['LOW_SATURATED_PIXELS'])
