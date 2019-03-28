@@ -332,7 +332,7 @@ def get_ObsID_fromfile(path: os.PathLike) -> ObservationID:
 
     try:
         return ObservationID(isis.getkey_k(p, 'Archive', 'ObservationId'))
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, ValueError):
         for part in reversed(p.parts):
             try:
                 return ObservationID(part)
@@ -349,7 +349,12 @@ def get_ProdID_fromfile(path: os.PathLike) -> ProductID:
 
     try:
         return ProductID(isis.getkey_k(p, 'Archive', 'ProductId'))
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, ValueError):
+        # The CalledProcessError is if there is some problem with running
+        # getkey, the ValueError is if a ProductID can't be extracted from
+        # the labels.  This allows this function to be called on any kind of
+        # file, as it will just try and read the ProductID from the filename
+        # or could also reverse recurse up to directory names.
         for part in reversed(p.parts):
             try:
                 return ProductID(part)
