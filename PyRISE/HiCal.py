@@ -31,9 +31,11 @@ import argparse
 import collections
 import csv
 import logging
+import os
 import re
 import shelve
 import statistics
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -137,7 +139,7 @@ def main():
     db.close()
 
 
-def HiCal(in_cube: os.PathLike, out_cube: os.Pathlike, ccdchan: tuple,
+def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
           conf: dict, db: dict, destripe=False, keep=False) -> tuple:
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
@@ -184,7 +186,9 @@ def HiCal(in_cube: os.PathLike, out_cube: os.Pathlike, ccdchan: tuple,
         next_cube = higain_file
 
     # Perform the high-pass filter cubenorm steps
-    (sl, nl) = set_lines(hconf, db)
+    (sl, nl) = set_lines(int(hconf['HiCal_Bin1_Skip_Top_Lines']),
+                         int(hconf['HiCal_Bin1_Skip_Bot_Lines']),
+                         int(db['BINNING']), int(db['IMAGE_LINES']))
     crop_file = to_delete.add(next_cube.with_suffix('.crop.cub'))
     isis.crop(next_cube, to=crop_file, line=sl, nlines=nl)
 
@@ -311,8 +315,8 @@ def conf_check_strings(conf_name: str, choices: tuple, conf_value: str) -> None:
     return
 
 
-def conf_check_count(conf_name: str, count: int, what: str, conf_value: str) -> None:
-    if len(conf_value.split(', ')) != count:
+def conf_check_count(conf_name: str, count: int, what: str, conf_value: list) -> None:
+    if len(conf_value) != count:
         KeyError('The {} parameter must have {} entries, one for each {}, '
                  'but it was {}'.format(conf_name, str(count), what, conf_value))
     return
@@ -408,9 +412,9 @@ def set_flags(conf: dict, db: dict, ccdchan: tuple, bindex: int) -> collections.
     noise_filter = False
     if ((process_this(ccdchan, conf['HiCal_Noise_Processing'])) and
         ((float(db['IMAGE_DARK_STANDARD_DEVIATION']) >=
-          float(conf['HiCal_Noise_Bin_DarkPixel_STD'].split(', ')[bindex])) or
+          float(conf['HiCal_Noise_Bin_DarkPixel_STD'][bindex])) or
          (float(db['CAL_MASK_STANDARD_DEVIATION']) >=
-          float(conf['HiCal_Noise_Bin_Mask_STD'].split(', ')[bindex])) or
+          float(conf['HiCal_Noise_Bin_Mask_STD'][bindex])) or
          (int(db['LOW_SATURATED_PIXELS']) >= int(conf['HiCal_Noise_LIS_Count'])))):
         noise_filter = True
 
@@ -430,18 +434,18 @@ def set_flags(conf: dict, db: dict, ccdchan: tuple, bindex: int) -> collections.
     return HiCalFlags(noise_filter, zapcols, divide)
 
 
-def set_lines(conf, db) -> collections.namedtuple:
+def set_lines(skip_top: int, skip_bottom: int,
+              binning: int, image_lines: int) -> collections.namedtuple:
     '''Determine the right values for the start lines and number of lines.'''
     Lines = collections.namedtuple('Lines', ['start', 'number'])
 
     # The original Perl code doesn't force sl and nl back into ints, so we
     # won't here, either, so sl and nl could be floats
-    sl = int(conf['HiCal_Bin1_Skip_Top_Lines']) / int(db['BINNING']) + 1
-    nl = int(db['IMAGE_LINES']) - (int(conf['HiCal_Bin1_Skip_Top_Lines']) +
-                                   int(conf['HiCal_Bin1_Skip_Bot_Lines'])) / int(db['BINNING'])
-    if nl < 2000 / int(db['BINNING']):
+    sl = skip_top / binning + 1
+    nl = image_lines - (skip_top + skip_bottom) / binning
+    if nl < 2000 / binning:
         sl = 1
-        nl = int(db['IMAGE_LINES'])
+        nl = image_lines
 
     return Lines(sl, nl)
 
@@ -1086,23 +1090,23 @@ def Hidestripe(in_cube: os.PathLike, out_cube: os.PathLike, binning: int,
     return stddev
 
 
-def chan_samp_setup(channel: int, binning: int) -> ChanSamp:
+def chan_samp_setup(channel: int, binning: int) -> collections.namedtuple:
     '''Returns a named tuple which contains a list and two numbers.'''
-    samp = dict()
+    samp = collections.defaultdict(dict)
     # samp[chan][binning]
     samp[0][2] = 1,  2,  3,  4,  5,  6,  7,  8,  9, 10
     samp[1][2] = 512, 511, 510, 509, 508, 507, 506, 505, 504, 503
     samp[0][4] = 1,  2,  3,  4,  5,  6
     samp[1][4] = 256, 255, 254, 253, 252, 251
 
-    ssamp = dict()
+    ssamp = collections.defaultdict(dict)
     # ssamp[chan][binning]
     ssamp[0][2] = 11
     ssamp[1][2] = 1
     ssamp[0][4] = 7
     ssamp[1][4] = 1
 
-    nsamp = dict()
+    nsamp = collections.defaultdict(dict)
     # nsamp[chan][binning]
     nsamp[0][2] = 502
     nsamp[1][2] = 502
@@ -1119,7 +1123,7 @@ def furrow_setup(ccd: str, binning: int):
     '''Returns the right tuple of furrow.'''
     # Expect to call the returned dict like this: d[ccd][binning]
     # Assume each channel for each CCD will have the same threshold
-    d = dict()
+    d = collections.defaultdict(dict)
     d['RED0'][2] = 8000, 8100,  8700,  9200,  9600, 10000, 12000, 12000, 12000, 12000
     d['RED0'][4] = 8000, 9000,  9500,  9900,  9900, 10000
     d['RED1'][2] = 7200, 7200,  7800,  8400,  9000,  9500, 12000, 12000, 12000, 12000
