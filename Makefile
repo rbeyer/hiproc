@@ -69,7 +69,20 @@ test: test-resources ## run tests quickly with the default Python
 
 test-resources: ## Download what we need for testing
 	mkdir test-resources
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_RED3_0.IMG test-resources/PSP_010502_2090_RED3_0.img
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_RED3_1.IMG test-resources/PSP_010502_2090_RED3_1.img
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_RED4_0.IMG test-resources/PSP_010502_2090_RED4_0.img
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_RED4_1.IMG test-resources/PSP_010502_2090_RED4_1.img
 	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_RED5_0.IMG test-resources/PSP_010502_2090_RED5_0.img
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_RED5_1.IMG test-resources/PSP_010502_2090_RED5_1.img
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_IR10_0.IMG test-resources/PSP_010502_2090_IR10_0.img
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_IR10_1.IMG test-resources/PSP_010502_2090_IR10_1.img
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_IR11_0.IMG test-resources/PSP_010502_2090_IR11_0.img
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_IR11_1.IMG test-resources/PSP_010502_2090_IR11_1.img
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_BG12_0.IMG test-resources/PSP_010502_2090_BG12_0.img
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_BG12_1.IMG test-resources/PSP_010502_2090_BG12_1.img
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_BG13_0.IMG test-resources/PSP_010502_2090_BG13_0.img
+	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_BG13_1.IMG test-resources/PSP_010502_2090_BG13_1.img
 
 coverage: ## check code coverage quickly with the default Python
 	coverage run --source PyRISE setup.py test
