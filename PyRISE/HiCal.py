@@ -127,7 +127,8 @@ def main():
     # db, but since we're not interested in persistance, we can ignore it.
 
     # All the setup is done, start processing:
-    (std, diff_std, zapped) = HiCal(in_cube, out_cube, ccdchan, conf, db,
+    (std, diff_std, zapped) = HiCal(in_cube, out_cube, ccdchan,
+                                    conf, args.conf, db,
                                     destripe=destripe_filter, keep=args.keep)
 
     db['HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION'] = std
@@ -140,7 +141,8 @@ def main():
 
 
 def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
-          conf: dict, db: dict, destripe=False, keep=False) -> tuple:
+          conf: dict, conf_path: os.PathLike, db: dict,
+          destripe=False, keep=False) -> tuple:
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
 
@@ -166,7 +168,7 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
     lis_per = int(db['LOW_SATURATED_PIXELS']) / (int(db['IMAGE_LINES']) *
                                                  int(db['LINE_SAMPLES'])) * 100.0
     hical_file = to_delete.add(next_cube.with_suffix('.hical.cub'))
-    run_hical(next_cube, hical_file, hconf,
+    run_hical(next_cube, hical_file, conf, conf_path,
               lis_per, float(db['IMAGE_BUFFER_MEAN']), int(db['BINNING']),
               flags.noise_filter)
     next_cube = hical_file
@@ -246,7 +248,7 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
     return(std_final, diff_std_dev, zapped)
 
 
-def FurrowCheck(vpnts: list, channel: int) -> int:
+def FurrowCheck(vpnts: list, channel: int) -> bool:
     # This function was brought forward from HiStitch, because
     # it is more appropriate to perform the check here, and then
     # store the result for later.
@@ -349,9 +351,9 @@ def check_destripe(cube: os.PathLike, mybinning: int, bin2=None, bin4=None) -> b
     if((mybinning == 1 or mybinning == 2) and
        (bin2 is None or bin4 is None)):
         binnings = get_bins_fromfiles(cube)
-        powered_count = len(filter(lambda x: x == 'On',
-                                   isis.getkey_k(cube, 'Instrument',
-                                                 'PoweredCpmmFlag').split(',')))
+        powered_count = len(list(filter(lambda x: x == 'On',
+                                        isis.getkey_k(cube, 'Instrument',
+                                                      'PoweredCpmmFlag').split(','))))
         if bin2 is None and '2' in binnings.values():
             bin2 = True
 
@@ -450,25 +452,27 @@ def set_lines(skip_top: int, skip_bottom: int,
     return Lines(sl, nl)
 
 
-def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike, hconf: dict,
+def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
+              conf: dict, conf_path: os.PathLike,
               lis_per: float, image_buffer_mean: float, binning: int,
               noise_filter: bool) -> None:
 
     to_s = '{}+SignedWord+{}:{}'.format(hical_cub,
-                                        hconf['HiCal_Normalization_Minimum'],
-                                        hconf['HiCal_Normalization_Maximum'])
+                                        conf['HiCal']['HiCal_Normalization_Minimum'],
+                                        conf['HiCal']['HiCal_Normalization_Maximum'])
     hical_args = {'to': to_s, 'units': 'IOF'}
-    if(hconf['HiCal_ISIS_Conf'] != 'DEFAULT'):
+    if(conf['HiCal']['HiCal_ISIS_Conf'] != 'DEFAULT'):
+        conf_dir = Path(conf_path).parent
         if(lis_per < 5 and image_buffer_mean > 0):
-            hical_args['conf'] = hconf['HiCal_ISIS_Conf']
+            hical_args['conf'] = conf_dir / conf['HiCal']['HiCal_ISIS_Conf']
         else:
-            hical_args['conf'] = hconf['HiCal_ISIS_Conf_Noise']
+            hical_args['conf'] = conf_dir / conf['HiCal']['HiCal_ISIS_Conf_Noise']
 
     if noise_filter:
-        mask_cube = in_cube.with_sufffix('.mask.cub')
-        mask(mask_cube, out_cube,
-             hconf['NoiseFilter_Raw_Min'],
-             hconf['NoiseFilter_Raw_Max'], binning)
+        mask_cube = in_cube.with_suffix('.mask.cub')
+        mask(in_cube, mask_cube,
+             conf['NoiseFilter']['NoiseFilter_Raw_Min'],
+             conf['NoiseFilter']['NoiseFilter_Raw_Max'], binning)
         isis.hical(mask_cube, **hical_args)
         mask_cube.unlink()
     else:
@@ -489,13 +493,15 @@ def furrow_nulling(cube: os.PathLike, out_cube: os.PathLike, binning: int,
                    ccdchan: tuple, keep=False) -> bool:
     furrows_found = False
 
-    to_del = isis.PathSet()
-    fcrop_file = to_del.add(out_cube.with_sufffix('.fcrop.cub'))
+    out_path = Path(out_cube)
 
-    isis.mask(cube, mask=cube, to=out_cube, minimum=1000000, maximum=1000000)
+    to_del = isis.PathSet()
+    fcrop_file = to_del.add(out_path.with_suffix('.fcrop.cub'))
+
+    isis.mask(cube, mask=cube, to=out_path, minimum=1000000, maximum=1000000)
 
     furrow_values = furrow_setup(ccdchan[0], binning)
-    chan_samp = chan_samp_setup(ccdchan[0], binning)
+    chan_samp = chan_samp_setup(ccdchan[1], binning)
 
     # Crop out the portion of the image that will not be furrow checked.
     # ^- that's what the original said, but this is really cropping out
@@ -503,21 +509,21 @@ def furrow_nulling(cube: os.PathLike, out_cube: os.PathLike, binning: int,
     isis.crop(cube, to=fcrop_file,
               samp=chan_samp.ssamp, nsamp=chan_samp.nsamp)
 
-    isis.handmos(fcrop_file, mosaic=out_cube,
+    isis.handmos(fcrop_file, mosaic=out_path,
                  insamp=1, outsamp=chan_samp.ssamp, create='no')
 
     # for each column subject to furrowing, crop out each column,
     # run mask to null pixels above the furrow threshold, and
     # mosaic into the output image.
     for (s, furrow_v) in zip(chan_samp.samp, furrow_values):
-        fscrop_file = to_del.add(out_cube.with_sufffix(f'.crop{s}.cub'))
+        fscrop_file = to_del.add(out_path.with_suffix(f'.crop{s}.cub'))
         isis.crop(cube, to=fscrop_file, samp=s, nsamp=1)
 
-        fsmask_file = to_del.add(out_cube.with_sufffix(f'.mask{s}.cub'))
+        fsmask_file = to_del.add(out_path.with_suffix(f'.mask{s}.cub'))
         isis.mask(fscrop_file, mask=fscrop_file, to=fsmask_file,
                   minimum=0, maximum=furrow_v)
 
-        isis.handmos(fsmask_file, mosaic=out_cube, insamp=1, outsamp=s)
+        isis.handmos(fsmask_file, mosaic=out_path, insamp=1, outsamp=s)
 
     else:
         # finally, check to see if any furrow pixels were zapped.
@@ -531,10 +537,10 @@ def furrow_nulling(cube: os.PathLike, out_cube: os.PathLike, binning: int,
            int(fscrop_stats['Results']['NullPixels'])):
             furrows_found = True
             # Perform simple 3x3 LPFZ filter to clean up the edges along the furrow
-            trim_file = out_cube.with_sufffix('.trim.cub')
-            isis.trimfilter(out_cube, to=trim_file,
+            trim_file = out_path.with_suffix('.trim.cub')
+            isis.trimfilter(out_path, to=trim_file,
                             lines=3, samples=3, minopt='COUNT')
-            trim_file.rename(out_cube)
+            trim_file.rename(out_path)
 
     if not keep:
         to_del.unlink()
@@ -546,7 +552,8 @@ def mask(in_cube: os.PathLike, out_cube: os.PathLike, noisefilter_min: float,
          noisefilter_max: float, binning: int, keep=False) -> None:
     '''mask out unwanted pixels'''
     to_del = isis.PathSet()
-    temp_cube = to_del.add(out_cube.with_suffix('.mask_temp.cub'))
+    out_path = Path(out_cube)
+    temp_cube = to_del.add(out_path.with_suffix('.mask_temp.cub'))
 
     isis.mask(in_cube, mask=in_cube, to=temp_cube,
               minimum=noisefilter_min, maximum=noisefilter_max,
@@ -556,7 +563,7 @@ def mask(in_cube: os.PathLike, out_cube: os.PathLike, noisefilter_min: float,
     isis.cubenorm(temp_cube, stats=cubenorm_stats_file)
     (mindn, maxdn) = analyze_cubenorm_stats(cubenorm_stats_file, binning)
 
-    isis.mask(temp_cube, mask=temp_cube, to=out_cube,
+    isis.mask(temp_cube, mask=temp_cube, to=out_path,
               minimum=mindn, maximum=maxdn,
               preserve='INSIDE', spixels='NONE')
 
@@ -574,10 +581,10 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
         maxs = list()
         reader = csv.DictReader(csvfile, dialect=isis.cubenormDialect)
         for row in reader:
-            valid_points.append(row['ValidPoints'])
-            std_devs.append(row['StdDev'])
-            mins.append(row['Minimum'])
-            maxs.append(row['Maximum'])
+            valid_points.append(int(row['ValidPoints']))
+            std_devs.append(float(row['StdDev']))
+            mins.append(int(row['Minimum']))
+            maxs.append(int(row['Maximum']))
 
     maxvp = max(valid_points)
 
@@ -614,17 +621,15 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
 
     # The original code sorts these min and max_w_maxvp arrays,
     # but then ignores this sorting by not using the sorted arrays.
-    # I believe this to be an error, so I'm going to print out these
-    # arrays and see how far from 'sorted' they are:
-    print('min_w_maxvp')
-    print(min_w_maxvp)
-    print('max_w_maxvp')
-    print(max_w_maxvp)
-    sys.exit()
+    # I believe this to be an error:
+    logging.warning('Potential error in original code, but reproducing.')
 
-    # To get that original behavior, comment out these two lines:
-    min_w_maxvp.sort()
-    max_w_maxvp.sort()
+    # For example, with test data, this function returns: (3349.2, 9486.4)
+    #                 If sorted correctly, the result is: (2901.0, 10491.599999999999)
+
+    # To fix this behavior, uncomment these two lines:
+    # min_w_maxvp.sort()
+    # max_w_maxvp.sort()
 
     mindn = min_w_maxvp[int((len(min_w_maxvp) - 1) * 0.05)]
     maxdn = max_w_maxvp[int((len(max_w_maxvp) - 1) * 0.95)]
@@ -646,9 +651,9 @@ def HiGainFx(cube: os.PathLike, outcube: os.PathLike,
              coef_path: os.PathLike, version: str,
              keep=False) -> None:
     '''Perform a Gain-Drift correction on an HiIRSE Channel Image.'''
-    binning = isis.getkey(cube, 'Instrument', 'Summing')
-    ccd = isis.getkey(cube, 'Instrument', 'CcdId')
-    chan = isis.getkey(cube, 'Instrument', 'ChannelNumber')
+    binning = isis.getkey_k(cube, 'Instrument', 'Summing')
+    ccd = isis.getkey_k(cube, 'Instrument', 'CcdId')
+    chan = isis.getkey_k(cube, 'Instrument', 'ChannelNumber')
 
     coef_dir = Path(coef_path)
 
@@ -660,13 +665,13 @@ def HiGainFx(cube: os.PathLike, outcube: os.PathLike,
     coef_p = Path(coef_dir) / f'HiRISE_Gain_Drift_Correction_Bin{binning}.{version}.csv'
 
     with open(coef_p) as csvfile:
-        reader = csv.DictReader(csvfile)
+        reader = csv.DictReader(csvfile, skipinitialspace=True)
         for row in reader:
             if hirise.getccdchannel(row['CCD CH']) == (ccd, chan):
                 max_line = row['Max line']
                 a_coef = (row['R(0)'], row['R(1)'], row['R(2)'])
 
-    eqn = "'((F1/({0}+({1}*line)+({2}*line*line)))*(line<{3}) + (F1*(line>={3})))'".format(a_coef, max_line)
+    eqn = "\((F1/({0}+({1}*line)+({2}*line*line)))*(line<{3}) + (F1*(line>={3})))".format(*a_coef, max_line)
 
     tfile = outcube.with_suffix('.tempfx.cub')
     isis.fx(f1=cube, to=tfile, mode='CUBES', equation=eqn)
@@ -695,9 +700,9 @@ def Cubenorm_Filter(cubenorm_tab: os.PathLike, outfile: os.PathLike, pause=False
         reader = csv.DictReader(csvfile, dialect=isis.cubenormDialect)
         header = reader.fieldnames
         for row in reader:
-            valid_points.append(row.pop('ValidPoints'))
-            averages.append(row.pop('Average'))
-            medians.append(row.pop('Median'))
+            valid_points.append(int(row.pop('ValidPoints')))
+            averages.append(float(row.pop('Average')))
+            medians.append(float(row.pop('Median')))
             other_cols.append(row)
 
     zapped = FurrowCheck(valid_points, chan)
@@ -711,7 +716,7 @@ def Cubenorm_Filter(cubenorm_tab: os.PathLike, outfile: os.PathLike, pause=False
                                     chan=chan, pause=pause, vpoints=valid_points,
                                     divide=divide)
 
-    with open(outfile) as csvfile:
+    with open(outfile, 'w') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=header, dialect=isis.cubenormDialect)
         writer.writeheader()
         for (d, vp, av, md) in zip(other_cols, valid_points, avgflt, medflt):
@@ -746,22 +751,32 @@ def cut_size(chan: int, length: int) -> collections.namedtuple:
     return Cut(left, right)
 
 
-def Cubenorm_Filter_filter_boxfilter(inlist: list, origlist: list, boxfilter: int) -> list:
+def Cubenorm_Filter_filter_boxfilter(inlist: list, origlist: list,
+                                     boxfilter: int,
+                                     iterations=50) -> list:
     x = inlist.copy()
     hwidth = int(boxfilter / 2)
     frac = 0.25
     for step in range(3):
-        for it in range(1, iterations):
+        for it in range(iterations):
             xflt = x.copy()
             for i, _ in enumerate(x):
                 if x[i] != 0.0:
-                    xflt[i] = statistics.mean(x[i - hwidth:i + hwidth])
+                    start = i - hwidth
+                    if start < 0:
+                        start = 0
+                    xflt[i] = statistics.mean(filter(lambda y: y > 0, x[start:i + hwidth]))
+                    # print('Range: {}:{}, Values: {}, Mean: {}'.format(start,
+                    #                                                   i + hwidth,
+                    #                                                   x[start:i + hwidth],
+                    #                                                   xflt[i]))
             x = xflt.copy()
         # Zap any columns that are different from the average by more then 25%
-        if step == 2:
+        if step == 1:
             frac = 0.125
         for i, (orig, new) in enumerate(zip(origlist, x)):
             if orig != 0 and new != 0 and abs(orig - new) / new > frac:
+                print(f'orig: {orig}, new: {new}, setting to zero')
                 x[i] = 0
     return x
 
@@ -793,7 +808,7 @@ def Cubenorm_Filter_filter(inlist: list, boxfilter: int, iterations: int,
             x[zap_slice] = [0] * abs(width)
 
     # boxfilter
-    x = Cubenorm_Filter_filter_boxfilter(x, inlist, boxfilter)
+    x = Cubenorm_Filter_filter_boxfilter(x, inlist, boxfilter, iterations)
 
     # Perform the highpass difference of divide the original from lowpass
     maxvp = max(vpoints)
@@ -807,20 +822,20 @@ def Cubenorm_Filter_filter(inlist: list, boxfilter: int, iterations: int,
             x[i] = None
 
     # Need to patch up any of those None values with neighboring values:
-    if 0 == chan:
-        first_i = -1
-        e = reversed(list(enumerate(x)))
-        patch = 1
-    else:
-        first_i = 0
-        e = list(enumerate(x))
-        patch = -1
+    first_i = (-1, 0)
+    patch = (1, -1)
 
-    if x[first_i] is None:
-        x[first_i] = int(divide)
+    if x[first_i[chan]] is None:
+        x[first_i[chan]] = int(divide)
+
+    if 0 == chan:
+        e = reversed(list(enumerate(x)))
+    else:
+        e = list(enumerate(x))
+
     for (i, x_val) in e:
         if x_val is None:
-            x[i] = x[i + patch]
+            x[i] = x[i + patch[chan]]
 
     return(x)
 
@@ -882,6 +897,7 @@ def highlow_destripe(in_cube: os.PathLike, out_cube: os.PathLike,
 def getHistVal(histogram: isis.Histogram, conf: dict) -> tuple:
     '''Return information about the histogram'''
     lisper = 0
+    maxval = None
     if int(histogram['Total Pixels']) - int(histogram['Null Pixels']) > 0:
         lisper = int(histogram['Lis Pixels']) / (int(histogram['Total Pixels'])
                                                  - int(histogram['Null Pixels'])) * 100
@@ -896,9 +912,13 @@ def getHistVal(histogram: isis.Histogram, conf: dict) -> tuple:
         cumper = hard_high_end
 
     for row in histogram:
-        if row.CumulativePercent > cumper:
-            maxval = row.DN
+        if float(row.CumulativePercent) > cumper:
+            maxval = float(row.DN)
             break
+
+    if maxval is None:
+        raise ValueError('Did not find a CumulativePercent value greater '
+                         'than {}'.format(cumper))
 
     return(lisper, maxval)
 
@@ -917,16 +937,20 @@ def NoiseFilter_noisefilter(from_cube: os.PathLike, to_cube: os.PathLike,
                      lisisnoise=True, lrsisnoise=True)
 
 
-def NoiseFilter_cubenorm_edit(in_tab: Path, out_tab: Path, conf: dict) -> None:
+def NoiseFilter_cubenorm_edit(in_tab: os.PathLike, out_tab: os.PathLike,
+                              chan: int, binning: int, conf: dict,
+                              zapc=False) -> None:
     '''This function zaps the relevent pixels in the cubenorm output and
        creates an edited cubenorm file.'''
     # Slightly different values from other function, not entirely sure why.
     # Pause point locations are 1-based pixel numbers, so -1 to get list index.
     # With values are the number of pixels to affect, including the pause point pixel
-    ch_pause[0] = 1, 252, 515, 778  # Channel 0 pause point sample locations
-    ch_pause[1] = 247, 510, 773, 1024  # Channel 1 pause point sample locations
-    ch_width[0] = 3, 6, 6, 6  # Number of pixels to cut from pause point
-    ch_width[1] = -8, -7, -6, -3  # sign indicates direction of cut from pause point
+
+    ch_pause = {0: (1, 252, 515, 778),  # Channel 0 pause point sample locations
+                1: (247, 510, 773, 1024)}  # Channel 1 pause point sample locations
+
+    ch_width = {0: (3, 6, 6, 6),  # Number of pixels to cut from pause point
+                1: (-8, -7, -6, -3)}  # sign indicates direction of cut from pause point
 
     vpnts = list()
     other_cols = list()
@@ -935,7 +959,7 @@ def NoiseFilter_cubenorm_edit(in_tab: Path, out_tab: Path, conf: dict) -> None:
         reader = csv.DictReader(csvfile, dialect=isis.cubenormDialect)
         header = reader.fieldnames
         for row in reader:
-            vpnts.append(row.pop['ValidPoints'])
+            vpnts.append(int(row.pop('ValidPoints')))
             other_cols.append(row)
 
     max_vpnts = max(vpnts)
@@ -950,14 +974,15 @@ def NoiseFilter_cubenorm_edit(in_tab: Path, out_tab: Path, conf: dict) -> None:
             norm[i] = 0
 
     # Determine if the pause point pixels need to be zapped
-    for samp, width in zip(ch_pause[chan], ch_width[chan]):
-        zap_slice = pause_slicer(samp, width)
-        for i in range(zap_slice):
-            if(vpnts[i] / max_vpnts <
-               float(conf['NoiseFilter_Nonvalid_Fraction'])):
-                norm[i] = 0
+    if binning == 1:
+        for samp, width in zip(ch_pause[chan], ch_width[chan]):
+            zap_slice = pause_slicer(samp, width)
+            for i in range(zap_slice.start, zap_slice.stop):
+                if(vpnts[i] / max_vpnts <
+                   float(conf['NoiseFilter_Nonvalid_Fraction'])):
+                    norm[i] = 0
 
-    with open(out_tab) as csvfile:
+    with open(out_tab, 'w') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=header, dialect=isis.cubenormDialect)
         writer.writeheader()
         for (d, vp, n) in zip(other_cols, vpnts, norm):
@@ -989,7 +1014,7 @@ def NoiseFilter(in_cube: os.PathLike, output: os.PathLike, conf: dict,
     isis.cubenorm(in_cube, stats=cn_tab, format_='TABLE', direction='COLUMN')
 
     cn2_tab = to_delete.add(output.with_suffix('.cn2.tab'))
-    NoiseFilter_cubenorm_edit(cn_tab, cn2_tab, conf)
+    NoiseFilter_cubenorm_edit(cn_tab, cn2_tab, chan, binning, conf, zapc)
 
     # Zap the bad columns for the highpass and lowpass filter
     zap_cub = to_delete.add(output.with_suffix('.zap.cub'))
