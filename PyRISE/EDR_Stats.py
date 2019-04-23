@@ -38,36 +38,27 @@ from pathlib import Path
 import pvl
 
 import PyRISE.hirise as hirise
+import PyRISE.util as util
 import kalasiris as isis
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--db',           required=False, default='.HiCat.json')
-    # parser.add_argument('-t', '--table',  required=False, default='EDR_Products')
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     parents=[util.parent_parser()])
     parser.add_argument('-o', '--output', required=False, default='.EDR_Stats.cub')
     parser.add_argument('--histmin',      required=False, default=0.01)
     parser.add_argument('--histmax',      required=False, default=99.99)
     parser.add_argument('-g', '--gains',  required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources' / 'EDR_Stats_gains_config.pvl')
-    parser.add_argument('-l', '--log', required=False, default='WARNING')
-    parser.add_argument('-k', '--keep', required=False, default=False, action='store_true')
+                        'resources' / 'EDR_Stats_gains_config.pvl',
+                        help='Path to the gains config PVL file.')
     parser.add_argument('img', metavar="some.img-file")
 
     args = parser.parse_args()
 
-    if isinstance(args.log, int):
-        log_level = args.log
-    else:
-        log_level = getattr(logging, args.log.upper(), logging.WARNING)
-        logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+    util.set_logging(args.log)
 
-    ofile_cub = ''
-    if args.output.startswith('.'):
-        ofile_cub = Path(args.img).with_suffix(args.output)
-    else:
-        ofile_cub = Path(args.output)
+    ofile_cub = util.path_w_suffix(args.output, args.img)
 
     histats = EDR_Stats(args.img, ofile_cub, args.gains,
                         args.histmin, args.histmax,
@@ -77,12 +68,7 @@ def main():
     # add the contents of histats to HiCat.EDR_Products
     # for k, v in histats.items():
     #     print(f'{k}: {v}')
-
-    db_path = ''
-    if args.db.startswith('.'):
-        db_path = Path(args.img).with_suffix(args.db)
-    else:
-        db_path = Path(args.db)
+    db_path = util.path_w_suffix(args.db, args.img)
 
     with open(db_path, 'w') as f:
         json.dump(histats, f, indent=0, sort_keys=True)

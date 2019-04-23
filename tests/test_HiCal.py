@@ -25,7 +25,7 @@ import pvl
 
 import kalasiris as isis
 import PyRISE.hirise as hirise
-# import PyRISE.EDR_Stats as edr
+import PyRISE.EDR_Stats as edr
 import PyRISE.HiCal as hc
 
 from .utils import resource_check as rc
@@ -43,6 +43,8 @@ imgs = list(map(test_resources.joinpath, HiRISE_imgs))
 
 gains = Path('resources') / 'EDR_Stats_gains_config.pvl'
 conf = Path('resources') / 'HiCal.conf'
+hgf_conf = Path('resources') / 'HiGainFx.conf'
+nf_conf = Path('resources') / 'NoiseFilter.conf'
 
 
 class TestResources(unittest.TestCase):
@@ -304,8 +306,7 @@ class TestNeedISISCube(unittest.TestCase):
 
         self.assertIsNone(hc.run_hical(self.cube, outcube, myconf,
                                        conf, 3, 3, self.binning, True))
-        pid = hirise.get_ProdID_fromfile(self.cube)
-        hical_log = Path(str(pid)).with_suffix('.hical.log')
+        hical_log = Path(str(self.pid)).with_suffix('.hical.log')
         hical_log.unlink()
         outcube.unlink()
 
@@ -315,20 +316,102 @@ class TestNeedISISCube(unittest.TestCase):
                                       '0001', keep=False))
         outcube.unlink()
 
-# Things that need cubes or files:
-# HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
-#          conf: dict, db: dict, destripe=False, keep=False)
-# Cubenorm_Filter (cubenorm_tab: os.PathLike, outfile: os.PathLike, pause=False,
-#                    boxfilter=5, divide=False, chan=None)
-# highlow_destripe(in_cube: os.PathLike, out_cube: os.PathLike,
-#                     conf: dict, isisnorm='',
-#                     lnull=True, lhrs=True, lhis=True, llrs=True, llis=True,
-#                     keep=False)
-# NoiseFilter_noisefilter(from_cube: os.PathLike, to_cube: os.PathLike,
-#                            flattol: float, conf: dict, maxval: float,
-#                            tolmin: float, tolmax: float)
-# NoiseFilter(in_cube: os.PathLike, output: os.PathLike, conf: dict,
-#                minimum=None, maximum=None, zapc=False, keep=False)
-# Hidestripe(in_cube: os.PathLike, out_cube: os.PathLike, binning: int,
-#               minimum: float, maximum: float, hidcorr: float,
-#               line_samples: int, keep=False)
+    def test_highlow_destripe(self):
+        myconf = dict(NoiseFilter_LPF_Line=501,
+                      NoiseFilter_LPF_Samp=9,
+                      NoiseFilter_LPF_Minper=5,
+                      NoiseFilter_HPF_Line=501,
+                      NoiseFilter_HPF_Samp=1,
+                      NoiseFilter_HPF_Minper=5)
+        outcube = Path('test_highlow_destripe-out.cub')
+        self.assertIsNone(hc.highlow_destripe(self.cube, outcube, myconf,
+                                              isisnorm='', lnull=True,
+                                              lhrs=True, lhis=True,
+                                              llrs=True, llis=True,
+                                              keep=False))
+        outcube.unlink()
+
+    def test_NoiseFilter_noisefilter(self):
+        myconf = dict(NoiseFilter_Minimum_Value=0,
+                      NoiseFilter_Noise_Samp=7,
+                      NoiseFilter_Noise_Line=7)
+        outcube = Path('test_NoiseFilter_noisefilter-out.cub')
+        self.assertIsNone(hc.NoiseFilter_noisefilter(self.cube, outcube,
+                                                     flattol=1, conf=myconf,
+                                                     maxval=4000,
+                                                     tolmin=3.5, tolmax=3.5))
+        outcube.unlink()
+
+    def test_NoiseFilter(self):
+        myconf = dict(NoiseFilter_HighEnd_Percent=99.999,
+                      NoiseFilter_Hard_Tolmax=1.5,
+                      NoiseFilter_Hard_Tolmin=1.5,
+                      NoiseFilter_Hard_HighEnd_Percent=99.9,
+                      NoiseFilter_Zap_Fraction=0.4,
+                      NoiseFilter_Nonvalid_Fraction=0.90,
+                      NoiseFilter_LPF_Line=501,
+                      NoiseFilter_LPF_Samp=9,
+                      NoiseFilter_LPF_Minper=5,
+                      NoiseFilter_HPF_Line=501,
+                      NoiseFilter_HPF_Samp=1,
+                      NoiseFilter_HPF_Minper=5,
+                      NoiseFilter_Tolmin=3.5,
+                      NoiseFilter_Tolmax=3.5,
+                      NoiseFilter_Hard_Filtering=5,
+                      NoiseFilter_Flattol=1,
+                      NoiseFilter_Minimum_Value=0,
+                      NoiseFilter_Noise_Samp=7,
+                      NoiseFilter_Noise_Line=7,
+                      NoiseFilter_LPFZ_Line=5,
+                      NoiseFilter_LPFZ_Samp=5)
+        outcube = Path('test_NoiseFilter-out.cub')
+        self.assertIsNone(hc.NoiseFilter(self.cube, outcube, myconf,
+                                         minimum=None, maximum=None,
+                                         zapc=False, keep=False))
+        outcube.unlink()
+
+    def test_Hidestripe(self):
+        to_del = isis.PathSet()
+        calcube = to_del.add(Path('test_Hidestripe-out.hical.cub'))
+        isis.hical(self.cube, to=calcube)
+        to_del.add(Path(str(self.pid)).with_suffix('.hical.log'))
+        outcube = to_del.add(Path('test_Hidestripe-out.cub'))
+        samps = int(isis.getkey_k(calcube, 'Dimensions', 'Samples'))
+
+        self.assertRaises(KeyError, hc.Hidestripe, self.cube, outcube,
+                          self.binning, minimum=0.0, maximum=1.5,
+                          hidcorr='ADD', line_samples=samps, keep=False)
+
+        self.assertEquals(0.000101402295171637,
+                          hc.Hidestripe(calcube, outcube, self.binning,
+                                        minimum=0.0, maximum=1.5, hidcorr='ADD',
+                                        line_samples=samps, keep=False))
+        to_del.unlink()
+
+
+class TestHiCal(unittest.TestCase):
+
+    def setUp(self):
+        self.cube = imgs[0].with_suffix('.TestHiCal.cub')
+        self.pid = hirise.get_ProdID_fromfile(self.cube)
+        self.db = edr.EDR_Stats(imgs[0], self.cube, gains)
+        self.binning = int(isis.getkey_k(self.cube, 'Instrument', 'Summing'))
+        self.conf = pvl.load(str(conf))
+        self.conf['HiGainFx'] = pvl.load(str(hgf_conf))['HiGainFx']
+        self.conf['NoiseFilter'] = pvl.load(str(nf_conf))['NoiseFilter']
+
+    def tearDown(self):
+        hical_log = self.cube.parent / Path(str(self.pid)).with_suffix('.hical.log')
+        with contextlib.suppress(FileNotFoundError):
+            self.cube.unlink()
+            hical_log.unlink()
+            Path('print.prt').unlink()
+
+    def test_HiCal(self):
+        outcube = Path('test_HiCal-out.cub')
+        ccdchan = (self.pid.get_ccd(), self.pid.channel)
+        hical = hc.HiCal(self.cube, outcube, ccdchan, self.conf, conf,
+                         self.db, destripe=False, keep=False)
+        self.assertEquals((0.0064524888519544455, None, False), hical[0:3])
+        hical[-1].unlink()
+        outcube.unlink()

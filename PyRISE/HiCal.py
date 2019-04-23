@@ -30,12 +30,11 @@
 import argparse
 import collections
 import csv
+import json
 import logging
 import os
 import re
-import shelve
 import statistics
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -43,64 +42,67 @@ from pathlib import Path
 import pvl
 
 import PyRISE.hirise as hirise
+import PyRISE.util as util
 import kalasiris as isis
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--db',            required=False, default='.HiCat')
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     parents=[util.parent_parser()])
     parser.add_argument('-o', '--output',  required=False, default='.HiCal.cub')
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
                         'resources' / 'HiCal.conf')
+    parser.add_argument('--hgfconf',    required=False, default='HiGainFx.conf')
+    parser.add_argument('--nfconf',     required=False, default='NoiseFilter.conf')
     parser.add_argument('--bin2',       required=False, action='store_true', default=None)
     parser.add_argument('--nobin2',     required=False, action='store_false',
                         default=None, dest='bin2')
     parser.add_argument('--bin4',       required=False, action='store_true', default=None)
     parser.add_argument('--nobin4',     required=False, action='store_false',
                         default=None, dest='bin4')
-    parser.add_argument('-l', '--log',  required=False, default='WARNING')
-    parser.add_argument('-k', '--keep', required=False, default=False)
-    parser.add_argument('cube', metavar=".cub-file")
+    parser.add_argument('cube', metavar="cube_file")
 
     args = parser.parse_args()
 
-    if isinstance(args.log, int):
-        log_level = args.log
-    else:
-        log_level = getattr(logging, args.log.upper(), logging.WARNING)
-        logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+    util.set_logging(args.log)
 
     in_cube = Path(args.cube)
 
-    out_cube = ''
-    if args.output.startswith('.'):
-        out_cube = in_cube.with_suffix(args.output)
-    else:
-        out_cube = Path(args.output)
-
-    db_path = ''
-    if args.db.startswith('.'):
-        db_path = Path(args.img).with_suffix(args.db)
-    else:
-        db_path = Path(args.db)
+    out_cube = util.path_w_suffix(args.output, in_cube)
+    db_path = util.pid_path_w_suffix(args.db, in_cube)
 
     # Get Configuration Parameters
     conf = pvl.load(str(args.conf))
     conf_check(conf)
+
+    # If the sub-conf arguments aren't 'findable', look for them in the main conf
+    # directory.
+    try:
+        hgf_path = util.get_path(Path(args.hgfconf), Path(args.conf).parent)
+        nf_path = util.get_path(Path(args.nfconf), Path(args.conf).parent)
+    except (TypeError, NotADirectoryError, FileNotFoundError) as err:
+        logging.critical(err)
+        sys.exit()
+
+    # Merge the configuration files together into a single dict
+    conf['HiGainFx'] = pvl.load(str(hgf_path))['HiGainFx']
+    conf['NoiseFilter'] = pvl.load(str(nf_path))['NoiseFilter']
 
     # The original Perl Setup00() builds data structures that we don't need.
     # The original Perl Setup01() set up data routing and did filename checking
     # that we don't need here.
 
     # The original Perl Setup02() read from the HiCat.EDR_Products table, but
-    # we'll just open the shelf:
-    db = shelve.open(str(db_path))
+    # we'll just open the json file:
+    with open(db_path, 'r') as f:
+        db = json.load(f)
 
-    pid = hirse.get_ProdID_fromfile(in_cube)
+    pid = hirise.get_ProdID_fromfile(in_cube)
     if str(pid) != db['PRODUCT_ID']:
-        print('The Product ID in the file ({}) does not match the one in the '
-              'database ({}).'.format(str(pid), db['PRODUCT_ID']))
+        logging.critical('The Product ID in the file ({}) does not match '
+                         'the one in the database ({}).'.format(str(pid),
+                                                                db['PRODUCT_ID']))
         sys.exit()
 
     # The original Perl Setup03 queried the HiCat.Planned_Observations table to
@@ -117,7 +119,7 @@ def main():
                                                    int(db['LINE_SAMPLES'])) * 100.0
     if (ccdchan == ('IR10', '1') and
        lis_per > conf['HiCal']['HiCal_Bypass_IR10_1']):
-        print('Bypassing IR10_1')
+        logging.warning('Bypassing IR10_1.')
         sys.exit()
 
     destripe_filter = check_destripe(in_cube, int(db['BINNING']),
@@ -127,9 +129,10 @@ def main():
     # db, but since we're not interested in persistance, we can ignore it.
 
     # All the setup is done, start processing:
-    (std, diff_std, zapped) = HiCal(in_cube, out_cube, ccdchan,
-                                    conf, args.conf, db,
-                                    destripe=destripe_filter, keep=args.keep)
+    (std, diff_std, zapped, cubenormfile) = HiCal(in_cube, out_cube, ccdchan,
+                                                  conf, args.conf, db,
+                                                  destripe=destripe_filter,
+                                                  keep=args.keep)
 
     db['HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION'] = std
     db['DESTRIPED_DIFFERENCE_STANDARD_DEVIATION'] = diff_std
@@ -137,7 +140,8 @@ def main():
     # The zapped flag is not in the original code, I'm putting it in
     # to the DB to use in a later step.
 
-    db.close()
+    with open(db_path, 'w') as f:
+        json.dump(db, f, indent=0, sort_keys=True)
 
 
 def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
@@ -158,11 +162,15 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
 
     # Start processing cube files
     to_delete = isis.PathSet()
-    next_cube = in_cube.with_suffix(f'.{temp_token}.cub')
+    next_cube = None
+    furrows_found = False
     if(int(db['BINNING']) > 1 and float(db['IMAGE_MEAN']) > 7000.0):
         furrow_cube = to_delete.add(in_cube.with_suffix(f'.{temp_token}.ffix.cub'))
         furrows_found = furrow_nulling(in_cube, furrow_cube, int(db['BINNING']), ccdchan)
         next_cube = furrow_cube
+    else:
+        next_cube = to_delete.add(in_cube.with_suffix(f'.{temp_token}.cub'))
+        next_cube.symlink_to(in_cube.resolve())
 
     # Run hical
     lis_per = int(db['LOW_SATURATED_PIXELS']) / (int(db['IMAGE_LINES']) *
@@ -195,14 +203,14 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
     isis.crop(next_cube, to=crop_file, line=sl, nlines=nl)
 
     # This file needs to be kept for the next step, HiStitch.
-    stats_file = next_cube.with_suffix('.cubenorm.tab')
+    stats_file = out_cube.with_suffix('.cubenorm.tab')
     stats_fix_file = to_delete.add(next_cube.with_suffix('.cubenorm_fix.tab'))
     isis.cubenorm(crop_file, stats=stats_file, format_='TABLE')
 
     (std_final, zapped) = Cubenorm_Filter(stats_file, stats_fix_file,
                                           boxfilter=5, pause=True,
                                           divide=flags.divide,
-                                          chan=ccdchan[1])
+                                          chan=int(ccdchan[1]))
 
     # Now perform the cubnorm_plus correction
     div_or_sub = {True: 'DIVIDE', False: 'SUBTRACT'}
@@ -240,12 +248,12 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
 
     # Create final output file
     to_delete.remove(next_cube)
-    next_cube.rename(out_cub)
+    next_cube.rename(out_cube)
 
     if not keep:
         to_delete.unlink()
 
-    return(std_final, diff_std_dev, zapped)
+    return(std_final, diff_std_dev, zapped, stats_file)
 
 
 def FurrowCheck(vpnts: list, channel: int) -> bool:
@@ -449,7 +457,7 @@ def set_lines(skip_top: int, skip_bottom: int,
         sl = 1
         nl = image_lines
 
-    return Lines(sl, nl)
+    return Lines(int(sl), int(nl))
 
 
 def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
@@ -688,7 +696,7 @@ def Cubenorm_Filter(cubenorm_tab: os.PathLike, outfile: os.PathLike, pause=False
         raise ValueError(f'boxfilter={boxfilter} is less than 3')
 
     if chan is None:
-        chan = hirise.getccdchannel(Path(cubenorm_tab).name)[1]
+        chan = int(hirise.getccdchannel(Path(cubenorm_tab).name)[1])
 
     # Make a list to receive each column
     valid_points = list()
@@ -717,12 +725,12 @@ def Cubenorm_Filter(cubenorm_tab: os.PathLike, outfile: os.PathLike, pause=False
                                     divide=divide)
 
     with open(outfile, 'w') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=header, dialect=isis.cubenormDialect)
+        writer = isis.cubenormfile.DictWriter(csvfile)
         writer.writeheader()
         for (d, vp, av, md) in zip(other_cols, valid_points, avgflt, medflt):
-            d['ValidPoints'] = vp
-            d['Average'] = av
-            d['Median'] = md
+            d['ValidPoints'] = str(vp)
+            d['Average'] = '{:f}'.format(av)
+            d['Median'] = '{:f}'.format(md)
             writer.writerow(d)
 
     # Calculate the standard deviation value for the filtered average:
@@ -872,15 +880,15 @@ def highlow_destripe(in_cube: os.PathLike, out_cube: os.PathLike,
     # Perform highpass/lowpass filter vertical destripping
     to_delete = isis.PathSet()
     lpf_cub = to_delete.add(out_cube.with_suffix('.lpf.cub'))
-    isis.lowpass(in_cub, to=lpf_cub,
+    isis.lowpass(in_cube, to=lpf_cub,
                  line=conf['NoiseFilter_LPF_Line'],
                  samp=conf['NoiseFilter_LPF_Samp'],
                  minopt='PERCENT', replace='NULL',
-                 minimum=['NoiseFilter_LPF_Minper'],
+                 minimum=conf['NoiseFilter_LPF_Minper'],
                  null=lnull, hrs=lhrs, his=lhis, lrs=llrs, lis=llis)
 
     hpf_cub = to_delete.add(out_cube.with_suffix('.hpf.cub'))
-    isis.highpass(in_cub, to=hpg_cub, minopt='PERCENT',
+    isis.highpass(in_cube, to=hpf_cub, minopt='PERCENT',
                   line=conf['NoiseFilter_HPF_Line'],
                   samp=conf['NoiseFilter_HPF_Samp'],
                   minimum=conf['NoiseFilter_HPF_Minper'])
@@ -927,7 +935,7 @@ def NoiseFilter_noisefilter(from_cube: os.PathLike, to_cube: os.PathLike,
                             flattol: float, conf: dict, maxval: float,
                             tolmin: float, tolmax: float) -> None:
     '''Convenience function for the repeated noisefiltering.'''
-    isis.noisefilter(from_cub, to=to_cube, flattol=flattol,
+    isis.noisefilter(from_cube, to=to_cube, flattol=flattol,
                      low=conf['NoiseFilter_Minimum_Value'],
                      high=maxval,
                      tolmin=tolmin, tolmax=tolmax,
@@ -983,7 +991,7 @@ def NoiseFilter_cubenorm_edit(in_tab: os.PathLike, out_tab: os.PathLike,
                     norm[i] = 0
 
     with open(out_tab, 'w') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=header, dialect=isis.cubenormDialect)
+        writer = isis.cubenormfile.DictWriter(csvfile)
         writer.writeheader()
         for (d, vp, n) in zip(other_cols, vpnts, norm):
             d['ValidPoints'] = vp
@@ -1082,15 +1090,15 @@ def NoiseFilter(in_cube: os.PathLike, output: os.PathLike, conf: dict,
 
 
 def Hidestripe(in_cube: os.PathLike, out_cube: os.PathLike, binning: int,
-               minimum: float, maximum: float, hidcorr: float,
+               minimum: float, maximum: float, hidcorr: str,
                line_samples: int, keep=False) -> float:
     # SignedWord+$HiCal_Normalization_Minimum:$HiCal_Normalization_Maximum
     to_s = '+SignedWord+{}:{}'.format(minimum, maximum)
     to_del = isis.PathSet()
     if 1 == binning:
         temp_cub = to_del.add(out_cube.with_suffix('.hd.cub'))
-        isis.hidestripe(in_cube, to=temp_cub + to_s, parity='EVEN', correction=hidcorr)
-        isis.hidestrip(temp_cub, to=out_cube + to_s, parity='ODD', correction=hidcorr)
+        isis.hidestripe(in_cube, to=str(temp_cub) + to_s, parity='EVEN', correction=hidcorr)
+        isis.hidestripe(temp_cub, to=str(out_cube) + to_s, parity='ODD', correction=hidcorr)
     else:
         lpf_cube = to_del.add(out_cube.with_suffix('.lpf.cub'))
         hpf_cube = to_del.add(out_cube.with_suffix('.hpf.cub'))
@@ -1100,17 +1108,27 @@ def Hidestripe(in_cube: os.PathLike, out_cube: os.PathLike, binning: int,
                      null=False, hrs=False, his=False, lrs=False, lis=False)
         isis.highpass(in_cube, to=hpf_cube, samples=boxsamp, lines=1,
                       propagate=True)
-        isis.algebra(from_=lpf_cube, from2=hpf_cube, to=out_cube + to_s,
+        isis.algebra(from_=lpf_cube, from2=hpf_cube, to=str(out_cube) + to_s,
                      operator='ADD', a='1.0', b='1.0')
 
     # Standard deviation of difference between cube after noise
     # filter and cube after hidestripe
     diff_cube = to_del.add(out_cube.with_suffix('.diff.cub'))
     isis.algebra(from_=out_cube, from2=in_cube, to=diff_cube, operator='subtract')
-    stddev = float(pvl.loads(isis.stats(diff_cube).stdout)['Results']['StandardDeviation'])
+    diff_pvl = pvl.loads(isis.stats(diff_cube).stdout)['Results']
+    try:
+        stddev = float(diff_pvl['StandardDeviation'])
+    except KeyError as err:
+        if int(diff_pvl['ValidPixels']) <= 0:
+            raise KeyError('There is no StandardDeviation computed from '
+                           f'{diff_cube} because there were no ValidPixels. '
+                           f'Probably because {in_cube} has values outside '
+                           f'the range: {minimum} to {maximum}.')
+        else:
+            raise err
 
     if not keep:
-        to_delete.unlink()
+        to_del.unlink()
 
     return stddev
 
