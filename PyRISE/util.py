@@ -83,7 +83,7 @@ def pid_path_w_suffix(in_path: str, template_path: os.PathLike) -> Path:
         else:
             raise FileNotFoundError(f'Could not find {pid_path}')
     else:
-        raise FileNotFoundError(f'Could not find {inPath}')
+        raise FileNotFoundError(f'Could not find {p}')
 
 
 def get_path(in_path: os.PathLike, search=None) -> Path:
@@ -93,11 +93,15 @@ def get_path(in_path: os.PathLike, search=None) -> Path:
         return inPath
 
     search_paths = list()
-    if isinstance(search, os.PathLike):
+    if isinstance(search, str):
         search_paths.append(Path(search))
+    elif isinstance(search, Path):
+        search_paths.append(search)
     elif isinstance(search, collections.abc.Sequence):
         for s in search:
             search_paths.append(Path(s))
+    elif search is None:
+        raise ValueError('You must provide a path or list of paths to search.')
     else:
         raise TypeError(f"Unfortunately, {search} isn't an os.PathLike "
                         " or a list of them.")
