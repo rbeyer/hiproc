@@ -1,0 +1,5 @@
+#!/usr/bin/env python
+
+import PyRISE.HiCal as hical
+
+hical.main()
