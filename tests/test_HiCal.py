@@ -305,9 +305,7 @@ class TestNeedISISCube(unittest.TestCase):
         outcube = Path('test_run_hical-out.cub')
 
         self.assertIsNone(hc.run_hical(self.cube, outcube, myconf,
-                                       conf, 3, 3, self.binning, True))
-        hical_log = Path(str(self.pid)).with_suffix('.hical.log')
-        hical_log.unlink()
+                                       conf, 3, 3, self.binning, True, keep=False))
         outcube.unlink()
 
     def test_HiGainFx(self):
@@ -401,10 +399,8 @@ class TestHiCal(unittest.TestCase):
         self.conf['NoiseFilter'] = pvl.load(str(nf_conf))['NoiseFilter']
 
     def tearDown(self):
-        hical_log = self.cube.parent / Path(str(self.pid)).with_suffix('.hical.log')
         with contextlib.suppress(FileNotFoundError):
             self.cube.unlink()
-            hical_log.unlink()
             Path('print.prt').unlink()
 
     def test_HiCal(self):
@@ -412,6 +408,5 @@ class TestHiCal(unittest.TestCase):
         ccdchan = (self.pid.get_ccd(), self.pid.channel)
         hical = hc.HiCal(self.cube, outcube, ccdchan, self.conf, conf,
                          self.db, destripe=False, keep=False)
-        self.assertEquals((0.0064524888519544455, None, False), hical[0:3])
-        hical[-1].unlink()
+        self.assertEquals((0.0064524888519544455, None, False), hical)
         outcube.unlink()

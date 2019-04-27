@@ -129,10 +129,10 @@ def main():
     # db, but since we're not interested in persistance, we can ignore it.
 
     # All the setup is done, start processing:
-    (std, diff_std, zapped, cubenormfile) = HiCal(in_cube, out_cube, ccdchan,
-                                                  conf, args.conf, db,
-                                                  destripe=destripe_filter,
-                                                  keep=args.keep)
+    (std, diff_std, zapped) = HiCal(in_cube, out_cube, ccdchan,
+                                    conf, args.conf, db,
+                                    destripe=destripe_filter,
+                                    keep=args.keep)
 
     db['HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION'] = std
     db['DESTRIPED_DIFFERENCE_STANDARD_DEVIATION'] = diff_std
@@ -178,7 +178,7 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
     hical_file = to_delete.add(next_cube.with_suffix('.hical.cub'))
     run_hical(next_cube, hical_file, conf, conf_path,
               lis_per, float(db['IMAGE_BUFFER_MEAN']), int(db['BINNING']),
-              flags.noise_filter)
+              flags.noise_filter, keep=keep)
     next_cube = hical_file
 
     if furrows_found:
@@ -203,8 +203,10 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
     crop_file = to_delete.add(next_cube.with_suffix('.crop.cub'))
     isis.crop(next_cube, to=crop_file, line=sl, nlines=nl)
 
-    # This file needs to be kept for the next step, HiStitch.
-    stats_file = out_cube.with_suffix('.cubenorm.tab')
+    # In the original Perl, this file was kept for the next step, HiStitch.
+    # However, since FurrowCheck() is now performed here, it does not need
+    # to be kept.
+    stats_file = to_delete.add(out_cube.with_suffix('.cubenorm.tab'))
     stats_fix_file = to_delete.add(next_cube.with_suffix('.cubenorm_fix.tab'))
     isis.cubenorm(crop_file, stats=stats_file, format_='TABLE')
 
@@ -254,7 +256,7 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
     if not keep:
         to_delete.unlink()
 
-    return(std_final, diff_std_dev, zapped, stats_file)
+    return(std_final, diff_std_dev, zapped)
 
 
 def FurrowCheck(vpnts: list, channel: int) -> bool:
@@ -463,7 +465,9 @@ def set_lines(skip_top: int, skip_bottom: int,
 def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
               conf: dict, conf_path: os.PathLike,
               lis_per: float, image_buffer_mean: float, binning: int,
-              noise_filter: bool) -> None:
+              noise_filter: bool, keep=False) -> None:
+
+    in_cub_path = Path(in_cube)
 
     to_s = '{}+SignedWord+{}:{}'.format(hical_cub,
                                         conf['HiCal']['HiCal_Normalization_Minimum'],
@@ -477,14 +481,18 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
             hical_args['conf'] = conf_dir / conf['HiCal']['HiCal_ISIS_Conf_Noise']
 
     if noise_filter:
-        mask_cube = in_cube.with_suffix('.mask.cub')
-        mask(in_cube, mask_cube,
+        mask_cube = in_cub_path.with_suffix('.mask.cub')
+        mask(in_cub_path, mask_cube,
              conf['NoiseFilter']['NoiseFilter_Raw_Min'],
              conf['NoiseFilter']['NoiseFilter_Raw_Max'], binning)
         isis.hical(mask_cube, **hical_args)
         mask_cube.unlink()
     else:
-        isis.hical(in_cube, **hical_args)
+        isis.hical(in_cub_path, **hical_args)
+
+    if not keep:
+        pid = hirise.get_ProdID_fromfile(hical_cub)
+        Path(hical_cub).with_name(str(pid)).with_suffix('.hical.log').unlink()
 
     return
 
