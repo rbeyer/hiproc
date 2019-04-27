@@ -251,7 +251,7 @@ class TestNeedCubenormStatsFile(unittest.TestCase):
         vpnts = list()
         averages = list()
         with open(self.statsfile) as csvfile:
-            reader = csv.DictReader(csvfile, dialect=isis.cubenormDialect)
+            reader = csv.DictReader(csvfile, dialect=isis.cubenormfile.Dialect)
             for row in reader:
                 vpnts.append(int(row.pop('ValidPoints')))
                 averages.append(float(row.pop('Average')))

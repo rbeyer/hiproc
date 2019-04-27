@@ -196,6 +196,7 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
         next_cube = higain_file
 
     # Perform the high-pass filter cubenorm steps
+
     (sl, nl) = set_lines(int(hconf['HiCal_Bin1_Skip_Top_Lines']),
                          int(hconf['HiCal_Bin1_Skip_Bot_Lines']),
                          int(db['BINNING']), int(db['IMAGE_LINES']))
@@ -272,38 +273,38 @@ def FurrowCheck(vpnts: list, channel: int) -> bool:
 def conf_check(conf: dict) -> None:
     '''Various checks on parameters in the configuration.'''
 
-    conf_check_strings('HiCal_Clean_EDR_Stats', ('DELETE', 'KEEP'),
-                       conf['HiCal']['HiCal_Clean_EDR_Stats'])
+    util.conf_check_strings('HiCal_Clean_EDR_Stats', ('DELETE', 'KEEP'),
+                            conf['HiCal']['HiCal_Clean_EDR_Stats'])
 
-    conf_check_strings('HiCal_HPF_Cubenorm', ('DIVIDE', 'SUBTRACT'),
-                       conf['HiCal']['HiCal_HPF_Cubenorm'])
+    util.conf_check_strings('HiCal_HPF_Cubenorm', ('DIVIDE', 'SUBTRACT'),
+                            conf['HiCal']['HiCal_HPF_Cubenorm'])
 
-    conf_check_count('HiCal_Noise_Processing', 28, 'CCD/channel',
-                     conf['HiCal']['HiCal_Noise_Processing'])
+    util.conf_check_count('HiCal_Noise_Processing', 28, 'CCD/channel',
+                          conf['HiCal']['HiCal_Noise_Processing'])
 
-    conf_check_bounds('HiCal_Bypass_IR10_1', (0.0, 100.0),
-                      conf['HiCal']['HiCal_Bypass_IR10_1'])
+    util.conf_check_bounds('HiCal_Bypass_IR10_1', (0.0, 100.0),
+                           conf['HiCal']['HiCal_Bypass_IR10_1'])
 
-    conf_check_count('HiCal_Noise_Bin_DarkPixel_STD', 5, 'possible bin mode',
-                     conf['HiCal']['HiCal_Noise_Bin_DarkPixel_STD'])
+    util.conf_check_count('HiCal_Noise_Bin_DarkPixel_STD', 5, 'possible bin mode',
+                          conf['HiCal']['HiCal_Noise_Bin_DarkPixel_STD'])
 
-    conf_check_count('HiCal_Noise_Bin_Mask_STD', 5, 'possible bin mode',
-                     conf['HiCal']['HiCal_Noise_Bin_Mask_STD'])
+    util.conf_check_count('HiCal_Noise_Bin_Mask_STD', 5, 'possible bin mode',
+                          conf['HiCal']['HiCal_Noise_Bin_Mask_STD'])
 
-    conf_check_bounds('HiCal_Normalization_Minimum', (-16384.0, 16364.0),
-                      conf['HiCal']['HiCal_Normalization_Minimum'])
+    util.conf_check_bounds('HiCal_Normalization_Minimum', (-16384.0, 16364.0),
+                           conf['HiCal']['HiCal_Normalization_Minimum'])
 
-    conf_check_bounds('HiCal_Normalization_Maximum', (-16384.0, 16384.0),
-                      conf['HiCal']['HiCal_Normalization_Maximum'])
+    util.conf_check_bounds('HiCal_Normalization_Maximum', (-16384.0, 16384.0),
+                           conf['HiCal']['HiCal_Normalization_Maximum'])
 
-    conf_check_strings('HiCal_Hidestripe_Correction', ('ADD', 'MULTIPLE'),
-                       conf['HiCal']['HiCal_Hidestripe_Correction'])
+    util.conf_check_strings('HiCal_Hidestripe_Correction', ('ADD', 'MULTIPLE'),
+                            conf['HiCal']['HiCal_Hidestripe_Correction'])
 
-    conf_check_bounds('HiCal_Minimum_Percent', (0.0001, 2.0),
-                      conf['HiCal']['HiCal_Minimum_Percent'])
+    util.conf_check_bounds('HiCal_Minimum_Percent', (0.0001, 2.0),
+                           conf['HiCal']['HiCal_Minimum_Percent'])
 
-    conf_check_bounds('HiCal_Maximum_Percent', (98.0, 99.9999),
-                      conf['HiCal']['HiCal_Maximum_Percent'])
+    util.conf_check_bounds('HiCal_Maximum_Percent', (98.0, 99.9999),
+                           conf['HiCal']['HiCal_Maximum_Percent'])
 
     # There are checks for HiCal_Jpeg_Quality, HiCal_Thumb_Samples, and
     # HiCal_Browse_Samples in the original Perl that aren't relevant here,
@@ -449,14 +450,13 @@ def set_lines(skip_top: int, skip_bottom: int,
     '''Determine the right values for the start lines and number of lines.'''
     Lines = collections.namedtuple('Lines', ['start', 'number'])
 
-    # The original Perl code doesn't force sl and nl back into ints, so we
-    # won't here, either, so sl and nl could be floats
     sl = skip_top / binning + 1
     nl = image_lines - (skip_top + skip_bottom) / binning
     if nl < 2000 / binning:
         sl = 1
         nl = image_lines
 
+    # The original Perl code doesn't force sl and nl back into ints, but we do.
     return Lines(int(sl), int(nl))
 
 
@@ -587,7 +587,7 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
         std_devs = list()
         mins = list()
         maxs = list()
-        reader = csv.DictReader(csvfile, dialect=isis.cubenormDialect)
+        reader = csv.DictReader(csvfile, dialect=isis.cubenormfile.Dialect)
         for row in reader:
             valid_points.append(int(row['ValidPoints']))
             std_devs.append(float(row['StdDev']))
@@ -627,15 +627,17 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
             min_w_maxvp.append(mi)
             max_w_maxvp.append(ma)
 
-    # The original code sorts these min and max_w_maxvp arrays,
+    # The original Perl code sorts these min and max_w_maxvp arrays,
     # but then ignores this sorting by not using the sorted arrays.
     # I believe this to be an error:
-    logging.warning('Potential error in original code, but reproducing.')
+    logging.warning('Original Perl issue: ignores sorting of valid points '
+                    'results in masking the wrong range of pixels if '
+                    'noise-filtering.')
 
     # For example, with test data, this function returns: (3349.2, 9486.4)
     #                 If sorted correctly, the result is: (2901.0, 10491.599999999999)
 
-    # To fix this behavior, uncomment these two lines:
+    # To correct this, just uncomment these two lines:
     # min_w_maxvp.sort()
     # max_w_maxvp.sort()
 
@@ -705,7 +707,7 @@ def Cubenorm_Filter(cubenorm_tab: os.PathLike, outfile: os.PathLike, pause=False
     other_cols = list()
     header = list()
     with open(cubenorm_tab) as csvfile:
-        reader = csv.DictReader(csvfile, dialect=isis.cubenormDialect)
+        reader = csv.DictReader(csvfile, dialect=isis.cubenormfile.Dialect)
         header = reader.fieldnames
         for row in reader:
             valid_points.append(int(row.pop('ValidPoints')))
@@ -952,7 +954,7 @@ def NoiseFilter_cubenorm_edit(in_tab: os.PathLike, out_tab: os.PathLike,
        creates an edited cubenorm file.'''
     # Slightly different values from other function, not entirely sure why.
     # Pause point locations are 1-based pixel numbers, so -1 to get list index.
-    # With values are the number of pixels to affect, including the pause point pixel
+    # Width values are the number of pixels to affect, including the pause point pixel
 
     ch_pause = {0: (1, 252, 515, 778),  # Channel 0 pause point sample locations
                 1: (247, 510, 773, 1024)}  # Channel 1 pause point sample locations
@@ -964,7 +966,7 @@ def NoiseFilter_cubenorm_edit(in_tab: os.PathLike, out_tab: os.PathLike,
     other_cols = list()
     header = list()
     with open(in_tab) as csvfile:
-        reader = csv.DictReader(csvfile, dialect=isis.cubenormDialect)
+        reader = csv.DictReader(csvfile, dialect=isis.cubenormfile.Dialect)
         header = reader.fieldnames
         for row in reader:
             vpnts.append(int(row.pop('ValidPoints')))

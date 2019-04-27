@@ -185,11 +185,13 @@ def parse_histat(pvltext: str) -> dict:
 def get_dncnt(cub, hmin=0.01, hmax=99.99, keep=False) -> int:
     '''Extract DN count from the histogram of a cub file'''
     # I'm not sure about this method.
-    # The statement above is what the original program wanted,
+    # The code below is what the original Perl program wanted,
     # but this is just counting the number of histogram bins
     # that are within the boundaries, not the number of DN.
     # And the # of bins is automatically computed by isis.hist,
     # so could be different for each cube.
+    logging.warning('Original Perl issue: counting DN bins instead of DN gets '
+                    'placed in HiCat.EDR_Products.STD_DN_LEVELS')
 
     histfile = Path(cub).with_suffix('.hist')
     if not histfile.is_file():

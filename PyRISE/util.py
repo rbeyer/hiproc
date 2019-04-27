@@ -115,3 +115,40 @@ def get_path(in_path: os.PathLike, search=None) -> Path:
             raise NotADirectoryError(f'{p} is not a directory.')
     else:
         raise FileNotFoundError(f'Could not find {inPath} in {search_paths}.')
+
+
+def conf_check_strings(conf_name: str, choices: tuple, conf_value: str) -> None:
+    assert conf_value in choices, ('The {} parameter can be {}, '
+                                   'but was {}'.format(conf_name,
+                                                       str(choices),
+                                                       conf_value))
+
+
+def conf_check_count(conf_name: str, count: int, what: str, conf_value: list) -> None:
+    assert len(conf_value) == count, ('The {} parameter must have {} '
+                                      'entries, one for each {}, but '
+                                      'it was {}'.format(conf_name,
+                                                         str(count),
+                                                         what,
+                                                         conf_value))
+
+
+def conf_check_bounds(conf_name: str, bounds: tuple, conf_value: str) -> None:
+    assert (float(conf_value) >= bounds[0] and
+            float(conf_value) <= bounds[1]), ('The {} parameter must be '
+                                              'between {} and {} inclusive, '
+                                              'but was {}'.format(conf_name,
+                                                                  *bounds,
+                                                                  conf_value))
+
+
+def str2bool(string: str) -> bool:
+    '''Specific to the values expected to be read in these pipeline
+    configuration files.'''
+
+    if string == 'FALSE':
+        return False
+    elif string == 'TRUE':
+        return True
+    else:
+        raise LookupError(f"The value '{string}' was neither 'TRUE' nor 'FALSE'.")

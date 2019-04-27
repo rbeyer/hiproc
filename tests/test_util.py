@@ -69,3 +69,20 @@ class TestUtil(unittest.TestCase):
         self.assertRaises(FileNotFoundError, util.get_path, 'dummy',
                           ['PyRISE', 'tests'])
         self.assertEquals(Path('PyRISE/util.py'), util.get_path('util.py', 'PyRISE'))
+
+    def test_conf_check_strings(self):
+        self.assertIsNone(util.conf_check_strings('foo', ('YES', 'NO'), 'YES'))
+        self.assertRaises(AssertionError,
+                          util.conf_check_strings, 'foo', ('YES', 'NO'), 'MAYBE')
+
+    def test_conf_check_count(self):
+        self.assertIsNone(util.conf_check_count('foo', 3, 'what', ['one',
+                                                                   'two',
+                                                                   'three']))
+        self.assertRaises(AssertionError,
+                          util.conf_check_count, 'foo', 3, 'what', ['one, two'])
+
+    def test_conf_check_bounds(self):
+        self.assertIsNone(util.conf_check_bounds('foo', (0.1, 1), '0.5'))
+        self.assertRaises(AssertionError,
+                          util.conf_check_bounds, 'foo', (0.1, 1), '1.5')
