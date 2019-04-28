@@ -124,6 +124,14 @@ def conf_check_strings(conf_name: str, choices: tuple, conf_value: str) -> None:
                                                        conf_value))
 
 
+def conf_check_bool(conf_name: str, conf_value: bool) -> None:
+    assert isinstance(conf_value, bool), ('The {} parameter must be '
+                                          'boolean but is {} with value '
+                                          '{}'.format(conf_name,
+                                                      type(conf_value),
+                                                      conf_value))
+
+
 def conf_check_count(conf_name: str, count: int, what: str, conf_value: list) -> None:
     assert len(conf_value) == count, ('The {} parameter must have {} '
                                       'entries, one for each {}, but '
@@ -140,15 +148,3 @@ def conf_check_bounds(conf_name: str, bounds: tuple, conf_value: str) -> None:
                                               'but was {}'.format(conf_name,
                                                                   *bounds,
                                                                   conf_value))
-
-
-def str2bool(string: str) -> bool:
-    '''Specific to the values expected to be read in these pipeline
-    configuration files.'''
-
-    if string == 'FALSE':
-        return False
-    elif string == 'TRUE':
-        return True
-    else:
-        raise LookupError(f"The value '{string}' was neither 'TRUE' nor 'FALSE'.")
