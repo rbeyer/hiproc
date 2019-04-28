@@ -179,6 +179,9 @@ class ProductID(ObservationID):
             raise AttributeError('This Product ID, {}, does not have a ccdname '
                                  'or ccdnumber'.format(str(self)))
 
+    def get_obsid(self) -> ObservationID:
+        return ObservationID(self.phase, self.orbit_number, self.latesque)
+
 
 def _match_chan(s: str):
     matched = chan_re.fullmatch(s)
