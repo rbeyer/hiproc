@@ -193,6 +193,161 @@ class TestObsID(unittest.TestCase):
         self.assertEqual("ObservationID('ESP_057866_1670')", repr(oid))
 
 
+class TestCCDID(unittest.TestCase):
+
+    def test_init_tuple(self):
+        tuples = ((('ESP', '034783', '1850', 'RED', '5'),
+                   ('ESP', '034783', '1850', 'RED', '5')),
+                  (('ESP', '034783', '1850', 'RED', '5'),
+                   ('ESP', '034783', '1850', 'RED5')),
+                  (('ESP', '034783', '1850', 'RED', '5'),
+                   ('034783', '1850', 'RED', '5')),
+                  (('ESP', '034783', '1850', 'RED', '5'),
+                   ('034783', '1850', 'RED5')),
+                  (('ESP', '034783', '1850', 'RED', '5'),
+                   ('34783', '1850', 'RED5')),
+                  (('ESP', '034783', '1850', 'RED', '5'),
+                   ('ESP', '034783', '1850', 'RED', '5')),
+                  (('ESP', '034783', '1850', 'RED', '5'),
+                   ('034783', '1850', 'RED', '5')),
+                  (('ESP', '034783', '1850', 'RED', '5'),
+                   ('ESP', '034783', '1850', 'RED5')),
+                  (('ESP', '034783', '1850', 'RED', '5'),
+                   ('ESP', '034783', '1850', 'RED', '5')))
+        for truth, t in tuples:
+            with self.subTest(truth=truth, test=t):
+                cid = hirise.CCDID(*t)
+                self.assertTupleEqual(truth,
+                                      (cid.phase, cid.orbit_number,
+                                       cid.latesque, cid.ccdname,
+                                       cid.ccdnumber))
+
+    def test_init_string(self):
+        string_tuples = (('ESP_034783_1850_RED5', 'ESP_034783_1850_RED5'),
+                         ('ESP_034783_1850_RED5', '34783_1850_RED5'),
+                         ('ESP_034783_1850_RED5', 'ESP_034783_1850_RED5_0'),
+                         ('ESP_034783_1850_RED5', '034783_1850_RED5_0'))
+        for s in string_tuples:
+            cid = hirise.CCDID(s[1])
+            with self.subTest(truth=s[0], ccid=cid):
+                self.assertEqual(s[0], str(cid))
+
+    def test_init_bad_tuples(self):
+        tuples = (('ESP', '034783', '1850'),
+                  ('34783', '1850', 'BLU1'),
+                  ('34783', '1850', 'RED'))
+        for t in tuples:
+            with self.subTest(test=t):
+                self.assertRaises(ValueError, hirise.CCDID, *t)
+
+    def test_init_bad_strings(self):
+        strings = ('ABC-123456-1235',
+                   'AB_123456_1235',  'ESPA_123456_1235',
+                   'PSP_1234_1234',   'ESP_1234567_1235',
+                   'ESP_123456_12345', 'ESP_123456',
+                   'ESP_034783_1850', 'ESP_034783_1850_IR13',
+                   'foobar')
+        for s in strings:
+            with self.subTest(test=s):
+                self.assertRaises(ValueError, hirise.CCDID, s)
+
+    def test_init_wrong_arg_count(self):
+        self.assertRaises(IndexError, hirise.CCDID,
+                          'ESP', '123456', '1235', 'RED', '5', '0')
+        self.assertRaises(IndexError, hirise.CCDID, '123456', '1235')
+        self.assertRaises(IndexError, hirise.CCDID)
+
+    def test_repr(self):
+        s = 'This is a CCDID: ESP_034783_1850_RED5'
+        cid = hirise.CCDID(s)
+        self.assertEqual("CCDID('ESP_034783_1850_RED5')", repr(cid))
+
+    def test_get_ccd(self):
+        s = 'This is a CCDID: ESP_034783_1850_RED5'
+        cid = hirise.CCDID(s)
+        self.assertEqual(cid.get_ccd(), 'RED5')
+
+    def test_get_obsid(self):
+        s = 'This is a CCDID: ESP_034783_1850_RED5'
+        oid = hirise.ObservationID(s)
+        cid = hirise.CCDID(s)
+        self.assertEqual(oid, cid.get_obsid())
+
+
+class TestChannelID(unittest.TestCase):
+
+    def test_init_tuple(self):
+        tuples = ((('ESP', '034783', '1850', 'RED', '5', '0'),
+                   ('034783', '1850', 'RED5', '0')),
+                  (('ESP', '034783', '1850', 'RED', '5', '0'),
+                   ('034783', '1850', 'RED', '5', '0')),
+                  (('ESP', '034783', '1850', 'RED', '5', '0'),
+                   ('ESP', '034783', '1850', 'RED5', '0')),
+                  (('ESP', '034783', '1850', 'RED', '5', '0'),
+                   ('ESP', '034783', '1850', 'RED', '5', '0')))
+
+        for truth, t in tuples:
+            with self.subTest(truth=truth, test=t):
+                cid = hirise.ChannelID(*t)
+                self.assertTupleEqual(truth,
+                                      (cid.phase, cid.orbit_number,
+                                       cid.latesque, cid.ccdname,
+                                       cid.ccdnumber, cid.channel))
+
+    def test_init_string(self):
+        string_tuples = (('ESP_034783_1850_RED5_0', 'ESP_034783_1850_RED5_0'),
+                         ('ESP_034783_1850_RED5_1', '34783_1850_RED5_1'))
+        for s in string_tuples:
+            cid = hirise.ChannelID(s[1])
+            with self.subTest(truth=s[0], channelid=cid):
+                self.assertEqual(s[0], str(cid))
+
+    def test_init_bad_tuples(self):
+        tuples = (('ESP', '034783', '1850', 'RED5'),
+                  ('ESP', '034783', '1850', 'RED5', 'A'),
+                  ('ESP', '034783', '1850', 'RED5', '2'),
+                  ('ESP', '034783', '1850', 'RED5', 'not a channel'))
+        for t in tuples:
+            with self.subTest(test=t):
+                self.assertRaises(ValueError, hirise.ChannelID, *t)
+
+    def test_init_bad_strings(self):
+        strings = ('ABC-123456-1235',
+                   'AB_123456_1235',  'ESPA_123456_1235',
+                   'PSP_1234_1234',   'ESP_1234567_1235',
+                   'ESP_123456_12345', 'ESP_123456',
+                   'ESP_034783_1850', 'ESP_034783_1850_IR13',
+                   'ESP_034783_1850_RED5', 'ESP_034783_1850_RED5_A',
+                   'ESP_034783_1850_RED5_2', 'ESP_034783_1850_RED5_10'
+                   'foobar')
+        for s in strings:
+            with self.subTest(test=s):
+                self.assertRaises(ValueError, hirise.ChannelID, s)
+
+    def test_init_wrong_arg_count(self):
+        self.assertRaises(IndexError, hirise.ChannelID,
+                          'ESP', '123456', '1235', 'RED', '5', '0', 'extra')
+        self.assertRaises(IndexError, hirise.ChannelID, '123456', '1235', '123')
+        self.assertRaises(IndexError, hirise.ChannelID, '123456', '1235')
+        self.assertRaises(IndexError, hirise.ChannelID)
+
+    def test_repr(self):
+        s = 'This is a CCDID: ESP_034783_1850_RED5_0'
+        cid = hirise.ChannelID(s)
+        self.assertEqual("ChannelID('ESP_034783_1850_RED5_0')", repr(cid))
+
+    def test_get_ccd(self):
+        s = 'This is a ChannelID: ESP_034783_1850_RED5_0'
+        cid = hirise.ChannelID(s)
+        self.assertEqual(cid.get_ccd(), 'RED5')
+
+    def test_get_obsid(self):
+        s = 'This is a ChannelID: ESP_034783_1850_RED5_0'
+        oid = hirise.ObservationID(s)
+        cid = hirise.ChannelID(s)
+        self.assertEqual(oid, cid.get_obsid())
+
+
 class TestProdID(unittest.TestCase):
 
     def test_init_tuple(self):
