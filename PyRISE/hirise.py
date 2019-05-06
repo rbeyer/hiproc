@@ -117,6 +117,9 @@ class ObservationID:
                     self.latesque == other.latesque)
         return False
 
+    def __hash__(self):
+        return hash((self.phase, self.orbit_number, self.latesque))
+
 
 class CCDID(ObservationID):
     """A class for HiRISE CCD IDs."""
@@ -163,10 +166,13 @@ class CCDID(ObservationID):
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return (super().__eq__() and
+            return (super().__eq__(other) and
                     self.ccdname == other.ccdname and
-                    self.ccdnumber == self.ccdnumber)
+                    self.ccdnumber == other.ccdnumber)
         return False
+
+    def __hash__(self):
+        return hash((super().__hash__(), self.ccdname, self.ccdnumber))
 
     def get_ccd(self) -> str:
         return self.ccdname + self.ccdnumber
@@ -209,6 +215,15 @@ class ChannelID(CCDID):
 
     def __repr__(self):
         return (f'{self.__class__.__name__}(\'{self.__str__()}\')')
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return (super().__eq__(other) and
+                    self.channel == other.channel)
+        return False
+
+    def __hash__(self):
+        return hash((super().__hash__(), self.channel))
 
 
 class ProductID(ObservationID):
