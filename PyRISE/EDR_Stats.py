@@ -83,14 +83,16 @@ def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
         raise err
 
     # Convert to .cub
-    isis.hi2isis(img, to=out_cube)
+    logging.info(isis.hi2isis(img, to=out_cube).args)
 
-    histats = parse_histat(isis.histat(out_cube, useoffsets=True,
-                                       leftimage=0,     rightimage=1,
-                                       leftcalbuffer=3, rightcalbuffer=1,
-                                       leftcaldark=3,   rightcaldark=1,
-                                       leftbuffer=3,    rightbuffer=1,
-                                       leftdark=3,      rightdark=1).stdout)
+    histat_complete = isis.histat(out_cube, useoffsets=True,
+                                  leftimage=0,     rightimage=1,
+                                  leftcalbuffer=3, rightcalbuffer=1,
+                                  leftcaldark=3,   rightcaldark=1,
+                                  leftbuffer=3,    rightbuffer=1,
+                                  leftdark=3,      rightdark=1)
+    logging.info(histat_complete.args)
+    histats = parse_histat(histat_complete.stdout)
 
     # Get some info from the new cube:
     histats['PRODUCT_ID'] = isis.getkey_k(out_cube, 'Archive', 'ProductId')
@@ -190,12 +192,13 @@ def get_dncnt(cub, hmin=0.01, hmax=99.99, keep=False) -> int:
     # that are within the boundaries, not the number of DN.
     # And the # of bins is automatically computed by isis.hist,
     # so could be different for each cube.
+    logging.info(get_dncnt.__doc__)
     logging.warning('Original Perl issue: counting DN bins instead of DN gets '
                     'placed in HiCat.EDR_Products.STD_DN_LEVELS')
 
     histfile = Path(cub).with_suffix('.hist')
     if not histfile.is_file():
-        isis.hist(cub, to=histfile)
+        logging.info(isis.hist(cub, to=histfile).args)
 
     h = isis.Histogram(histfile)
 
@@ -212,6 +215,7 @@ def get_dncnt(cub, hmin=0.01, hmax=99.99, keep=False) -> int:
 
 def calc_snr(cub: os.PathLike, gainsfile: os.PathLike, histats: dict) -> float:
     '''Calculate the signal to noise ratio.'''
+    logging.info(calc_snr.__doc__)
 
     ccdchan = '{0[0]}_{0[1]}'.format(hirise.getccdchannel(str(cub)))
 
@@ -244,6 +248,7 @@ def calc_snr(cub: os.PathLike, gainsfile: os.PathLike, histats: dict) -> float:
 def check_lut(img: os.PathLike):
     '''Checks whether a stored look up table (LUT) matches a known LUT.'''
     # Original author of this function was Robert King, in December 2006.
+    logging.info(check_lut.__doc__)
 
     img_pvl = pvl.load(str(img))
     lut_type = img_pvl['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_TABLE_TYPE']
