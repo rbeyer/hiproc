@@ -76,6 +76,8 @@ def main():
 
 def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
               keep=False) -> dict:
+    logging.info(f'EDR_Stats(in: {img}, out: {out_cube}, gains: {gains_file}, '
+                 f'hist min & max: {histmin} & {histmax}, keep: {keep})')
     try:
         logging.info('The LUT for this file is: ' + str(check_lut(img)))
     except KeyError as err:
@@ -109,6 +111,7 @@ def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
     tdi_bin_check(out_cube, histats)
     lut_check(out_cube, histats)
 
+    logging.info('EDR_Stats done.')
     return(histats)
 
 

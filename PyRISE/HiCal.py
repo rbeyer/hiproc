@@ -147,6 +147,7 @@ def main():
 def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
           conf: dict, conf_path: os.PathLike, db: dict,
           destripe=False, keep=False) -> tuple:
+    logging.info('HiCal start.')
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
 
@@ -170,6 +171,7 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
         next_cube = furrow_cube
     else:
         next_cube = to_delete.add(in_cube.with_suffix(f'.{temp_token}.cub'))
+        logging.info(f'Symlink {in_cube} to {next_cube}')
         next_cube.symlink_to(in_cube.resolve())
 
     # Run hical
@@ -253,11 +255,13 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
 
     # Create final output file
     to_delete.remove(next_cube)
+    logging.info(f'Rename {next_cube} to {out_cube}.')
     next_cube.rename(out_cube)
 
     if not keep:
         to_delete.unlink()
 
+    logging.info('HiCal done.')
     return(std_final, diff_std_dev, zapped)
 
 
@@ -674,7 +678,7 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
 def HiGainFx(cube: os.PathLike, outcube: os.PathLike,
              coef_path: os.PathLike, version: str,
              keep=False) -> None:
-    '''Perform a Gain-Drift correction on an HiRISE Channel Image.'''
+    '''Perform a Gain-Drift correction on a HiRISE Channel Image.'''
     logging.info(HiGainFx.__doc__)
     binning = isis.getkey_k(cube, 'Instrument', 'Summing')
     ccd = isis.getkey_k(cube, 'Instrument', 'CcdId')
