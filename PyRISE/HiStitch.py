@@ -38,6 +38,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import pvl
+
 import kalasiris as isis
 import PyRISE.hirise as hirise
 import PyRISE.util as util
@@ -47,19 +49,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()],
                                      conflict_handler='resolve')
-    parent.add_argument('--db',      required=False, default='.HiCat.json',
-                        action='append',
-                        help="The .json files to use.  Either needs to be "
-                        "given twice (one .json file for each input file), "
-                        "or if a single argument is given, it must start "
-                        "with a '.' and it is considered an extension and will "
-                        "be swapped with the two input files' extension to try "
-                        "and find the right .json files to use.")
+    parser.add_argument('--db2',         required=False, default='.HiCat.json',
+                        help="The second .json file to use.  Optionally, if it starts "
+                        "with a '.' it is considered an extension and will be "
+                        "swapped with the second input file's extension to find the "
+                        ".json file to use.")
     parser.add_argument('--dbout',        required=False, default='.HiCat.json')
     parser.add_argument('-o', '--output', required=False, default='.HiStitch.cub')
-    parser.add_argument('-c', '--conf',    required=False, default='HiStitch.conf')
-    parser.add_argument('cube0', metavar=".cub-file")
-    parser.add_argument('cube1', metavar=".cub-file", required=False)
+    parser.add_argument('-c', '--conf',    required=False,
+                        default=Path(__file__).resolve().parent.parent /
+                        'resources' / 'HiStitch.conf')
+    parser.add_argument('cube0', metavar="cube0.cub-file")
+    parser.add_argument('cube1', metavar="cube1.cub-file", nargs='?')
 
     # The original Perl needed the specific output of cubenorm from a
     # particular step in the HiCal pipeline before here.  However, rather
@@ -79,47 +80,37 @@ def main():
     if not args.cube1:
         cubes = Path(args.cube0),
     else:
-        cubes = sort_input_cubes(args.cube0, args.cube1)
+        cubes = sort_input_cubes(Path(args.cube0), Path(args.cube1))
 
     chids = get_chids(cubes)
 
-    outcub_path = set_outpath(args.output, CCDID(chids[0]), cubes[0].parent)
+    outcub_path = set_outpath(args.output, hirise.CCDID(chids[0]), cubes[0].parent)
 
     # PrepareDBStatements()
     #   select from HiCat.EDR_Products
     db = list()
     db_paths = list()
-    if len(args.db) == 1:
-        for c in cubes:
-            db_paths.append(util.pid_path_w_suffix(args.db, c))
-    elif len(args.db) == 2:
-        for p in map(Path, args.db):
-            if p.exists():
-                db_paths.append(p)
-            else:
-                logging.critical(f'Could not find {p}')
-                sys.exit()
-    else:
-        logging.critical('Too many files given to --db.')
-        sys.exit()
+    db_paths.append(util.pid_path_w_suffix(args.db, cubes[0]))
+    if len(cubes) == 2:
+        db_paths.append(util.pid_path_w_suffix(args.db2, cubes[1]))
 
     dbs = sort_databases(db_paths, chids)
 
     (truthchannel, balanceratio) = HiStitch(cubes,
-                                            output_path,
+                                            outcub_path,
                                             conf['HiStitch'], dbs,
-                                            int(pids[0].ccdnumber),
+                                            int(chids[0].ccdnumber),
                                             keep=args.keep)
 
     # insert ObsID, pid0.ccdname+pid0.ccdnumber, truthchannel, balanceratio
     # into HiCat.CCD_Processing_Statistics
     db = dict()
-    db['OBSERVATION_ID'] = str(pids[0].get_obsid())
-    db['CCD'] = pids[0].ccdname + pids[0].ccdnumber
+    db['OBSERVATION_ID'] = str(chids[0].get_obsid())
+    db['CCD'] = chids[0].get_ccd()
     db['CONTROL_CHANNEL'] = truthchannel
     db['CHANNEL_MATCHING_CORRECTION'] = balanceratio
 
-    db_path = set_outpath(args.dbout, CCDID(chids[0]), outcub_path.parent)
+    db_path = set_outpath(args.dbout, hirise.CCDID(chids[0]), outcub_path.parent)
 
     with open(db_path, 'w') as f:
         json.dump(db, f, indent=0, sort_keys=True)
@@ -306,9 +297,9 @@ def HiFurrow_Fix(in_cube: os.PathLike, out_cube: os.PathLike,
 
     in_cub = Path(in_cube)
 
-    binning = isis.getkey_k(in_cub, 'Instrument', 'Summing')
-    lines = isis.getkey_k(in_cub, 'Dimensions', 'Lines')
-    samps = isis.getkey_k(in_cub, 'Dimensions', 'Samples')
+    binning = int(isis.getkey_k(in_cub, 'Instrument', 'Summing'))
+    lines = int(isis.getkey_k(in_cub, 'Dimensions', 'Lines'))
+    samps = int(isis.getkey_k(in_cub, 'Dimensions', 'Samples'))
 
     if binning != 2 and binning != 4:
         raise ValueError('HiFurrow_Fix only supports correction for '
@@ -351,7 +342,7 @@ def HiFurrow_Fix(in_cube: os.PathLike, out_cube: os.PathLike,
     # Create a mask file
     # DN=1 for non-furrow area
     # DN=0 for furrow area
-    eqn = f'(1*(sample<{dn_range[0]})+ 1*(sample>{dn_range[1]}) + 0)'
+    eqn = f'\(1*(sample<{dn_range[0]})+ 1*(sample>{dn_range[1]}) + 0)'
     fx_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.fx.cub'))
     logging.info(isis.fx(to=fx_cub, mode='OUTPUTONLY', lines=lines, samples=samps,
                          equation=eqn).args)
