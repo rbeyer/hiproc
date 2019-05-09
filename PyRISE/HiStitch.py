@@ -28,12 +28,14 @@
 # emulate functionality.
 
 import argparse
+import collections
 import json
 import logging
 import os
 import re
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import kalasiris as isis
@@ -75,13 +77,13 @@ def main():
 
     # GetProductFiles()
     if not args.cube1:
-        cubes = (Path(args.cube0), )
+        cubes = Path(args.cube0),
     else:
         cubes = sort_input_cubes(args.cube0, args.cube1)
 
-    pids = get_pids(cubes)
+    chids = get_chids(cubes)
 
-    outcub_path = set_outpath(args.output, pids[0], cubes[0].parent)
+    outcub_path = set_outpath(args.output, CCDID(chids[0]), cubes[0].parent)
 
     # PrepareDBStatements()
     #   select from HiCat.EDR_Products
@@ -101,7 +103,7 @@ def main():
         logging.critical('Too many files given to --db.')
         sys.exit()
 
-    dbs = sort_databases(db_paths, pids)
+    dbs = sort_databases(db_paths, chids)
 
     (truthchannel, balanceratio) = HiStitch(cubes,
                                             output_path,
@@ -117,35 +119,31 @@ def main():
     db['CONTROL_CHANNEL'] = truthchannel
     db['CHANNEL_MATCHING_CORRECTION'] = balanceratio
 
-    db_path = set_outpath(args.dbout, pids[0], outcub_path.parent)
+    db_path = set_outpath(args.dbout, CCDID(chids[0]), outcub_path.parent)
 
     with open(db_path, 'w') as f:
         json.dump(db, f, indent=0, sort_keys=True)
 
 
-def get_pids(cubes: list) -> tuple:
+def get_chids(cubes: list) -> tuple:
 
-    pid_a = hirise.get_ProdID_fromfile(cubes[0])
+    cid_a = hirise.get_ChannelID_fromfile(cubes[0])
 
     if len(cubes) == 2:
-        pid_b = hirise.get_ProdID_fromfile(cubes[1])
-        if pid_a != pid_b:
-            raise ValueError(f'These do not appear to be channels '
-                             'from the same Observation: {cubes[0]}: '
-                             '{pid_a} and {cubes[1]}: {pid_b}')
-        return (pid_a, pid_b)
+        cid_b = hirise.get_ChannelID_fromfile(cubes[1])
+        if(hirise.CCDID(cid_a) == hirise.CCDID(cid_b)):
+            return (cid_a, cid_b)
+        else:
+            raise ValueError('These do not appear to be channels '
+                             f'from the same CCD:\n{cubes[0]}: '
+                             f'{cid_a} and\n{cubes[1]}: {cid_b}')
     else:
-        return (pid_a, )
+        return (cid_a, )
 
 
-def set_outpath(output: os.PathLike, pid: hirise.ProductID, directory: Path) -> Path:
-    if output.startswith('.'):
-        stitch_prod = '{}_{}_{}_{}{}'.format(pid.phase,
-                                             pid.orbit_number,
-                                             pid.latesque,
-                                             pid.ccdname,
-                                             pid.ccdnumber)
-        return (directory / Path(stitch_prod + output))
+def set_outpath(output: os.PathLike, cid: hirise.CCDID, directory: Path) -> Path:
+    if str(output).startswith('.'):
+        return (directory / Path(str(cid) + output))
     else:
         return Path(output)
 
@@ -153,46 +151,51 @@ def set_outpath(output: os.PathLike, pid: hirise.ProductID, directory: Path) -> 
 def sort_input_cubes(a_cub: os.PathLike, b_cub: os.PathLike) -> tuple:
     '''Figures out which one is Channel 0 and which is Channel 1.'''
 
-    a_chan = isis.getkey_k(a_cub, 'Instrument', 'ChannelNumber')
-    b_chan = isis.getkey_k(b_cub, 'Instrument', 'ChannelNumber')
+    channel_of = dict()
+    channel_of[a_cub] = isis.getkey_k(a_cub, 'Instrument', 'ChannelNumber')
+    channel_of[b_cub] = isis.getkey_k(b_cub, 'Instrument', 'ChannelNumber')
 
-    if a_chan == b_chan:
-        raise RuntimeError(f'{a_cub} and {b_cub} have the same channel: {a_chan}.')
+    if channel_of[a_cub] == channel_of[b_cub]:
+        raise RuntimeError(f'{a_cub} and {b_cub} have the same channel: '
+                           '{channel_of[a_cub]}.')
 
-    for (chan, cub) in zip((a_chan, b_chan), (a_cub, b_cub)):
-        if int(chan) < 0 or int(chan) > 1:
+    for (cub, chan) in channel_of.items():
+        if int(chan) != 0 and int(chan) != 1:
             raise RuntimeError(f'{cub} has a channel other than 0 or 1: {chan}')
 
-    if int(a_chan) < int(b_chan):
-        return (a_cub, b_cub)
-    else:
-        return (a_cub, b_cub)
+    sorted_cubchan = sorted(channel_of.items(), key=lambda x: x[1])
+    return (sorted_cubchan[0][0], sorted_cubchan[1][0])
 
 
-def sort_databases(db_paths: list, pids: tuple) -> tuple:
+def sort_databases(db_paths: list, chids: tuple) -> tuple:
     '''Ensures that the databases match the cubes.'''
 
-    if len(dp_paths) != len(pids):
-        raise Exception
+    if len(db_paths) != len(chids):
+        raise IndexError(f'The number of database paths {db_paths} does not '
+                         'match the number of Product IDs {pids}')
 
     dbs = list()
     for p in db_paths:
         with open(p) as f:
             dbs.append(json.load(f))
 
-    pid_db_map = dict()
-    for p in pids:
+    chid_db_map = dict()
+    for p in chids:
         for d in dbs:
             if str(p) == d['PRODUCT_ID']:
-                pid_db_map[p] = d
+                chid_db_map[p] = d
                 break
-    if len(pid_db_map) != len(pids):
-        raise Exception
+    if len(chid_db_map) != len(chids):
+        raise LookupError('The Product IDs in the databases '
+                          f'do not match {chids}')
 
-    return tuple(pid_db_map[pids[0]], pid_db_map[pids[1]])
+    return tuple([chid_db_map[chids[0]], chid_db_map[chids[1]]])
 
 
-def HiStitch(cubes, out_cub, conf, dbs, ccd_number: int, keep=False) -> tuple:
+def HiStitch(cubes: list, out_cube: os.PathLike, conf: dict, dbs: list,
+             ccd_number: int, keep=False) -> tuple:
+
+    out_path = Path(out_cube)
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
 
@@ -207,26 +210,26 @@ def HiStitch(cubes, out_cub, conf, dbs, ccd_number: int, keep=False) -> tuple:
 
     # HiStitchStep() - runs HiStitch, and originally inserted to db, now we
     # just return at the bottom of this function.
-    HiStitchStep(cubes, out_cub, dbs[0]['BINNING'], ccd_number,
+    HiStitchStep(cubes, out_path, dbs[0]['BINNING'], ccd_number, conf,
                  flags.balance, flags.equalize)
 
     if len(cubes) == 2 and flags.balance:
         # run getkey from ?HiStitch_output?
-        truthchannel = isis.getkey_k(out_cub, 'HiStitch', 'TruthChannel')
-        balanceratio = isis.getkey_k(out_cub, 'HiStitch', 'BalanceRatio')
+        truthchannel = isis.getkey_k(out_path, 'HiStitch', 'TruthChannel')
+        balanceratio = isis.getkey_k(out_path, 'HiStitch', 'BalanceRatio')
 
     if flags.furrow:
-        furrow_file = out_cub.with_suffix(f'.{temp_token}.temp.cub')
-        HiFurrow_Fix(out_cub, furrow_file, max_mean, keep=keep)
-        furrow_file.rename(out_cube)
+        furrow_file = out_path.with_suffix(f'.{temp_token}.temp.cub')
+        HiFurrow_Fix(out_path, furrow_file, max_mean, keep=keep)
+        furrow_file.rename(out_path)
 
-    if len(cubes) == 2 and balance:
+    if len(cubes) == 2 and flags.balance:
         return(truthchannel, balanceratio)
     else:
         return(None, None)
 
 
-def set_flags(conf, dbs, ccdnum: int, bindex: int, max_mean) -> collections.namedtuple:
+def set_flags(conf, dbs, ccdnum: int, bindex: int, max_mean: float) -> collections.namedtuple:
     '''Set various processing flags based on various configuration
     parameters.'''
     HiStitchFlags = collections.namedtuple('HiStitchFlags',
@@ -253,8 +256,7 @@ def set_flags(conf, dbs, ccdnum: int, bindex: int, max_mean) -> collections.name
     balance = False
     equalize = False
 
-    if(util.str2bool(conf['HiStitch_Balance']) or
-       util.str2bool(conf['HiStitch_Equalize'])):
+    if(conf['HiStitch_Balance'] or conf['HiStitch_Equalize']):
         if (int(conf['HiStitch_Balance_Processing'][ccdnum]) == 0 or
             (max_lis < int(conf['HiStitch_LIS_Pixels']) and
              # The original Perl had these two following conditions written
@@ -266,14 +268,14 @@ def set_flags(conf, dbs, ccdnum: int, bindex: int, max_mean) -> collections.name
                             'equalize and balance flags.')
             # To correct, change the indexing of the conf lists above with
             # 'bindex' instead of 'binning'.
-            equalize = bool(util.str2bool(conf['HiStitch_Equalize']) and
+            equalize = bool(conf['HiStitch_Equalize'] and
                             max_gper < float(conf['HiStitch_Gap_Percent']))
-            balance = util.str2bool(conf['HiStitch_Balance'])
+            balance = conf['HiStitch_Balance']
 
     return HiStitchFlags(furrow, balance, equalize)
 
 
-def HiStitchStep(in_cubes, out_cub, binning, ccdnum, balance, equalize):
+def HiStitchStep(in_cubes, out_cub, binning, ccdnum, conf, balance, equalize):
     zpad_bin = '{:0>2}'.format(binning)
     histitch_args = {'from1': in_cubes[0], 'to': out_cub}
     if len(in_cubes) == 2:
@@ -294,19 +296,22 @@ def HiStitchStep(in_cubes, out_cub, binning, ccdnum, balance, equalize):
     return isis.histitch(**histitch_args)
 
 
-def HiFurrow_Fix(in_cub, out_cub, max_mean, keep=False):
+def HiFurrow_Fix(in_cube: os.PathLike, out_cube: os.PathLike,
+                 max_mean: float, keep=False):
     '''Perform a normalization of the furrow region of bin 2 or 4
        HiRISE images. The input to this script is a HiRISE stitch
        product containing both channels of a CCD.'''
+
+    in_cub = Path(in_cube)
 
     binning = isis.getkey_k(in_cub, 'Instrument', 'Summing')
     lines = isis.getkey_k(in_cub, 'Dimensions', 'Lines')
     samps = isis.getkey_k(in_cub, 'Dimensions', 'Samples')
 
-    if binning != '2' and binning != '4':
+    if binning != 2 and binning != 4:
         raise ValueError('HiFurrow_Fix only supports correction for '
                          'bin 2 or 4 data.')
-    if binning == '2' and samps != '1024':
+    if binning == 2 and samps != 1024:
         raise ValueError(f'HiFurrowFix: improper number of samples: {samps}, '
                          'for a stitch product with bin 2 (should be 1024).')
 
@@ -318,10 +323,10 @@ def HiFurrow_Fix(in_cub, out_cub, max_mean, keep=False):
 
     # For bin2 and bin4 imaging, specify width of furrow based on
     # image average DN range
-    range_low['2'] = (512, 513)  # 2 pixel furrow width
-    range_mid['2'] = (511, 514)  # 4 pixel furrow width
-    range_hgh['2'] = (511, 514)  # 4 pixel furrow width
-    range_max['2'] = (510, 515)  # 6 pixel furrow width
+    range_low = {2: (512, 513), 4: (256, 257)}  # 2 pixel furrow width
+    range_mid = {2: (511, 514), 4: (255, 258)}  # 4 pixel furrow width
+    range_hgh = {2: (511, 514), 4: (255, 258)}  # 4 pixel furrow width
+    range_max = {2: (510, 515), 4: (254, 259)}  # 6 pixel furrow width
 
     # Original code had low/mid/hgh for bin2 and bin4, but they
     # were hard-coded to be identical.
@@ -329,16 +334,11 @@ def HiFurrow_Fix(in_cub, out_cub, max_mean, keep=False):
     dn_range_mid = 10000
     dn_range_hgh = 12000
 
-    range_low['4'] = (256, 257)  # 2 pixel furrow width
-    range_mid['4'] = (255, 258)  # 4 pixel furrow width
-    range_hgh['4'] = (255, 258)  # 4 pixel furrow width
-    range_max['4'] = (254, 259)  # 6 pixel furrow width
-
-    if max_avg > dn_range_hgh:
+    if max_mean > dn_range_hgh:
         dn_range = range_max[binning]
-    elif max_avg > dn_range_mid:
+    elif max_mean > dn_range_mid:
         dn_range = range_hgh[binning]
-    elif max_avg > dn_range_low:
+    elif max_mean > dn_range_low:
         dn_range = range_mid[binning]
     else:
         dn_range = range_low[binning]
@@ -351,7 +351,7 @@ def HiFurrow_Fix(in_cub, out_cub, max_mean, keep=False):
     # DN=0 for furrow area
     fx_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.fx.cub'))
     isis.fx(to=fx_cub, mode='OUTPUTONLY', lines=lines, samples=samps,
-            equation=f'(1*(sample<{dnrange[0]})+ 1*(sample>{dn_range[1]}) + 0)')
+            equation=f'(1*(sample<{dn_range[0]})+ 1*(sample>{dn_range[1]}) + 0)')
 
     # Create a file where the furrow area is set to null
     mask1_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.mask1.cub'))
@@ -395,11 +395,11 @@ def conf_check(conf: dict) -> None:
     util.conf_check_strings('HiStitch_Clean_Files', ('DELETE', 'KEEP'),
                             conf['HiStitch']['HiStitch_Clean_Files'])
 
-    util.conf_check_strings('HiStitch_Balance', ('TRUE', 'FALSE'),
-                            conf['HiStitch']['HiStitch_Balance'])
+    util.conf_check_bool('HiStitch_Balance',
+                         conf['HiStitch']['HiStitch_Balance'])
 
-    util.conf_check_strings('HiStitch_Gap_Percent', ('TRUE', 'FALSE'),
-                            conf['HiStitch']['HiStitch_Gap_Percent'])
+    util.conf_check_bool('HiStitch_Equalize',
+                         conf['HiStitch']['HiStitch_Equalize'])
 
     util.conf_check_strings('HiStitch_Equalize_Correction', ('MULTIPLY', 'ADD'),
                             conf['HiStitch']['HiStitch_Equalize_Correction'])
