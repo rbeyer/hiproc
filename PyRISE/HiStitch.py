@@ -194,6 +194,7 @@ def sort_databases(db_paths: list, chids: tuple) -> tuple:
 
 def HiStitch(cubes: list, out_cube: os.PathLike, conf: dict, dbs: list,
              ccd_number: int, keep=False) -> tuple:
+    logging.info('HiStitch start.')
 
     out_path = Path(out_cube)
     # Allows for indexing in lists ordered by bin value.
@@ -210,8 +211,8 @@ def HiStitch(cubes: list, out_cube: os.PathLike, conf: dict, dbs: list,
 
     # HiStitchStep() - runs HiStitch, and originally inserted to db, now we
     # just return at the bottom of this function.
-    HiStitchStep(cubes, out_path, dbs[0]['BINNING'], ccd_number, conf,
-                 flags.balance, flags.equalize)
+    logging.info(HiStitchStep(cubes, out_path, dbs[0]['BINNING'], ccd_number,
+                              conf, flags.balance, flags.equalize).args)
 
     if len(cubes) == 2 and flags.balance:
         # run getkey from ?HiStitch_output?
@@ -223,6 +224,7 @@ def HiStitch(cubes: list, out_cube: os.PathLike, conf: dict, dbs: list,
         HiFurrow_Fix(out_path, furrow_file, max_mean, keep=keep)
         furrow_file.rename(out_path)
 
+    logging.info('HiStitch done.')
     if len(cubes) == 2 and flags.balance:
         return(truthchannel, balanceratio)
     else:
@@ -349,39 +351,43 @@ def HiFurrow_Fix(in_cube: os.PathLike, out_cube: os.PathLike,
     # Create a mask file
     # DN=1 for non-furrow area
     # DN=0 for furrow area
+    eqn = f'(1*(sample<{dn_range[0]})+ 1*(sample>{dn_range[1]}) + 0)'
     fx_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.fx.cub'))
-    isis.fx(to=fx_cub, mode='OUTPUTONLY', lines=lines, samples=samps,
-            equation=f'(1*(sample<{dn_range[0]})+ 1*(sample>{dn_range[1]}) + 0)')
+    logging.info(isis.fx(to=fx_cub, mode='OUTPUTONLY', lines=lines, samples=samps,
+                         equation=eqn).args)
 
     # Create a file where the furrow area is set to null
     mask1_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.mask1.cub'))
-    isis.mask(in_cub, mask=fx_cub, to=mask1_cub, min_=1, max_=1,
-              preserve='INSIDE', spixels='NULL')
+    logging.info(isis.mask(in_cub, mask=fx_cub, to=mask1_cub, min_=1, max_=1,
+                           preserve='INSIDE', spixels='NULL').args)
 
     # Lowpass filter to fill in the null pixel area
     lpf_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.lpf.cub'))
-    isis.lowpass(mask1_cub, to=lpf_cub, sample=lpf_samp, line=lpf_line,
-                 null=True, hrs=False, his=False, lis=False)
+    logging.info(isis.lowpass(mask1_cub, to=lpf_cub, sample=lpf_samp, line=lpf_line,
+                              null=True, hrs=False, his=False, lis=False).args)
 
     # Create a file where non-furrow columns are set to null
     mask2_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.mask2.cub'))
-    isis.mask(in_cub, mask=fx_cub, to=mask2_cub, min_=0, max_=0,
-              preserve='INSIDE', spixels='NULL')
+    logging.info(isis.mask(in_cub, mask=fx_cub, to=mask2_cub, min_=0, max_=0,
+                           preserve='INSIDE', spixels='NULL').args)
 
     # Highpass filter the furrow region
     hpf_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.hpf.cub'))
-    isis.highpass(mask2_cub, to=hpf_cub, sample=1, line=lpf_line)
+    logging.info(isis.highpass(mask2_cub, to=hpf_cub, sample=1,
+                               line=lpf_line).args)
 
     # Add lowpass and highpass together to achieve desired result
     alg_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.alg.cub'))
-    isis.algebra(from_=lpf_cub, from2=hpf_cub, to=alg_cub,
-                 operator='ADD', A=1.0, B=1.0)
+    logging.info(isis.algebra(from_=lpf_cub, from2=hpf_cub, to=alg_cub,
+                 operator='ADD', A=1.0, B=1.0).args)
 
     # copy the input file to the output file then mosaic the
     # furrow area as needed.
+    logging.info(f'Copy {in_cub} to {out_cube}.')
     shutil.copyfile(in_cub, out_cube)
-    isis.handmos(alg_cub, mosaic=out_cube, outsample=1, outline=1, outband=1,
-                 insample=1, inline=1, inband=1, create='NO')
+    logging.info(isis.handmos(alg_cub, mosaic=out_cube, outsample=1,
+                              outline=1, outband=1, insample=1, inline=1,
+                              inband=1, create='NO').args)
 
     if not keep:
         to_del.unlink()
