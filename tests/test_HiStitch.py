@@ -111,13 +111,15 @@ class TestMock(unittest.TestCase):
             self.assertRaises(ValueError, hs.HiFurrow_Fix, 'dum_in', 'dum_out', 0)
         with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=[2, 1, 1]):
             self.assertRaises(ValueError, hs.HiFurrow_Fix, 'dum_in', 'dum_out', 0)
-        with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=[2, 1024, 1024]):
+        with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=['2',
+                                                                 '1024',
+                                                                 '1024']):
             in_cube = 'dummy_in.cub'
             out_cube = 'dummy_out.cub'
             hs.HiFurrow_Fix(in_cube, out_cube, 1000, keep=True)
 
             mock_fx.assert_called_once()
-            eqn = '(1*(sample<512)+ 1*(sample>513) + 0)'
+            eqn = '\(1*(sample<512)+ 1*(sample>513) + 0)'
             fx_path = mock_fx.call_args[1]['to']
             mock_fx.assert_called_once_with(equation=eqn,
                                             lines=1024, mode='OUTPUTONLY',
