@@ -36,6 +36,7 @@ def parent_parser() -> argparse.ArgumentParser:
                         help="The log level to show for this program, can be a "
                         "named log level or a numerical level.")
     parent.add_argument('-k', '--keep', required=False, default=False,
+                        action='store_true',
                         help="Normally, the program will clean up any "
                         "intermediary files, but if this option is given, it "
                         "won't.")
