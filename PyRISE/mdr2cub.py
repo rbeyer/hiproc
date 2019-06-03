@@ -71,7 +71,7 @@ def main():
     logging.info(isis.hi2isis(edr_path, to=h2i_path).args)
 
     # Convert Alan's MDR to a cube file
-    mdr_cub_path = to_del.add(mdr_path.with_suffix('.mdr.cub'))
+    mdr_cub_path = to_del.add(mdr_path.with_suffix('.alan.cub'))
     logging.info(f'Running gdal_translate {mdr_path} -of ISIS3 {mdr_cub_path}')
     gdal.Translate(str(mdr_cub_path), str(mdr_path), format='ISIS3')
 
@@ -107,26 +107,31 @@ def main():
         logging.info(isis.handmos(mdr_16b_p, mosaic=out_path).args)
     else:
         logging.info('MDR is in DN units and will be converted to I/F.')
-        # This part isn't quite working yet.
 
-        fpa_t = statistics.mean([float(isis.getkey_k(h2i_16b_path, 'Instrument',
+        fpa_t = statistics.mean([float(isis.getkey_k(h2i_16b_p, 'Instrument',
                                                      'FpaPositiveYTemperature')),
-                                 float(isis.getkey_k(h2i_16b_path, 'Instrument',
+                                 float(isis.getkey_k(h2i_16b_p, 'Instrument',
                                                      'FpaNegativeYTemperature'))])
+        print(f'fpa_t {fpa_t}')
 
-        cid = hirise.get_CCDID_fromfile(h2i_16b_path)
+        cid = hirise.get_CCDID_fromfile(h2i_16b_p)
         tdg = t_dep_gain(cid.ccdname, fpa_t)
         suncorr = solar_correction()
-        sed = float(isis.getkey_k(h2i_16b_path, 'Instrument', 'LineExposureDuration'))
+        sed = float(isis.getkey_k(h2i_16b_p, 'Instrument', 'LineExposureDuration'))
         zbin = 1  # Ideally, this comes from the hical conf file GainUnitConversionBinFactor
 
         # The 'ziof' name is from the ISIS HiCal/GainUnitConversion.h, it is a
         # divisor in the calibration equation.
+        print(f'zbin {zbin}')
+        print(f'tdg {tdg}')
+        print(f'sed {sed}')
+        print(f'suncorr {suncorr}')
         ziof = (zbin * tdg * sed * 1e-6 * suncorr)
         eqn = f"\(F1 / {ziof})"
 
-        h2iiof_p = to_del.add(mdr_16b_p.with_suffix('.iof.cub'))
-        logging.info(isis.fx(f1=mdr_16b_p, to=mdriof_p, equ=eqn).args)
+        mdriof_p = to_del.add(mdr_cub_path.with_suffix('.iof.cub'))
+        to_s = '{}+SignedWord+{}:{}'.format(mdriof_p, 0, 1.5)
+        logging.info(isis.fx(f1=mdr_cub_path, to=to_s, equ=eqn).args)
 
         logging.info(isis.handmos(mdriof_p, mosaic=out_path).args)
 
@@ -152,12 +157,9 @@ def t_dep_gain(ccd: str, t: float) -> float:
     #   baseT = IoverFbasetemperature (deg C)  - Alan's numbers are the same
     #   Q = QEpercentincreaseperC (1/deg C) - Alan's numbers are the same
     #   absgainTDI = AbsGain_TDI128 (? units) - Alan's numbers don't match
-    t_factor = 1 + (t - 18.9)
-    if ccd == 'RED':
-        return 157709797 * t_factor * 0.0005704 * 6.37688
-    elif ccd == 'IR':
-        return 56467454 * t_factor * 0.002696 * 6.99017
-    elif ccd == 'BG':
-        return 115121269 * t_factor * 0.00002295 * 7.00042
-    else:
-        raise Exception(f'{ccd} is not a valid CCD type.')
+    zgain = dict(RED=157709797, IR=56467454, BG=115121269)
+    baseT = dict(RED=18.9, IR=18.9, BG=18.9)
+    QEpcntC = dict(RED=0.0005704, IR=0.002696, BG=0.00002295)
+    absgainTDI = dict(RED=6.37688, IR=6.99017, BG=7.00042)
+
+    return zgain[ccd] * (1 + (t - baseT[ccd]) * QEpcntC[ccd] * absgainTDI[ccd])
