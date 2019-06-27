@@ -806,7 +806,7 @@ def Cubenorm_Filter_filter_boxfilter(inlist: list, origlist: list,
             frac = 0.125
         for i, (orig, new) in enumerate(zip(origlist, x)):
             if orig != 0 and new != 0 and abs(orig - new) / new > frac:
-                print(f'orig: {orig}, new: {new}, setting to zero')
+                # print(f'orig: {orig}, new: {new}, setting to zero')
                 x[i] = 0
     return x
 
