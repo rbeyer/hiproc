@@ -41,6 +41,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-o', '--output',  required=False, default='.mdr.iof.cub')
     parser.add_argument('-e', '--edr',  required=True)
+    parser.add_argument('-c', '--conf',    required=False,
+                        default=Path(__file__).resolve().parent.parent /
+                        'resources' / 'hical.pipelines.conf')
     parser.add_argument('mdr', metavar="MDR_file")
     parser.add_argument('-l', '--log',  required=False, default='WARNING',
                         help="The log level to show for this program, can be a "
@@ -61,6 +64,7 @@ def main():
     to_del = isis.PathSet()
 
     h2i_path = to_del.add(edr_path.with_suffix('.hi2isis.cub'))
+
     out_path = util.path_w_suffix(args.output, edr_path)
 
     # The first thing Alan's program did was to crop the image down to only the
@@ -75,15 +79,44 @@ def main():
     logging.info(f'Running gdal_translate {mdr_path} -of ISIS3 {mdr_cub_path}')
     gdal.Translate(str(mdr_cub_path), str(mdr_path), format='ISIS3')
 
-    h2i_s = isis.getkey_k(h2i_path, 'Dimensions', 'Samples')
-    h2i_l = isis.getkey_k(h2i_path, 'Dimensions', 'Lines')
-    mdr_s = isis.getkey_k(mdr_cub_path, 'Dimensions', 'Samples')
-    mdr_l = isis.getkey_k(mdr_cub_path, 'Dimensions', 'Lines')
+    h2i_s = int(isis.getkey_k(h2i_path, 'Dimensions', 'Samples'))
+    h2i_l = int(isis.getkey_k(h2i_path, 'Dimensions', 'Lines'))
+    mdr_s = int(isis.getkey_k(mdr_cub_path, 'Dimensions', 'Samples'))
+    mdr_l = int(isis.getkey_k(mdr_cub_path, 'Dimensions', 'Lines'))
 
     if h2i_s != mdr_s:
-        logging.critical(f'The number of samples in {h2i_path} ({h2i_s}) '
-                         f'and {mdr_cub_path} ({mdr_s}) are different. Exiting.')
-        sys.exit()
+        label = pvl.load(str(h2i_path))
+        hirise_cal_info = get_one(label, 'Table', 'HiRISE Calibration Ancillary')
+
+        buffer_pixels = get_one(hirise_cal_info, 'Field', 'BufferPixels')['Size']
+        dark_pixels = get_one(hirise_cal_info, 'Field', 'DarkPixels')['Size']
+        rev_mask_tdi_lines = hirise_cal_info['Records']
+
+        if h2i_s + buffer_pixels + dark_pixels == mdr_s:
+            logging.info(f'The file {mdr_cub_path} has {buffer_pixels + dark_pixels} more sample pixels '
+                         f'than {h2i_path}, assuming those are dark and buffer '
+                         f'pixels and will crop accordingly.')
+            if h2i_l + rev_mask_tdi_lines != mdr_l:
+                logging.critical('Even assuming this is a "full" channel image, '
+                                 'this has the wrong number of lines. '
+                                 f'{mdr_cub_path} should have {h2i_l + rev_mask_tdi_lines}, but '
+                                 f'has {mdr_l} lines. Exiting')
+                sys.exit()
+            else:
+                crop_path = to_del.add(mdr_cub_path.with_suffix('.crop.cub'))
+                # We want to start with the next pixel (+1) after the cal
+                # pixels.
+                logging.info(isis.crop(mdr_cub_path, to=crop_path,
+                                       sample=buffer_pixels + 1,
+                                       nsamples=h2i_s,
+                                       line=rev_mask_tdi_lines + 1).args)
+                mdr_cub_path = crop_path
+                mdr_l = int(isis.getkey_k(mdr_cub_path, 'Dimensions', 'Lines'))
+
+        else:
+            logging.critical(f'The number of samples in {h2i_path} ({h2i_s}) '
+                             f'and {mdr_cub_path} ({mdr_s}) are different. Exiting.')
+            sys.exit()
 
     if h2i_l != mdr_l:
         logging.critical(f'The number of lines in {h2i_path} ({h2i_l}) '
@@ -94,8 +127,16 @@ def main():
     h2i_16b_p = to_del.add(h2i_path.with_suffix('.16bit.cub'))
     logging.info(isis.bit2bit(h2i_path, to=h2i_16b_p, bit='16bit',
                               clip='minmax', minval=0, maxval=1.5).args)
-
     shutil.copyfile(h2i_16b_p, out_path)
+
+    # If it is a channel 1 file, Alan mirrored it so that he could process
+    # the two channels in an identical way (which we also took advantage
+    # of above if the buffer and dark pixels were included), so we need to mirror it back.
+    cid = hirise.get_ChannelID_fromfile(h2i_16b_p)
+    if cid.channel == '1':
+        mirror_path = to_del.add(mdr_cub_path.with_suffix('.mirror.cub'))
+        logging.info(isis.mirror(mdr_cub_path, to=mirror_path).args)
+        mdr_cub_path = mirror_path
 
     # Is the MDR in DN or I/F?
     maximum_pxl = float(pvl.loads(isis.stats(mdr_cub_path).stdout)['Results']['Maximum'])
@@ -114,11 +155,12 @@ def main():
                                                      'FpaNegativeYTemperature'))])
         print(f'fpa_t {fpa_t}')
 
-        cid = hirise.get_CCDID_fromfile(h2i_16b_p)
-        tdg = t_dep_gain(cid.ccdname, fpa_t)
+        conf = pvl.load(str(args.conf))
+
+        tdg = t_dep_gain(get_one(conf['Hical'], 'Profile', cid.ccdname), fpa_t)
         suncorr = solar_correction()
         sed = float(isis.getkey_k(h2i_16b_p, 'Instrument', 'LineExposureDuration'))
-        zbin = 1  # Ideally, this comes from the hical conf file GainUnitConversionBinFactor
+        zbin = get_one(conf['Hical'], 'Profile', 'GainUnitConversion')['GainUnitConversionBinFactor']
 
         # The 'ziof' name is from the ISIS HiCal/GainUnitConversion.h, it is a
         # divisor in the calibration equation.
@@ -146,20 +188,34 @@ def solar_correction() -> float:
     return s * s
 
 
-def t_dep_gain(ccd: str, t: float) -> float:
-    '''Given the type of CCD, and the FPA temperature in C,
+def t_dep_gain(profile: dict, t: float) -> float:
+    '''Given the profile, and the FPA temperature in C,
        calculate the temperature dependent gain.'''
     # Equivalent to getTempDepGain() in ISIS HiCal/GainUnitConversion.h
-    # But numbers all come from Alan.
     # These equations are really g * (1 + t - baseT) * Q * absgainTDI
-    # where these variables are from the various hical .conf files.
+    # where these variables are from the hical.pipelines.conf file.
     #   g = FilterGainCorrection (DN/s) - Alan's numbers don't match
     #   baseT = IoverFbasetemperature (deg C)  - Alan's numbers are the same
     #   Q = QEpercentincreaseperC (1/deg C) - Alan's numbers are the same
     #   absgainTDI = AbsGain_TDI128 (? units) - Alan's numbers don't match
-    zgain = dict(RED=157709797, IR=56467454, BG=115121269)
-    baseT = dict(RED=18.9, IR=18.9, BG=18.9)
-    QEpcntC = dict(RED=0.0005704, IR=0.002696, BG=0.00002295)
-    absgainTDI = dict(RED=6.37688, IR=6.99017, BG=7.00042)
+    #
+    # These are Alan's numbers from the clean11 era.  Need to hunt down
+    # authoritative values and/or verify hical.pipelines.conf which had a
+    # syntax error.
+    # zgain = dict(RED=157709797, IR=56467454, BG=115121269)
+    # baseT = dict(RED=18.9, IR=18.9, BG=18.9)
+    # QEpcntC = dict(RED=0.0005704, IR=0.002696, BG=0.00002295)
+    # absgainTDI = dict(RED=6.37688, IR=6.99017, BG=7.00042)
+    zgain = profile['FilterGainCorrection']
+    baseT = profile['IoverFbasetemperature']
+    QEpcntC = profile['QEpercentincreaseperC']
+    absgainTDI = profile['AbsGain_TDI128']
 
-    return zgain[ccd] * (1 + (t - baseT[ccd]) * QEpcntC[ccd] * absgainTDI[ccd])
+    return zgain * (1 + (t - baseT) * QEpcntC * absgainTDI)
+
+
+def get_one(conf, thing: str, name: str) -> dict:
+    '''Return the item for the named thing (of which there are multiple).'''
+    for it in conf.getlist(thing):
+        if it['Name'] == name:
+            return it
