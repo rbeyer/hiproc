@@ -31,6 +31,7 @@ from pathlib import Path
 from osgeo import gdal
 
 import pvl
+import spiceypy
 
 import PyRISE.hirise as hirise
 import PyRISE.util as util
@@ -159,6 +160,9 @@ def main():
 
         tdg = t_dep_gain(get_one(conf['Hical'], 'Profile', cid.ccdname), fpa_t)
         suncorr = solar_correction()
+        sclk = isis.getkey_k(h2i_16b_p, 'Instrument', 'SpacecraftClockStartCount')
+        target = isis.getkey_k(h2i_16b_p, 'Instrument', 'TargetName')
+        suncorr = solar_correction(sunDistanceAU(sclk, target))
         sed = float(isis.getkey_k(h2i_16b_p, 'Instrument', 'LineExposureDuration'))
         zbin = get_one(conf['Hical'], 'Profile', 'GainUnitConversion')['GainUnitConversionBinFactor']
 
@@ -181,11 +185,36 @@ def main():
         to_del.unlink()
 
 
-def solar_correction() -> float:
-    # Ideally, get the value of the distance to the Sun for this observation.
-    au = 1.498  # Placeholder from Alan
-    s = 1.5 / au  # Not sure about this, comes from ISIS
+def solar_correction(au=1.498) -> float:
+    # au = 1.498  # Placeholder from Alan
+    s = 1.5 / au  # Not sure about this, comes from the ISIS code
     return s * s
+
+
+def sunDistanceAU(time: str, target: str) -> float:
+    '''Returns distance in AU between Sun and observed body from MRO'''
+
+    base_kernel_path = Path(isis.environ['ISIS3DATA']) / 'base' / 'kernels'
+    lsk = sorted(Path(base_kernel_path / 'lsk').glob('naif*.tls'))[-1]
+    pck = sorted(Path(base_kernel_path / 'spk').glob('de*.bsp'))[-1]
+    sat = sorted(Path(base_kernel_path / 'spk').glob('mar*.bsp'))[-1]
+
+    sclk = sorted(Path(Path(isis.environ['ISIS3DATA']) / 'mro' / 'kernels' /
+                       'sclk').glob('MRO_SCLKSCET.*.65536.tsc'))[-1]
+
+    spiceypy.furnsh([str(lsk), str(pck), str(sat), str(sclk)])
+
+    et = spiceypy.scs2e(-74999, time)
+
+    targ = target.lower()
+    if targ == 'sky' or targ == 'cal' or targ == 'phobos' or targ == 'deimos':
+        targ = 'mars'
+
+    (sunv, lt) = spiceypy.spkpos(targ, et, "J2000", "LT+S", "sun")
+
+    sunkm = spiceypy.vnorm(sunv)
+    # Return in AU units
+    return sunkm / 1.49597870691E8
 
 
 def t_dep_gain(profile: dict, t: float) -> float:
