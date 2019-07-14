@@ -117,6 +117,16 @@ class ObservationID:
                     self.latesque == other.latesque)
         return False
 
+    def __lt__(self, other):
+        if isinstance(other, self.__class__):
+            return (phase_names.index(self.phase),
+                    int(self.orbit_number),
+                    int(self.latesque)) < (phase_names.index(other.phase),
+                                           int(other.orbit_number),
+                                           int(other.latesque))
+        else:
+            return NotImplemented
+
     def __hash__(self):
         return hash((self.phase, self.orbit_number, self.latesque))
 
@@ -171,6 +181,15 @@ class CCDID(ObservationID):
                     self.ccdnumber == other.ccdnumber)
         return False
 
+    def __lt__(self, other):
+        if isinstance(other, self.__class__):
+            if(super().__eq__(other)):
+                return (int(self.ccdnumber) < int(other.ccdnumber))
+            else:
+                return super().__lt__(other)
+        else:
+            return NotImplemented
+
     def __hash__(self):
         return hash((super().__hash__(), self.ccdname, self.ccdnumber))
 
@@ -221,6 +240,15 @@ class ChannelID(CCDID):
             return (super().__eq__(other) and
                     self.channel == other.channel)
         return False
+
+    def __lt__(self, other):
+        if isinstance(other, self.__class__):
+            if(super().__eq__(other)):
+                return (int(self.channel) < int(other.channel))
+            else:
+                return super().__lt__(other)
+        else:
+            return NotImplemented
 
     def __hash__(self):
         return hash((super().__hash__(), self.channel))

@@ -192,6 +192,15 @@ class TestObsID(unittest.TestCase):
         oid = hirise.ObservationID(s)
         self.assertEqual("ObservationID('ESP_057866_1670')", repr(oid))
 
+    def test_lt(self):
+        oid1 = hirise.ObservationID('PSP_005632_1225')
+        oid2 = hirise.ObservationID('ESP_057866_1670')
+        oid3 = hirise.ObservationID('ESP_057867_1670')
+        oid4 = hirise.ObservationID('ESP_057867_1675')
+        self.assertTrue(oid1 < oid2)
+        self.assertTrue(oid2 < oid3)
+        self.assertTrue(oid3 < oid4)
+
 
 class TestCCDID(unittest.TestCase):
 
@@ -261,6 +270,15 @@ class TestCCDID(unittest.TestCase):
         s = 'This is a CCDID: ESP_034783_1850_RED5'
         cid = hirise.CCDID(s)
         self.assertEqual("CCDID('ESP_034783_1850_RED5')", repr(cid))
+
+    def test_lt(self):
+        cid1 = hirise.CCDID('ESP_034783_1850_RED4')
+        cid2 = hirise.CCDID('ESP_034783_1850_RED5')
+        cid3 = hirise.CCDID('ESP_034783_1850_IR10')
+        cid4 = hirise.CCDID('ESP_034783_1850_BG13')
+        self.assertTrue(cid1 < cid2)
+        self.assertTrue(cid2 < cid3)
+        self.assertTrue(cid3 < cid4)
 
     def test_get_ccd(self):
         s = 'This is a CCDID: ESP_034783_1850_RED5'
@@ -335,6 +353,13 @@ class TestChannelID(unittest.TestCase):
         s = 'This is a CCDID: ESP_034783_1850_RED5_0'
         cid = hirise.ChannelID(s)
         self.assertEqual("ChannelID('ESP_034783_1850_RED5_0')", repr(cid))
+
+    def test_lt(self):
+        cid1 = hirise.ChannelID('ESP_034783_1850_RED5_0')
+        cid2 = hirise.ChannelID('ESP_034783_1850_RED5_1')
+        cid3 = hirise.ChannelID('ESP_034783_1850_IR10_1')
+        self.assertTrue(cid1 < cid2)
+        self.assertTrue(cid2 < cid3)
 
     def test_get_ccd(self):
         s = 'This is a ChannelID: ESP_034783_1850_RED5_0'
