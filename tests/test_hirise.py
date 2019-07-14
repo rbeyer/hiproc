@@ -280,6 +280,9 @@ class TestCCDID(unittest.TestCase):
         self.assertTrue(cid2 < cid3)
         self.assertTrue(cid3 < cid4)
 
+        ccds = [cid3, cid4, cid1, cid2]
+        self.assertEqual(sorted(ccds), [cid1, cid2, cid3, cid4])
+
     def test_get_ccd(self):
         s = 'This is a CCDID: ESP_034783_1850_RED5'
         cid = hirise.CCDID(s)
