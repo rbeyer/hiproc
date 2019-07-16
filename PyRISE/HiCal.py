@@ -129,14 +129,16 @@ def main():
     # db, but since we're not interested in persistance, we can ignore it.
 
     # All the setup is done, start processing:
-    (std, diff_std, zapped) = HiCal(in_cube, out_cube, ccdchan,
-                                    conf, args.conf, db,
-                                    destripe=destripe_filter,
-                                    keep=args.keep)
+    (std, diff_std, zapped, status) = HiCal(in_cube, out_cube,
+                                            ccdchan, conf,
+                                            args.conf, db,
+                                            destripe=destripe_filter,
+                                            keep=args.keep)
 
     db['HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION'] = std
     db['DESTRIPED_DIFFERENCE_STANDARD_DEVIATION'] = diff_std
     db['zapped'] = zapped
+    db['hical_status'] = status
     # The zapped flag is not in the original code, I'm putting it in
     # to the DB to use in a later step.
 
@@ -178,9 +180,10 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
     lis_per = int(db['LOW_SATURATED_PIXELS']) / (int(db['IMAGE_LINES']) *
                                                  int(db['LINE_SAMPLES'])) * 100.0
     hical_file = to_delete.add(next_cube.with_suffix('.hical.cub'))
-    run_hical(next_cube, hical_file, conf, conf_path,
-              lis_per, float(db['IMAGE_BUFFER_MEAN']), int(db['BINNING']),
-              flags.noise_filter, keep=keep)
+    hical_status = run_hical(next_cube, hical_file, conf, conf_path,
+                             lis_per, float(db['IMAGE_BUFFER_MEAN']),
+                             int(db['BINNING']), flags.noise_filter,
+                             keep=keep)
     next_cube = hical_file
 
     if furrows_found:
@@ -262,7 +265,7 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
         to_delete.unlink()
 
     logging.info('HiCal done.')
-    return(std_final, diff_std_dev, zapped)
+    return(std_final, diff_std_dev, zapped, hical_status)
 
 
 def FurrowCheck(vpnts: list, channel: int) -> bool:
@@ -474,6 +477,7 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
               noise_filter: bool, keep=False) -> None:
 
     in_cub_path = Path(in_cube)
+    status = 'Standard'
 
     to_s = '{}+SignedWord+{}:{}'.format(hical_cub,
                                         conf['HiCal']['HiCal_Normalization_Minimum'],
@@ -485,6 +489,7 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
             hical_args['conf'] = conf_dir / conf['HiCal']['HiCal_ISIS_Conf']
         else:
             hical_args['conf'] = conf_dir / conf['HiCal']['HiCal_ISIS_Conf_Noise']
+            status = 'BadCal'
 
     if noise_filter:
         mask_cube = in_cub_path.with_suffix('.mask.cub')
@@ -500,7 +505,7 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
         pid = hirise.get_ProdID_fromfile(hical_cub)
         Path(hical_cub).with_name(str(pid)).with_suffix('.hical.log').unlink()
 
-    return
+    return status
 
 
 def process_this(ccdchan: tuple, flag_list: list) -> int:
