@@ -474,7 +474,7 @@ def set_lines(skip_top: int, skip_bottom: int,
 def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
               conf: dict, conf_path: os.PathLike,
               lis_per: float, image_buffer_mean: float, binning: int,
-              noise_filter: bool, keep=False) -> None:
+              noise_filter: bool, keep=False) -> str:
 
     in_cub_path = Path(in_cube)
     status = 'Standard'
