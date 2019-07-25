@@ -112,8 +112,8 @@ class HiccdStitchCube(hirise.CCDID):
                                'trainging area.  The calculated start, end '
                                f'lines are: {start_line}, {end_line}.')
 
-        self.sl_cubenorm = start_line
-        self.nl_cubenorm = end_line - start_line + 1
+        self.sl_cubenorm = int(start_line)
+        self.nl_cubenorm = int(end_line - start_line + 1)
         return (self.sl_cubenorm, self.nl_cubenorm)
 
     def set_balance(self, skiptop: int, skipbot: int, area: dict,
@@ -122,18 +122,18 @@ class HiccdStitchCube(hirise.CCDID):
         # and right crop areas and the scaling needed for each crop are.
         (skip, samps) = area[self.bin]
 
-        self.ss_balance_left = skip + 1
-        self.ns_balance_left = samps
-        self.ss_balance_right = self.ns + 1 - skip - samps
-        self.ns_balance_right = samps
+        self.ss_balance_left = int(skip + 1)
+        self.ns_balance_left = int(samps)
+        self.ss_balance_right = int(self.ns + 1 - skip - samps)
+        self.ns_balance_right = int(samps)
 
         sl_bal = skiptop / self.bin + 1
         nl_bal = minbinlines / self.bin - skipbot / self.bin - sl_bal + 1
         if nl_bal < 1:
             sl_bal = 1
             nl_bal = minbinlines / self.bin
-        self.sl_balance = sl_bal
-        self.nl_balance = nl_bal
+        self.sl_balance = int(sl_bal)
+        self.nl_balance = int(nl_bal)
 
         return
 
@@ -194,9 +194,11 @@ def main():
                              'the number of cubenorm flags given '
                              f'({len(args.cubenorm)}) did not match. Exiting.')
             sys.exit()
+    else:
+        args.cubenorm = [False] * len(args.cubes)
 
     # Perl: GetConfigurationParameters()
-    conf = pvl.load(args.conf)
+    conf = pvl.load(str(args.conf))
     conf_check(conf)
 
     # We may not need to read anything from the DB, only write to it?
@@ -219,22 +221,26 @@ def main():
 
     if len(args.cubes) == 1:
         # Assume this is a filepath to a file of cube names
-        cubes = map(HiccdStitchCube, Path(args.cubes[0]).read_text().splitlines(), args.cubenorm)
+        cubes = list(map(HiccdStitchCube,
+                         Path(args.cubes[0]).read_text().splitlines(),
+                         args.cubenorm))
     else:
-        cubes = map(HiccdStitchCube, args.cubes, args.cubenorm)
+        cubes = list(map(HiccdStitchCube, args.cubes, args.cubenorm))
 
     for c in cubes:
         c.gather_from_db()
 
     outcub_path = set_outpath(args.output, cubes)
-    db_path = util.pid_path_w_suffix(args.db, cubes[0])
 
     # Perl: GetImageDims()
     cubes = GetImageDims(cubes, conf, args.sline, args.eline)
 
-    cubes = HiccdStitch(cubes, outpath, conf, keep=args.keep)
+    cubes = HiccdStitch(cubes, outcub_path, conf, keep=args.keep)
 
     # Afterwards inserts into CCD_Processing_Statistics table.
+
+    db_path = util.path_w_suffix(args.db, outcub_path)
+
     db = {'OBSERVATION_ID': str(cubes[0].get_obsid())}
     for c in cubes:
         ccd_db = {'CCDID': str(c),
@@ -243,7 +249,7 @@ def main():
                   'RIGHT_OVERLAP_AVERAGE': c.rstats,
                   'CUBENORM_COLUMN_CORRECTION_STANDARD_DEVIATION':
                   c.cubenorm_stddev}
-        db['CCD'] = ccd_db
+        db[c.get_ccd()] = ccd_db
 
     with open(db_path, 'w') as f:
         json.dump(db, f, indent=0, sort_keys=True)
@@ -277,8 +283,7 @@ def HiccdStitch(cubes: list, out_path: os.PathLike, conf: dict,
 
     listpath = to_delete.add(out_p.with_suffix(f'.{temp_token}.list.txt'))
     cubes.sort()
-    for c in cubes:
-        listpath.write_text(str(c.nextpath))
+    listpath.write_text('\n'.join(map(lambda c: str(c.nextpath), cubes)))
 
     logging.info("The Original Perl looked for a custom file for hiccdstitch's "
                  "shiftdef parameter, but the default ISIS file seems better, "
@@ -514,8 +519,8 @@ def BalanceStep(cubes, conf, keep=False) -> list:
     # want to zap pixels where there is not common coverage.
     for i, c in enumerate(cubes):
         if i + 1 < len(cubes) and int(cubes[i].ccdnumber) + 1 == int(cubes[i + 1].ccdnumber):
-            cubes[i].rm_path = c.nextpath.with_suffix('.right.mask.cub')
-            cubes[i + 1].lm_path = cubes[i + 1].nextpath.with_suffix('.left.mask.cub')
+            cubes[i].rm_path = to_del.add(c.nextpath.with_suffix('.right.mask.cub'))
+            cubes[i + 1].lm_path = to_del.add(cubes[i + 1].nextpath.with_suffix('.left.mask.cub'))
 
             for f, m, t in zip([cubes[i].rs_path, cubes[i + 1].ls_path],
                                [cubes[i + 1].ls_path, cubes[i].rs_path],
@@ -545,6 +550,7 @@ def BalanceStep(cubes, conf, keep=False) -> list:
             i = ccd + offset
             cubes[i].correction = get_correction(cubes[i], cubes[i - 1],
                                                  conf['HiccdStitch_Balance_Correction'], i)
+            logging.info(f'CCDID: {cubes[i]}, correction: {cubes[i].correction}')
 
         normalization = get_normalization(cubes, group, offset,
                                           conf['HiccdStitch_Control_CCD'])

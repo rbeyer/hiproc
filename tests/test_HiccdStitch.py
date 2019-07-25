@@ -69,7 +69,7 @@ class TestHiccdStitchCube(unittest.TestCase):
         self.assertEquals(1023, c.ss_balance_right)
         self.assertEquals(1, c.ns_balance_right)
         self.assertEquals(1, c.sl_balance)
-        self.assertEquals(0.5, c.nl_balance)
+        self.assertEquals(0, c.nl_balance)
 
     @patch('PyRISE.HiStitch.isis.getkey_k', side_effect=getkey)
     def test_set_ls_path(self, mock_getkey):
@@ -350,7 +350,6 @@ class TestMock(unittest.TestCase):
         m_CubeNormStep.assert_not_called()
         m_Balance.assert_has_calls([call([c1, c2], self.conf['HiccdStitch'], keep=False)])
         m_Special.assert_has_calls([call(c1), call(c2)])
-        m_write_text.assert_has_calls([call(str(c1.nextpath)),
-                                       call(str(c2.nextpath))])
+        m_write_text.assert_has_calls([call(str(c1.nextpath) + '\n' + str(c2.nextpath))])
         m_hiccdstitch.assert_called_once()
         m_SNR.assert_has_calls([call([c1, c2], 50)])
