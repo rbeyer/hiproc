@@ -27,11 +27,6 @@ import PyRISE.hirise as hirise
 def parent_parser() -> argparse.ArgumentParser:
     '''Returns a parent parser with common arguments for PyRISE programs.'''
     parent = argparse.ArgumentParser(add_help=False)
-    parent.add_argument('--db',         required=False, default='.HiCat.json',
-                        help="The .json file to use.  Optionally, if it starts "
-                        "with a '.' it is considered an extension and will be "
-                        "swapped with the input file's extension to find the "
-                        ".json file to use.")
     parent.add_argument('-l', '--log',  required=False, default='WARNING',
                         help="The log level to show for this program, can be a "
                         "named log level or a numerical level.")

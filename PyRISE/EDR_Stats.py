@@ -46,6 +46,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()])
     parser.add_argument('-o', '--output', required=False, default='.EDR_Stats.cub')
+    parent.add_argument('--db',         required=False, default='.HiCat.json',
+                        help="The .json file to output.  Optionally, if it starts "
+                        "with a '.' it is considered an extension and will be "
+                        "swapped with the input file's extension to determine the "
+                        "file to write.")
     parser.add_argument('--histmin',      required=False, default=0.01)
     parser.add_argument('--histmax',      required=False, default=99.99)
     parser.add_argument('-g', '--gains',  required=False,

@@ -53,6 +53,11 @@ def main():
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
                         'resources' / 'HiCal.conf')
+    parent.add_argument('--db',         required=False, default='.HiCat.json',
+                        help="The .json file to use.  Optionally, if it starts "
+                        "with a '.' it is considered an extension and will be "
+                        "swapped with the input file's extension to find the "
+                        ".json file to use.")
     parser.add_argument('--hgfconf',    required=False, default='HiGainFx.conf')
     parser.add_argument('--nfconf',     required=False, default='NoiseFilter.conf')
     parser.add_argument('--bin2',       required=False, action='store_true', default=None)

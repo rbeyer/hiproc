@@ -49,6 +49,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()],
                                      conflict_handler='resolve')
+    parent.add_argument('--db',         required=False, default='.HiCat.json',
+                        help="The .json file to use.  Optionally, if it starts "
+                        "with a '.' it is considered an extension and will be "
+                        "swapped with the input file's extension to find the "
+                        ".json file to use.")
     parser.add_argument('--db2',         required=False, default='.HiCat.json',
                         help="The second .json file to use.  Optionally, if it starts "
                         "with a '.' it is considered an extension and will be "

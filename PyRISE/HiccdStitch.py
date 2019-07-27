@@ -172,6 +172,11 @@ def main():
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
                         'resources' / 'HiccdStitch.conf')
+    parent.add_argument('--db',         required=False, default='.HiCat.json',
+                        help="The .json file to use.  Optionally, if it starts "
+                        "with a '.' it is considered an extension and will be "
+                        "swapped with the input file's extension to find the "
+                        ".json file to use.")
     parser.add_argument('--sline', required=False, default=None, type=int)
     parser.add_argument('--eline', required=False, default=None, type=int)
     parser.add_argument('--reduce', required=False, default=None, type=int)
