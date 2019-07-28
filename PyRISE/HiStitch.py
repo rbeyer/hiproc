@@ -184,8 +184,7 @@ def sort_databases(db_paths: list, chids: tuple) -> tuple:
     if len(chid_db_map) != len(chids):
         raise LookupError('The Product IDs in the databases '
                           f'do not match {chids}')
-
-    return tuple([chid_db_map[chids[0]], chid_db_map[chids[1]]])
+    return tuple(map(chid_db_map.get, chids))
 
 
 def HiStitch(cubes: list, out_cube: os.PathLike, conf: dict, dbs: list,
