@@ -46,7 +46,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()])
     parser.add_argument('-o', '--output', required=False, default='.EDR_Stats.cub')
-    parent.add_argument('--db',         required=False, default='.HiCat.json',
+    parser.add_argument('--db',         required=False, default='.HiCat.json',
                         help="The .json file to output.  Optionally, if it starts "
                         "with a '.' it is considered an extension and will be "
                         "swapped with the input file's extension to determine the "
