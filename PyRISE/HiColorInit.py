@@ -115,6 +115,11 @@ def HiColorInit(red: HiColorCube, ir: HiColorCube, bg: HiColorCube,
                 outsuffix: str, keep=False):
     '''Do all of the scaling and cropping for a RED/IR/BG set.'''
 
+    if len(set(map(lambda c: c.get_obsid(), filter(lambda x: x is not None,
+                                                   [red, ir, bg])))) != 1:
+        raise ValueError("These cube files don't all have the same Observation "
+                         f"ID: {cubes}")
+
     temp_token = datetime.now().strftime('HiColorInit-%y%m%d%H%M%S')
 
     # These two values are calculated but only written to a PVL file,
