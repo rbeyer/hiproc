@@ -38,6 +38,12 @@ import PyRISE.hirise as hirise
 import PyRISE.util as util
 
 
+CCD_Corresponence = {'IR10': 'RED4',
+                     'IR11': 'RED5',
+                     'BG12': 'RED4',
+                     'BG13': 'RED5'}
+
+
 class HiColorCube(hirise.CCDID):
     """A class for HiRISE CCD IDs with additional capabilities for HiColor."""
 
