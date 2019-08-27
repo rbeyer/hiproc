@@ -188,8 +188,9 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
         with open(path, 'r') as f:
             flat = f.read()
 
-            match = re.search(r'#\s+Total Registers:\s+(\S+)', flat)
+            match = re.search(r'#\s+Total Registers:\s+(\d+) of (\S+)', flat)
             self['MatchedCount'] = int(match.group(1))
+            self['RegisterCount'] = int(match.group(2))
 
             match = re.search(r'#\s+Number Suspect:\s+(\S+)', flat)
             self['SuspectCount'] = int(match.group(1))
@@ -201,9 +202,6 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
             match = re.search(r'#\s+Average Line Offset:\s+(\S+)\s+StdDev:\s+(\S+)', flat)
             self['AvgLineOffset'] = float(match.group(1))
             self['STDLineOffset'] = float(match.group(2))
-
-            match = re.search(r'#\s+Total Registers:\s+\d+ of (\S+)', flat)
-            self['RegisterCount'] = int(match.group(1))
 
             match = re.search(r'#\s+Corr. Tolerance:\s+(\S+)', flat)
             self['Tolerance'] = float(match.group(1))
