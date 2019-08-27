@@ -258,13 +258,6 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
 
         count = [0] * self['Columns']
 
-        logging.info('Original Perl issue: there are two "conditions" for '
-                     'extracting information, one, labeled "<3.4" was to find '
-                     'a ControlMeasure with a Reference = False key.  The other '
-                     'labeled ">=3.4" was a ControlMeasure with MeasureType = '
-                     'Candidate.  However, in ISIS 3.8.0, it seems like the '
-                     'right condition is MeasureType = RegisteredPixel.')
-
         control_measures = self._get_control_measures(p)
 
         lineCount = 0
@@ -311,13 +304,24 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
     @staticmethod
     def _get_control_measures(pvl) -> list:
         control_measures = list()
+
+        logging.info('Original Perl issue: there are two "conditions" for '
+                     'extracting information, one, labeled "<3.4" was to find '
+                     'a ControlMeasure with a Reference = False key.  The other '
+                     'labeled ">=3.4" was a ControlMeasure with MeasureType = '
+                     'Candidate.  However, this condition really just ended '
+                     'the line-by-line parsing, because the Candidate '
+                     'ControlMeasure was the second one in the ControlPoint. '
+                     'The proper logic is to get information from the '
+                     'ControlMeasure that meets the conditions.')
+
         for cp in pvl['ControlNetwork'].getlist('ControlPoint'):
             if('PointId' not in cp or
                'ControlMeasure' not in cp):
                 continue
             for cm in cp.getlist('ControlMeasure'):
                 if('MeasureType' not in cm or
-                   'Reference' not in cm or
+                   # 'Reference' not in cm or
                    'GoodnessOfFit' not in cm or
                    'LineResidual' not in cm or
                    'SampleResidual' not in cm):

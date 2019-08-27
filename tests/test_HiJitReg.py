@@ -191,6 +191,13 @@ class TestJitterCube(unittest.TestCase):
             self.assertFalse(c['CanSlither'])
             self.assertEqual(c['MatchedLineCount'], 1)
 
+    @unittest.skip("Tests on a real file, time consuming.")
+    def test_parseCNetPVL_file(self):
+        c = hjr.JitterCube('tmp/PSP_010502_2090_IR10.HiStitch.balance.precolor.cub')
+        c.parseRegDefs()
+        c.parseFlatTab()
+        c.parseCNetPVL('tmp/test.pvl')
+
     @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_filterCNetPVL(self, mock_getkey):
         c = hjr.JitterCube('dummy/PSP_010502_2090_IR10_0')
