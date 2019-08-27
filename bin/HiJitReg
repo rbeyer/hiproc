@@ -1,0 +1,5 @@
+#!/usr/bin/env python
+
+import PyRISE.HiJitReg as hjr
+
+hjr.main()
