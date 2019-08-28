@@ -79,7 +79,9 @@ def main():
         logging.critical('Unable to continue. ' + str(err))
         sys.exit()
 
-    print(f'Successful CCDs are: {successful_ccds}')
+    print('Successful CCDs are:')
+    for c in successful_ccds:
+        print('\t{}'.format(str(c)))
     return
 
 
