@@ -1,0 +1,5 @@
+#!/usr/bin/env python
+
+import PyRISE.JitPlot as jp
+
+jp.main()
