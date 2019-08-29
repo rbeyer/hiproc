@@ -190,6 +190,16 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
         with open(path, 'r') as f:
             flat = f.read()
 
+            match = re.search(r'#\s+Line Spacing:\s+(\S+)', flat)
+            self['LineSpacing'] = float(match.group(1))
+
+            match = re.search(r'#\s+Columns, Rows:\s+(\d+)\s+(\d+)', flat)
+            self['Columns'] = int(match.group(1))
+            self['Rows'] = int(match.group(2))
+
+            match = re.search(r'#\s+Corr. Tolerance:\s+(\S+)', flat)
+            self['Tolerance'] = float(match.group(1))
+
             match = re.search(r'#\s+Total Registers:\s+(\d+) of (\S+)', flat)
             self['MatchedCount'] = int(match.group(1))
             self['RegisterCount'] = int(match.group(2))
@@ -204,13 +214,6 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
             match = re.search(r'#\s+Average Line Offset:\s+(\S+)\s+StdDev:\s+(\S+)', flat)
             self['AvgLineOffset'] = float(match.group(1))
             self['STDLineOffset'] = float(match.group(2))
-
-            match = re.search(r'#\s+Corr. Tolerance:\s+(\S+)', flat)
-            self['Tolerance'] = float(match.group(1))
-
-            match = re.search(r'#\s+Columns, Rows:\s+(\d+)\s+(\d+)', flat)
-            self['Columns'] = int(match.group(1))
-            self['Rows'] = int(match.group(2))
 
             dialect = csv.Dialect
             dialect.delimiter = ' '
@@ -260,10 +263,10 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
 
         count = [0] * self['Columns']
 
-        control_measures = self._get_control_measures(p)
+        self.control_measures = self._get_control_measures(p)
 
         lineCount = 0
-        for i, cm in enumerate(control_measures):
+        for i, cm in enumerate(self.control_measures):
             offset = int(i - self['BoxcarLength'] / 2)
             length = int(self['BoxcarLength'])
 
@@ -271,13 +274,13 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
                 offset = 0
                 length = int(self['BoxcarLength'] / 2 + i)
 
-            if self['BoxcarLength'] > (len(control_measures) - i):
+            if self['BoxcarLength'] > (len(self.control_measures) - i):
                 # offset not changed
-                length = int(self['BoxcarLength'] / 2 + (len(control_measures)
+                length = int(self['BoxcarLength'] / 2 + (len(self.control_measures)
                                                          - i))
 
             boxcar = map(lambda x: x['ErrorMagnitude'],
-                         control_measures[offset:offset + length])
+                         self.control_measures[offset:offset + length])
 
             median = statistics.median(boxcar)
             delta = abs(cm['ErrorMagnitude'] - median)
@@ -290,13 +293,11 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
                              'badness {} and '.format(cm['GoodnessOfFit']) +
                              f'smoothing delta {delta}')
             else:
-                match = re.search(r'Row (\d+)', cm['PointId'])
-                if match:
+                if 'Row' in cm:
                     lineCount += 1
 
-                match = re.search(r'Column (\d+)', cm['PointId'])
-                if match:
-                    count[int(match.group(1))] += 1
+                if 'Column' in cm:
+                    count[cm['Column']] += 1
 
             if len(tuple(filter(lambda x: x > 3, count))) >= 3:
                 self['CanSlither'] = True
@@ -307,15 +308,16 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
     def _get_control_measures(pvl) -> list:
         control_measures = list()
 
-        logging.info('Original Perl issue: there are two "conditions" for '
-                     'extracting information, one, labeled "<3.4" was to find '
-                     'a ControlMeasure with a Reference = False key.  The other '
-                     'labeled ">=3.4" was a ControlMeasure with MeasureType = '
-                     'Candidate.  However, this condition really just ended '
-                     'the line-by-line parsing, because the Candidate '
-                     'ControlMeasure was the second one in the ControlPoint. '
-                     'The proper logic is to get information from the '
-                     'ControlMeasure that meets the conditions.')
+        # Original Perl issue: there were two "conditions" for
+        # extracting information, one, labeled "<3.4" was to find
+        # a ControlMeasure with a Reference = False key.  The other
+        # labeled ">=3.4" was a ControlMeasure with MeasureType =
+        # Candidate.  However, this condition really just ended
+        # the line-by-line parsing, because the "Candidate"
+        # ControlMeasure was the second one in the ControlPoint.
+        # The proper logic is to get information from the
+        # ControlMeasure that meets the conditions as implemented
+        # below.
 
         for cp in pvl['ControlNetwork'].getlist('ControlPoint'):
             if('PointId' not in cp or
@@ -332,8 +334,13 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
                 if cm['MeasureType'] == 'RegisteredPixel':
                     cm['ErrorMagnitude'] = math.hypot(cm['SampleResidual'].value,
                                                       cm['LineResidual'].value)
-                    # Tack on the PointId here, and then append
+                    # Tack on a few extra values here, and then append
                     cm['PointId'] = cp['PointId']
+                    match = re.search(r'Row\s+(\d+)\s+Column\s+(\d+)', cp['PointId'])
+                    if match:
+                        cm['Row'] = int(match.group(1))
+                        cm['Column'] = int(match.group(2))
+
                     control_measures.append(cm)
         return control_measures
 
