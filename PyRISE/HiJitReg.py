@@ -140,12 +140,9 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
         self.dictionary['BadnessLimit'] = self.conf['Smoothing']['Badness_Limit']
         self.dictionary['BoxcarLength'] = self.conf['Smoothing']['Boxcar_Length']
 
-        pair_name = '{}_{}-{}'.format(str(self.get_obsid()),
-                                      hicolor.CCD_Corresponence[self.get_ccd()],
-                                      self.get_ccd())
-        self.cnet_path = self.path.parent / (pair_name + '.control.pvl')
-        self.regdef_path = self.path.parent / (pair_name + '.regdef.pvl')
-        self.flattab_path = self.path.parent / (pair_name + '.flat.tab')
+        self.cnet_path = self.get_cnet_path(self)
+        self.regdef_path = self.get_regdef_path(self)
+        self.flattab_path = self.get_flattab_path(self)
 
     def __getitem__(self, key):
         return self.dictionary[key]
@@ -161,6 +158,30 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
 
     def __len__(self):
         return len(self.dictionary)
+
+    @staticmethod
+    def get_pair_name(cube):
+        pair_name = '{}_{}-{}'.format(str(cube.get_obsid()),
+                                      hicolor.CCD_Corresponence[cube.get_ccd()],
+                                      cube.get_ccd())
+        return pair_name
+
+    @staticmethod
+    def _get_path(cube, suffix):
+        pair = JitterCube.get_pair_name(cube)
+        return cube.path.parent / (pair + suffix)
+
+    @staticmethod
+    def get_cnet_path(cube):
+        return JitterCube._get_path(cube, '.control.pvl')
+
+    @staticmethod
+    def get_regdef_path(cube):
+        return JitterCube._get_path(cube, '.regdef.pvl')
+
+    @staticmethod
+    def get_flattab_path(cube):
+        return JitterCube._get_path(cube, '.flat.tab')
 
     def reset(self):
         self.IgnoredPoints.clear()
