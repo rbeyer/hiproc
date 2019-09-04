@@ -381,10 +381,10 @@ class TestNeedISISCube(unittest.TestCase):
                           self.binning, minimum=0.0, maximum=1.5,
                           hidcorr='ADD', line_samples=samps, keep=False)
 
-        self.assertEquals(0.000101402295171637,
-                          hc.Hidestripe(calcube, outcube, self.binning,
-                                        minimum=0.0, maximum=1.5, hidcorr='ADD',
-                                        line_samples=samps, keep=False))
+        self.assertAlmostEqual(0.000101402295171637,
+                               hc.Hidestripe(calcube, outcube, self.binning,
+                                             minimum=0.0, maximum=1.5, hidcorr='ADD',
+                                             line_samples=samps, keep=False))
         to_del.unlink()
 
 
