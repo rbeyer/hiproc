@@ -57,26 +57,35 @@ def main():
                         default=Path(__file__).resolve().parent.parent /
                         'resources' / 'EDR_Stats_gains_config.pvl',
                         help='Path to the gains config PVL file.')
-    parser.add_argument('img', metavar="some.img-file")
+    parser.add_argument('img', metavar="some.img-file", nargs='+',
+                        help='More than one can be listed here.')
 
     args = parser.parse_args()
 
     util.set_logging(args.log)
 
-    ofile_cub = util.path_w_suffix(args.output, args.img)
+    if(len(args.img) > 1 and
+       not args.output.startswith('.')):
+        logging.critical('With more than one input IMG file, the --output '
+                         'must start with a period, and it '
+                         f'does not: {args.output}')
+        sys.exit()
 
-    histats = EDR_Stats(args.img, ofile_cub, args.gains,
-                        args.histmin, args.histmax,
-                        keep=args.keep)
+    for i in args.img:
+        ofile_cub = util.path_w_suffix(args.output, i)
 
-    # DB stuff
-    # add the contents of histats to HiCat.EDR_Products
-    # for k, v in histats.items():
-    #     print(f'{k}: {v}')
-    db_path = util.path_w_suffix(args.db, args.img)
+        histats = EDR_Stats(i, ofile_cub, args.gains,
+                            args.histmin, args.histmax,
+                            keep=args.keep)
 
-    with open(db_path, 'w') as f:
-        json.dump(histats, f, indent=0, sort_keys=True)
+        # DB stuff
+        # add the contents of histats to HiCat.EDR_Products
+        # for k, v in histats.items():
+        #     print(f'{k}: {v}')
+        db_path = util.path_w_suffix(args.db, i)
+
+        with open(db_path, 'w') as f:
+            json.dump(histats, f, indent=0, sort_keys=True)
 
 
 def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
