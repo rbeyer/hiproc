@@ -73,8 +73,8 @@ def main():
 
     util.set_logging(args.log)
 
-    if(len(args.img) > 1 and (not args.output.startswith('.') or
-                              not args.db.startswith('.'))):
+    if(len(args.cube) > 1 and (not args.output.startswith('.') or
+                               not args.db.startswith('.'))):
         logging.critical('With more than one input cube file, the --output '
                          ' and --db must start with a period, and one of them'
                          f'does not: {args.output} {args.db}')
@@ -543,7 +543,7 @@ def furrow_nulling(cube: os.PathLike, out_cube: os.PathLike, binning: int,
                            maximum=1000000).args)
 
     furrow_values = furrow_setup(ccdchan[0], binning)
-    chan_samp = chan_samp_setup(ccdchan[1], binning)
+    chan_samp = chan_samp_setup(int(ccdchan[1]), binning)
 
     # Crop out the portion of the image that will not be furrow checked.
     # ^- that's what the original said, but this is really cropping out
@@ -1188,6 +1188,15 @@ def Hidestripe(in_cube: os.PathLike, out_cube: os.PathLike, binning: int,
 
 def chan_samp_setup(channel: int, binning: int) -> collections.namedtuple:
     '''Returns a named tuple which contains a list and two numbers.'''
+
+    if not isinstance(channel, int):
+        raise TypeError('channel should be an int, but it '
+                        'is: {} {}'.format(channel, type(channel)))
+
+    if not isinstance(binning, int):
+        raise TypeError('binning should be an int, but it '
+                        'is: {} {}'.format(binning, type(binning)))
+
     samp = collections.defaultdict(dict)
     # samp[chan][binning]
     samp[0][2] = 1,  2,  3,  4,  5,  6,  7,  8,  9, 10
