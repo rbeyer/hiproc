@@ -66,89 +66,98 @@ def main():
     parser.add_argument('--bin4',       required=False, action='store_true', default=None)
     parser.add_argument('--nobin4',     required=False, action='store_false',
                         default=None, dest='bin4')
-    parser.add_argument('cube', metavar="cube_file")
+    parser.add_argument('cube', metavar="cube_file", nargs='+',
+                        help='More than one can be listed here.')
 
     args = parser.parse_args()
 
     util.set_logging(args.log)
 
-    in_cube = Path(args.cube)
-
-    out_cube = util.path_w_suffix(args.output, in_cube)
-    db_path = util.pid_path_w_suffix(args.db, in_cube)
-
-    # Get Configuration Parameters
-    conf = pvl.load(str(args.conf))
-    conf_check(conf)
-
-    # If the sub-conf arguments aren't 'findable', look for them in the main conf
-    # directory.
-    try:
-        hgf_path = util.get_path(Path(args.hgfconf), Path(args.conf).parent)
-        nf_path = util.get_path(Path(args.nfconf), Path(args.conf).parent)
-    except (TypeError, NotADirectoryError, FileNotFoundError) as err:
-        logging.critical(err)
+    if(len(args.img) > 1 and (not args.output.startswith('.') or
+                              not args.db.startswith('.'))):
+        logging.critical('With more than one input cube file, the --output '
+                         ' and --db must start with a period, and one of them'
+                         f'does not: {args.output} {args.db}')
         sys.exit()
 
-    # Merge the configuration files together into a single dict
-    conf['HiGainFx'] = pvl.load(str(hgf_path))['HiGainFx']
-    conf['NoiseFilter'] = pvl.load(str(nf_path))['NoiseFilter']
+    for c in args.cube:
+        in_cube = Path(c)
 
-    # The original Perl Setup00() builds data structures that we don't need.
-    # The original Perl Setup01() set up data routing and did filename checking
-    # that we don't need here.
+        out_cube = util.path_w_suffix(args.output, in_cube)
+        db_path = util.pid_path_w_suffix(args.db, in_cube)
 
-    # The original Perl Setup02() read from the HiCat.EDR_Products table, but
-    # we'll just open the json file:
-    with open(db_path, 'r') as f:
-        db = json.load(f)
+        # Get Configuration Parameters
+        conf = pvl.load(str(args.conf))
+        conf_check(conf)
 
-    pid = hirise.get_ProdID_fromfile(in_cube)
-    if str(pid) != db['PRODUCT_ID']:
-        logging.critical('The Product ID in the file ({}) does not match '
-                         'the one in the database ({}).'.format(str(pid),
-                                                                db['PRODUCT_ID']))
-        sys.exit()
+        # If the sub-conf arguments aren't 'findable', look for them in the main conf
+        # directory.
+        try:
+            hgf_path = util.get_path(Path(args.hgfconf), Path(args.conf).parent)
+            nf_path = util.get_path(Path(args.nfconf), Path(args.conf).parent)
+        except (TypeError, NotADirectoryError, FileNotFoundError) as err:
+            logging.critical(err)
+            sys.exit()
 
-    # The original Perl Setup03 queried the HiCat.Planned_Observations table to
-    # get all of the possible binning values for CCDs in this CCD's
-    # observation.  We now accomplish the same thing with check_destripe()
-    # farther down.
+        # Merge the configuration files together into a single dict
+        conf['HiGainFx'] = pvl.load(str(hgf_path))['HiGainFx']
+        conf['NoiseFilter'] = pvl.load(str(nf_path))['NoiseFilter']
 
-    # The original Perl ProcessingSwitches() set various flags.  That
-    # functionality is now broken up and spread out to the check_destripe()
-    # function, the set_flags() function, and the if statement below that
-    # checks HiCal_Bypass_IR10_1
-    ccdchan = (pid.get_ccd(), pid.channel)
-    lis_per = float(db['LOW_SATURATED_PIXELS']) / (int(db['IMAGE_LINES']) *
-                                                   int(db['LINE_SAMPLES'])) * 100.0
-    if (ccdchan == ('IR10', '1') and
-       lis_per > conf['HiCal']['HiCal_Bypass_IR10_1']):
-        logging.warning('Bypassing IR10_1.')
-        sys.exit()
+        # The original Perl Setup00() builds data structures that we don't need.
+        # The original Perl Setup01() set up data routing and did filename checking
+        # that we don't need here.
 
-    destripe_filter = check_destripe(in_cube, int(db['BINNING']),
-                                     args.bin2, args.bin4)
+        # The original Perl Setup02() read from the HiCat.EDR_Products table, but
+        # we'll just open the json file:
+        with open(db_path, 'r') as f:
+            db = json.load(f)
 
-    # The original Perl SetHiCalVersion() placed the HiCal version into the
-    # db, but since we're not interested in persistance, we can ignore it.
+        pid = hirise.get_ProdID_fromfile(in_cube)
+        if str(pid) != db['PRODUCT_ID']:
+            logging.critical('The Product ID in the file ({}) does not match '
+                             'the one in the database ({}).'.format(str(pid),
+                                                                    db['PRODUCT_ID']))
+            sys.exit()
 
-    # All the setup is done, start processing:
-    (std, diff_std, zapped, status) = HiCal(in_cube, out_cube,
-                                            ccdchan, conf,
-                                            args.conf, db,
-                                            destripe=destripe_filter,
-                                            keep=args.keep)
+        # The original Perl Setup03 queried the HiCat.Planned_Observations table to
+        # get all of the possible binning values for CCDs in this CCD's
+        # observation.  We now accomplish the same thing with check_destripe()
+        # farther down.
 
-    db['HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION'] = std
-    db['DESTRIPED_DIFFERENCE_STANDARD_DEVIATION'] = diff_std
-    db['zapped'] = zapped
-    db['hical_status'] = status
-    # The zapped flag is not in the original code, I'm putting it in
-    # to the DB to use in a later step.
+        # The original Perl ProcessingSwitches() set various flags.  That
+        # functionality is now broken up and spread out to the check_destripe()
+        # function, the set_flags() function, and the if statement below that
+        # checks HiCal_Bypass_IR10_1
+        ccdchan = (pid.get_ccd(), pid.channel)
+        lis_per = float(db['LOW_SATURATED_PIXELS']) / (int(db['IMAGE_LINES']) *
+                                                       int(db['LINE_SAMPLES'])) * 100.0
+        if (ccdchan == ('IR10', '1') and
+           lis_per > conf['HiCal']['HiCal_Bypass_IR10_1']):
+            logging.warning('Bypassing IR10_1.')
+            sys.exit()
 
-    with open(db_path, 'w') as f:
-        json.dump(db, f, indent=0, sort_keys=True)
+        destripe_filter = check_destripe(in_cube, int(db['BINNING']),
+                                         args.bin2, args.bin4)
+
+        # The original Perl SetHiCalVersion() placed the HiCal version into the
+        # db, but since we're not interested in persistance, we can ignore it.
+
+        # All the setup is done, start processing:
+        (std, diff_std, zapped, status) = HiCal(in_cube, out_cube,
+                                                ccdchan, conf,
+                                                args.conf, db,
+                                                destripe=destripe_filter,
+                                                keep=args.keep)
+
+        db['HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION'] = std
+        db['DESTRIPED_DIFFERENCE_STANDARD_DEVIATION'] = diff_std
+        db['zapped'] = zapped
+        db['hical_status'] = status
+        # The zapped flag is not in the original code, I'm putting it in
+        # to the DB to use in a later step.
+
+        with open(db_path, 'w') as f:
+            json.dump(db, f, indent=0, sort_keys=True)
 
 
 def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
