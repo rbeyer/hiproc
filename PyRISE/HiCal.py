@@ -58,7 +58,7 @@ def main():
                         "with a '.' it is considered an extension and will be "
                         "swapped with the input file's extension to find the "
                         ".json file to use.")
-    parser.add_argument('--hgfconf',    required=False, default='HiGainFx.conf')
+    # parser.add_argument('--hgfconf',    required=False, default='HiGainFx.conf')
     parser.add_argument('--nfconf',     required=False, default='NoiseFilter.conf')
     parser.add_argument('--bin2',       required=False, action='store_true', default=None)
     parser.add_argument('--nobin2',     required=False, action='store_false',
@@ -100,7 +100,7 @@ def main():
             sys.exit()
 
         # Merge the configuration files together into a single dict
-        conf['HiGainFx'] = pvl.load(str(hgf_path))['HiGainFx']
+        # conf['HiGainFx'] = pvl.load(str(hgf_path))['HiGainFx']
         conf['NoiseFilter'] = pvl.load(str(nf_path))['NoiseFilter']
 
         # The original Perl Setup00() builds data structures that we don't need.
@@ -206,13 +206,13 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
                      minopt='COUNT', minimum=5, filter_='OUTSIDE').args)
         next_cube = lpfz_file
 
-    # Perform gain-drift correction
-    if(db['BINNING'] != '8'):  # There is no gain fix for bin8 imaging
-        higain_file = to_delete.add(next_cube.with_suffix('.fx.cub'))
-        HiGainFx(next_cube, higain_file,
-                 conf['HiGainFx']['HiGainFx_Coefficient_Path'],
-                 conf['HiGainFx']['HiGainFx_Version'])
-        next_cube = higain_file
+    # # Perform gain-drift correction
+    # if(db['BINNING'] != '8'):  # There is no gain fix for bin8 imaging
+    #     higain_file = to_delete.add(next_cube.with_suffix('.fx.cub'))
+    #     HiGainFx(next_cube, higain_file,
+    #              conf['HiGainFx']['HiGainFx_Coefficient_Path'],
+    #              conf['HiGainFx']['HiGainFx_Version'])
+    #     next_cube = higain_file
 
     # Perform the high-pass filter cubenorm steps
 
@@ -698,6 +698,28 @@ def HiGainFx(cube: os.PathLike, outcube: os.PathLike,
              coef_path: os.PathLike, version: str,
              keep=False) -> None:
     '''Perform a Gain-Drift correction on a HiRISE Channel Image.'''
+    # Eric Eliason (2019 Sept):
+    # The HiCal pipeline is apparently double correcting for the
+    # Gain Line Drift.   After looking at the source code of the HiCal
+    # pipeline, hical program, HiGainFx and the various log files
+    # sent to me, I too have come to the same conclusion.  My memory
+    # from 10 years ago is starting to come back to me.  Here’s how
+    # I remember things:
+
+    # The HiGainFX perl script inserted into the HiCal pipeline was
+    # always meant to be a stop-gap measure until a more thorough and
+    # robust correction could be developed in the ISIS hical program.
+    # Alan D. developed the algorithms for both the stop-gap and
+    # full-correction models.  To further complicate things, there
+    # were various other intermediary renditions that could be found
+    # in the ISIS hicalbeta program but I don’t think hicalbeta was
+    # ever used in the HiCal pipeline. I assume hicalbeta eventually
+    # became hical.
+    #
+    # Put in a straight-up 'return' here to keep people from using this
+    # function:
+    return
+
     logging.info(HiGainFx.__doc__)
     binning = isis.getkey_k(cube, 'Instrument', 'Summing')
     ccd = isis.getkey_k(cube, 'Instrument', 'CcdId')
