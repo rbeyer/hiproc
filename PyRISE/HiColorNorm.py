@@ -34,6 +34,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import statistics
 from datetime import datetime
 from pathlib import Path
@@ -72,7 +73,8 @@ class ColorCube(hirise.ObservationID):
                             'BandBin/Center of 900, 700, 500.')
         self.band = {'IR': 1, 'RED': 2, 'BG': 3}
 
-        self.pids = isis.getkey_k(self.path, 'Mosaic', 'SourceProductId')
+        self.pids = isis.getkey_k(self.path, 'Mosaic',
+                                  'SourceProductId').split(', ')
         self.ir_bin = self.get_binning('IR')
         self.red_bin = self.get_binning('RED')
         # self.bg_bin = get_binning('BG')
@@ -137,7 +139,7 @@ class ColorCube(hirise.ObservationID):
             for pid in pids:
                 if color_code in pid:
                     for p in parent.glob(f'{pid}*.json'):
-                        db_paths.append(parent / p)
+                        db_paths.append(p)
 
         bins = collections.Counter()
         for p in db_paths:
@@ -147,7 +149,7 @@ class ColorCube(hirise.ObservationID):
             raise Exception('Gathered {} different '.format(len(bins)) +
                             f'binning values for the {color_code} channel, '
                             'must be an error.')
-        return int(bins.keys()[0])
+        return int([*bins][0])
 
     def get_boxcar_size(self, color_bin: int) -> int:
         if color_bin > self.red_bin * 2:
@@ -171,7 +173,7 @@ def main():
                         help='Stops creation of an unfiltered cube.')
     parser.add_argument('cubes',
                         metavar="the COLOR4.cub and COLOR5.cub files",
-                        nargs='2')
+                        nargs=2)
 
     args = parser.parse_args()
 
@@ -196,7 +198,8 @@ def main():
     #   and also whether there were furrows in the IR or BG components
     #   Finally, there's an insert into the Color_Processing_Statistics
     #       table that puts in the HICOLORNORM_RATIO_CORRECTION_STANDARD_DEVIATION
-    #       for each FILTER?
+    #       for each FILTER
+    # At the moment, we're not doing that here.
 
 
 def conf_check(conf: dict) -> None:
@@ -255,9 +258,9 @@ def HiColorNorm(cubes, outcub_path, conf, furrow_flag,
             mask_list.append(tmp_p)
 
         listpath = to_del.add(c.path.with_suffix(f'.{temp_token}.list.txt'))
-        listpath.write_text('\n'.join(str(p) for p in mask_list))
+        listpath.write_text('\n'.join(str(p) for p in mask_list) + '\n')
 
-        c.final_path = c.path.with_suffix(f'.{temp_token}.cub')
+        c.final_path = c.path.with_suffix(f'.HiColorNorm.cub')
         logging.info(isis.cubeit(fromlist=listpath, to=c.final_path).args)
 
         (cubes[i].mask_path['IR'],
@@ -272,7 +275,7 @@ def HiColorNorm(cubes, outcub_path, conf, furrow_flag,
 
     if conf['HiColorNorm']['HiColorNorm_Make_Stitch']:
         listpath = to_del.add(c.path.with_suffix(f'.{temp_token}.list.txt'))
-        listpath.write_text('\n'.join(str(c.final_path) for c in cubes))
+        listpath.write_text('\n'.join(str(c.final_path) for c in cubes) + '\n')
 
         logging.info(isis.hiccdstitch(fromlist=listpath, to=out_p).args)
 
@@ -281,6 +284,11 @@ def HiColorNorm(cubes, outcub_path, conf, furrow_flag,
 
     if not keep:
         to_del.unlink()
+        for c in cubes:
+            for cc in ('IR', 'BG'):
+                c.mask_path[cc].unlink()
+                c.crop_path[cc].unlink()
+                c.nrm_path[cc].unlink()
 
     return(ir_ratio_stddev, bg_ratio_stddev)
 
@@ -296,7 +304,7 @@ def FurrowCheck(cubes, db_path=None) -> bool:
                 if 'RED' in pid:
                     continue
                 for p in parent.glob(f'{pid}*.json'):
-                    db_path.append(parent / p)
+                    db_path.append(p)
     dbs = list()
     for p in db_path:
         with open(p) as f:
@@ -340,7 +348,7 @@ def per_color(cube, temp_token, color_code, keep=False):
 
 def make_LR_mosaic(left_path, right_path, left_samps, mosaic_path, lines, samps):
     logging.info(isis.handmos(left_path, mosaic=mosaic_path,
-                              create=True, nlines=lines, nsamp=samps,
+                              create='YES', nlines=lines, nsamp=samps,
                               nbands=1, outsamp=1,
                               outline=1, outband=1).args)
     logging.info(isis.handmos(right_path, mosaic=mosaic_path,
@@ -356,7 +364,7 @@ def cubenorm_stats(crpmos, mos, mosnrm, keep=False):
                                direction='column', norm='average').args)
     averages = list()
     with open(stats_p) as csvfile:
-        reader = csv.DictReader(csvfile, dialect=isis.cubenorm.Dialect)
+        reader = csv.DictReader(csvfile, dialect=isis.cubenormfile.Dialect)
         for row in reader:
             averages.append(float(row['Average']))
     stddev = statistics.stdev(averages)
@@ -379,6 +387,7 @@ def make_unfiltered(in_path, nrm_path, temp_token, color_code, color_band,
     in_p = Path(in_path)
     unfiltered_p = in_p.with_name(in_p.name.replace('COLOR',
                                                     'UNFILTERED_COLOR'))
+    shutil.copyfile(in_p, unfiltered_p)
     # run ISIS algebra program to create unfiltered (normalized-IR/RED)*RED files
     alg_unfiltered_path = in_p.with_suffix(f'.{tt}.algebra.cub')
     logging.info(isis.algebra(nrm_path,
@@ -490,7 +499,7 @@ def per_band(cubes, out_p, temp_token, color_code, furrow_flag, unfiltered, keep
             lowpass_args['lines'] = 1
             lowpass_args['samples'] = 1
 
-        lpf_path = c.path.with_suffix(f'.{temp_token}.{color_code}.lpf.cub')
+        lpf_path = to_del.add(c.path.with_suffix(f'.{temp_token}.{color_code}.lpf.cub'))
         logging.info(isis.lowpass(c.nrm_path[color_code], to=lpf_path,
                                   **lowpass_args).args)
 
@@ -503,7 +512,7 @@ def per_band(cubes, out_p, temp_token, color_code, furrow_flag, unfiltered, keep
             lpfz_path = lpf_path
 
         # run ISIS algebra program to created (normalized-IR/RED)*RED files
-        alg_path = c.path.with_suffix(f'.{temp_token}.{color_code}.algebra.cub')
+        alg_path = to_del.add(c.path.with_suffix(f'.{temp_token}.{color_code}.algebra.cub'))
         logging.info(isis.algebra(lpfz_path, from2=f'{c.path}+2',
                                   to=alg_path, operator='MULTIPLY').args)
 

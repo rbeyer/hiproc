@@ -288,7 +288,7 @@ def HiccdStitch(cubes: list, out_path: os.PathLike, conf: dict,
 
     listpath = to_delete.add(out_p.with_suffix(f'.{temp_token}.list.txt'))
     cubes.sort()
-    listpath.write_text('\n'.join(map(lambda c: str(c.nextpath), cubes)))
+    listpath.write_text('\n'.join(map(lambda c: str(c.nextpath), cubes)) + '\n')
 
     logging.info("The Original Perl looked for a custom file for hiccdstitch's "
                  "shiftdef parameter, but the default ISIS file seems better, "

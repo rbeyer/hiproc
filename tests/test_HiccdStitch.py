@@ -350,6 +350,7 @@ class TestMock(unittest.TestCase):
         m_CubeNormStep.assert_not_called()
         m_Balance.assert_has_calls([call([c1, c2], self.conf['HiccdStitch'], keep=False)])
         m_Special.assert_has_calls([call(c1), call(c2)])
-        m_write_text.assert_has_calls([call(str(c1.nextpath) + '\n' + str(c2.nextpath))])
+        m_write_text.assert_has_calls([call(str(c1.nextpath) + '\n' +
+                                            str(c2.nextpath) + '\n')])
         m_hiccdstitch.assert_called_once()
         m_SNR.assert_has_calls([call([c1, c2], 50)])

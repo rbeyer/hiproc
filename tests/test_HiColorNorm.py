@@ -34,8 +34,7 @@ def getkey(cube, group, key):
               'Bands': 3,
               'TDI': 64,
               'Center': '(900, 700, 500) <NANOMETERS>',
-              'SourceProductId': ('PSP_010502_2090_RED4_0',
-                                  'PSP_010502_2090_RED4_1')}
+              'SourceProductId': ('PSP_010502_2090_RED4_0, PSP_010502_2090_RED4_1')}
     return values[key]
 
 
@@ -111,7 +110,7 @@ class TestHiColorNorm(unittest.TestCase):
     @patch('PyRISE.HiColorNorm.isis.handmos')
     def test_make_LR_mosaic(self, m_handmos):
         hcn.make_LR_mosaic('left.cub', 'right.cub', 10, 'mosaic.cub', 100, 20)
-        expected = [call('left.cub', create=True, mosaic='mosaic.cub',
+        expected = [call('left.cub', create='YES', mosaic='mosaic.cub',
                          nbands=1, nlines=100, nsamp=20, outband=1,
                          outline=1, outsamp=1),
                     call('right.cub', mosaic='mosaic.cub', outband=1,
@@ -135,7 +134,8 @@ class TestHiColorNorm(unittest.TestCase):
 
     @patch('PyRISE.HiColorNorm.isis.handmos')
     @patch('PyRISE.HiColorNorm.isis.algebra')
-    def test_make_unfiltered(self, m_alg, m_hand):
+    @patch('PyRISE.HiColorNorm.shutil.copyfile')
+    def test_make_unfiltered(self, m_copy, m_alg, m_hand):
         self.assertEqual(Path('in_UNFILTERED_COLOR4.cub'),
                          hcn.make_unfiltered('in_COLOR4.cub',
                                              'nrm.cub', 'ttoken', 'CC', 2,
