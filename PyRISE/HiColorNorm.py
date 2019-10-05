@@ -257,11 +257,13 @@ def HiColorNorm(cubes, outcub_path, conf, furrow_flag,
                                    minimum=0.0, maximum=2.0, preserve='INSIDE').args)
             mask_list.append(tmp_p)
 
-        listpath = to_del.add(c.path.with_suffix(f'.{temp_token}.list.txt'))
-        listpath.write_text('\n'.join(str(p) for p in mask_list) + '\n')
-
+        # listpath = to_del.add(c.path.with_suffix(f'.{temp_token}.list.txt'))
+        # listpath.write_text('\n'.join(str(p) for p in mask_list) + '\n')
+        #
+        # c.final_path = c.path.with_suffix(f'.HiColorNorm.cub')
+        # logging.info(isis.cubeit(fromlist=listpath, to=c.final_path).args)
         c.final_path = c.path.with_suffix(f'.HiColorNorm.cub')
-        logging.info(isis.cubeit(fromlist=listpath, to=c.final_path).args)
+        logging.info(isis.cubeit_k(mask_list, to=c.final_path).args)
 
         (cubes[i].mask_path['IR'],
          cubes[i].crop_path['IR']) = per_color(c, temp_token, 'IR', keep=keep)
