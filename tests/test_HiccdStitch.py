@@ -333,16 +333,16 @@ class TestMock(unittest.TestCase):
         with self.assertLogs(level='WARN'):
             self.assertIsNone(hcs.SNR_Check([c1, c2], 50))
 
+    @patch('kalasiris.k_funcs.isis.fromlist.open_fl', mock_open())
     @patch('PyRISE.HiccdStitch.SNR_Check')
     @patch('PyRISE.HiccdStitch.isis.hiccdstitch')
-    @patch('PyRISE.HiccdStitch.Path.write_text')
     @patch('PyRISE.HiccdStitch.SpecialProcessingFlags')
     @patch('PyRISE.HiccdStitch.BalanceStep', side_effect=lambda a, b, keep=False: a)
     @patch('PyRISE.HiccdStitch.CubeNormStep', side_effect=lambda a, b, c: a)
     @patch('PyRISE.HiStitch.isis.PathSet.unlink')
     @patch('PyRISE.HiccdStitch.isis.getkey_k', side_effect=getkey)
     def test_HiccdStitch(self, m_getkey, m_unlink, m_CubeNormStep, m_Balance,
-                         m_Special, m_write_text, m_hiccdstitch, m_SNR):
+                         m_Special, m_hiccdstitch, m_SNR):
         c1 = hcs.HiccdStitchCube('dummy/PSP_010502_2090_RED1')
         c2 = hcs.HiccdStitchCube('dummy/PSP_010502_2090_RED2')
         p = 'out-dummy/foo.cub'
@@ -350,7 +350,5 @@ class TestMock(unittest.TestCase):
         m_CubeNormStep.assert_not_called()
         m_Balance.assert_has_calls([call([c1, c2], self.conf['HiccdStitch'], keep=False)])
         m_Special.assert_has_calls([call(c1), call(c2)])
-        m_write_text.assert_has_calls([call(str(c1.nextpath) + '\n' +
-                                            str(c2.nextpath) + '\n')])
         m_hiccdstitch.assert_called_once()
         m_SNR.assert_has_calls([call([c1, c2], 50)])

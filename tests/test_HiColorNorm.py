@@ -222,6 +222,7 @@ class TestHiColorNorm(unittest.TestCase):
         self.assertEqual(num_cubes, m_algebra.call_count)
         self.assertEqual(num_cubes, m_handmos.call_count)
 
+    @patch('kalasiris.k_funcs.isis.fromlist.open_fl', mock_open())
     @patch('PyRISE.HiColorNorm.isis.hiccdstitch')
     @patch('PyRISE.HiColorNorm.per_band', return_value=3)
     @patch('PyRISE.HiColorNorm.per_color', return_value=('CCmask.cub',

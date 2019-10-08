@@ -286,16 +286,15 @@ def HiccdStitch(cubes: list, out_path: os.PathLike, conf: dict,
     for c in cubes:
         SpecialProcessingFlags(c)
 
-    listpath = to_delete.add(out_p.with_suffix(f'.{temp_token}.list.txt'))
     cubes.sort()
-    listpath.write_text('\n'.join(map(lambda c: str(c.nextpath), cubes)) + '\n')
 
     logging.info("The Original Perl looked for a custom file for hiccdstitch's "
                  "shiftdef parameter, but the default ISIS file seems better, "
                  "so this isn't implemented.")
 
-    logging.info(isis.hiccdstitch(fromlist=listpath, to=out_p,
-                                  interp=conf['HiccdStitch']['HiccdStitch_Interpolation']).args)
+    with isis.fromlist.open_fl([str(c.nextpath) for c in cubes]) as f:
+        logging.info(isis.hiccdstitch(fromlist=f, to=out_p,
+                                      interp=conf['HiccdStitch']['HiccdStitch_Interpolation']).args)
 
     SNR_Check(cubes, conf['HiccdStitch']['HiccdStitch_SNR_Threshold'])
 

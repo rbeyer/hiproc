@@ -276,10 +276,11 @@ def HiColorNorm(cubes, outcub_path, conf, furrow_flag,
                                furrow_flag, unfiltered, keep=keep)
 
     if conf['HiColorNorm']['HiColorNorm_Make_Stitch']:
-        listpath = to_del.add(c.path.with_suffix(f'.{temp_token}.list.txt'))
-        listpath.write_text('\n'.join(str(c.final_path) for c in cubes) + '\n')
+        # listpath = to_del.add(c.path.with_suffix(f'.{temp_token}.list.txt'))
+        # listpath.write_text('\n'.join(str(c.final_path) for c in cubes) + '\n')
 
-        logging.info(isis.hiccdstitch(fromlist=listpath, to=out_p).args)
+        with isis.fromlist.open_fl([str(c.final_path) for c in cubes]) as f:
+            logging.info(isis.hiccdstitch(fromlist=f, to=out_p).args)
 
         for c in cubes:
             to_del.add(c.final_path)
