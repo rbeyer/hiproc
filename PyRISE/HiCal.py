@@ -93,7 +93,7 @@ def main():
         # If the sub-conf arguments aren't 'findable', look for them in the main conf
         # directory.
         try:
-            hgf_path = util.get_path(Path(args.hgfconf), Path(args.conf).parent)
+            # hgf_path = util.get_path(Path(args.hgfconf), Path(args.conf).parent)
             nf_path = util.get_path(Path(args.nfconf), Path(args.conf).parent)
         except (TypeError, NotADirectoryError, FileNotFoundError) as err:
             logging.critical(err)
