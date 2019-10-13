@@ -279,7 +279,7 @@ def HiColorNorm(cubes, outcub_path, conf, furrow_flag,
         # listpath = to_del.add(c.path.with_suffix(f'.{temp_token}.list.txt'))
         # listpath.write_text('\n'.join(str(c.final_path) for c in cubes) + '\n')
 
-        with isis.fromlist.open_fl([str(c.final_path) for c in cubes]) as f:
+        with isis.fromlist.temp([str(c.final_path) for c in cubes]) as f:
             logging.info(isis.hiccdstitch(fromlist=f, to=out_p).args)
 
         for c in cubes:

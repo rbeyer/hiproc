@@ -292,7 +292,7 @@ def HiccdStitch(cubes: list, out_path: os.PathLike, conf: dict,
                  "shiftdef parameter, but the default ISIS file seems better, "
                  "so this isn't implemented.")
 
-    with isis.fromlist.open_fl([str(c.nextpath) for c in cubes]) as f:
+    with isis.fromlist.temp([str(c.nextpath) for c in cubes]) as f:
         logging.info(isis.hiccdstitch(fromlist=f, to=out_p,
                                       interp=conf['HiccdStitch']['HiccdStitch_Interpolation']).args)
 
