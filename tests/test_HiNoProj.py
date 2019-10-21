@@ -49,7 +49,7 @@ class TestHiNoProjCube(unittest.TestCase):
     @patch('PyRISE.HiNoProj.isis.getkey_k', side_effect=getkey)
     def test_init(self, mock_getkey):
         c = hnp.Cube('dummy/PSP_010502_2090_RED5_0')
-        self.assertIsNone(c.noproj_path)
+        self.assertIsNone(c.next_path)
 
 
 class TestConf(unittest.TestCase):
@@ -88,7 +88,7 @@ class TestHiNoProj(unittest.TestCase):
         cubes = (c2, c3, c4, c5, c6)
 
         for i, c in enumerate(cubes):
-            cubes[i].noproj_path = c.path
+            cubes[i].next_path = c.path
             cubes[i].line_offset = 10
             cubes[i].samp_offset = 10
 

@@ -51,7 +51,7 @@ class Cube(hci.HiColorCube):
 
     def __init__(self, pathlike):
         super().__init__(pathlike)
-        self.noproj_path = None
+        self.next_path = None
         self.line_offset = 0
         self.samp_offset = 0
 
@@ -161,8 +161,90 @@ def handmos_side(cubes, base_cube, out_p: os.PathLike, left=True):
     for c in cubes[(cubes.index(base_cube) + side)::side]:
         slm -= side * round(c.line_offset)
         ssm -= side * round(c.samp_offset)
-        logging.info(isis.handmos(c.noproj_path, mosaic=out_p, priority=priority,
+        logging.info(isis.handmos(c.next_path, mosaic=out_p, priority=priority,
                                   outline=slm, outsample=ssm, outband=1).args)
+    return
+
+
+def copy_and_spice(inpath: os.PathLike, outpath: os.PathLike,
+                   conf: dict, polar=False):
+    shutil.copyfile(inpath, outpath)
+
+    spiceinit_args = {'from': outpath, 'shape': conf['Shape'],
+                      'cksmithed': True, 'spksmithed': True,
+                      'spkrecon': True, 'spkpredicted': False}
+
+    if conf['Shape'] == 'USER':
+        if polar:
+            spiceinit_args['model'] = conf['Polar_Shape_Model_Path']
+        else:
+            spiceinit_args['model'] = conf['Shape_Model_Path']
+
+    logging.info(isis.spiceinit(**spiceinit_args).args)
+
+    return
+
+
+def get_offsets(cube: os.PathLike, match: os.PathLike, flat: os.PathLike) -> tuple:
+    logging.info(isis.hijitreg(cube, match=match, flat=flat).args)
+
+    with open(flat, 'r') as f:
+        flat_text = f.read()
+
+        match = re.search(r'#\s+Average Line Offset:\s+(\S+)', flat_text)
+        avg_line_offset = float(match.group(1))
+
+        match = re.search(r'#\s+Average Sample Offset:\s+(\S+)', flat_text)
+        avg_samp_offset = float(match.group(1))
+
+    return (avg_line_offset, avg_samp_offset)
+
+
+def add_offsets(cubes: list, base_ccdnumber: int, temp_token: str, keep=False) -> tuple:
+    flats = isis.PathSet()
+    for i, c in enumerate(cubes[:-1]):
+        pair = '{}-{}'.format(cubes[i].get_ccd(), cubes[i + 1].get_ccd())
+        flat_p = flats.add(c.path.with_suffix(f'.{temp_token}.{pair}.flat.tab'))
+
+        (avg_line_offset, avg_samp_offset) = get_offsets(cubes[i].next_path,
+                                                         cubes[i + 1].next_path,
+                                                         flat_p)
+
+        j = i
+        if int(c.ccdnumber) >= base_ccdnumber:
+            j = i + 1
+
+        cubes[j].line_offset = avg_line_offset
+        cubes[j].samp_offset = avg_samp_offset
+
+    if not keep:
+        flats.unlink()
+        return (cubes, None)
+    else:
+        return (cubes, flats)
+
+
+def fix_labels(cubes: list, path: os.PathLike, matched_cube: str, prodid: str) -> None:
+    logging.info(isis.editlab(path, option='modkey', grpname='Archive',
+                              keyword='ProductId',
+                              value=prodid).args)
+    logging.info(isis.editlab(path, option='modkey', grpname='Instrument',
+                              keyword='MatchedCube',
+                              value=str(matched_cube)).args)
+
+    # Fix ck kernel in InstrumentPointing in RED label
+    # This doesn't seem to be needed, maybe it was HiROC-specific.
+
+    #  Add SourceProductIds to Archive group in label
+    logging.info('Original Perl just assumes that both channels are included '
+                 'in the balance cube.')
+    source_ids = list()
+    for c in cubes:
+        source_ids.append(isis.getkey_k(c.path, 'Instrument', 'StitchedProductIds'))
+
+    logging.info(isis.editlab(path, option='ADDKEY', grpname='Archive',
+                              keyword='SourceProductId',
+                              value='({})'.format(', '.join(source_ids))).args)
     return
 
 
@@ -179,56 +261,22 @@ def HiNoProj(cubes: list, base_cube, outcub_path: os.PathLike, conf: dict, keep=
     for c in cubes:
 
         temp_p = to_del.add(c.path.with_suffix(f'.{temp_token}.spiced.cub'))
-        shutil.copyfile(c.path, temp_p)
-
-        spiceinit_args = {'from': temp_p, 'shape': conf['Shape'],
-                          'cksmithed': True, 'spksmithed': True,
-                          'spkrecon': True, 'spkpredicted': False}
-
-        if conf['Shape'] == 'USER':
-            if polar:
-                spiceinit_args['model'] = conf['Polar_Shape_Model_Path']
-            else:
-                spiceinit_args['model'] = conf['Shape_Model_Path']
-
-        logging.info(isis.spiceinit(**spiceinit_args).args)
+        copy_and_spice(c.path, temp_p, conf, polar)
 
         logging.info(isis.spicefit(temp_p).args)
 
-        c.noproj_path = to_del.add(c.path.with_suffix(f'.{temp_token}.noproj.cub'))
+        c.next_path = to_del.add(c.path.with_suffix(f'.{temp_token}.noproj.cub'))
         c.path = temp_p
 
     for c in cubes:
-        logging.info(isis.noproj(c.path, match=base_cube.path, to=c.noproj_path,
+        logging.info(isis.noproj(c.path, match=base_cube.path, to=c.next_path,
                                  source='frommatch').args)
 
     # Run hijitreg on adjacent noproj'ed ccds to get average line/sample offset
-    for i, c in enumerate(cubes[:-1]):
-        pair = '{}-{}'.format(cubes[i].get_ccd(), cubes[i + 1].get_ccd())
-        flat_p = to_del.add(c.path.with_suffix(f'.{temp_token}.{pair}.flat.tab'))
-
-        logging.info(isis.hijitreg(cubes[i].noproj_path,
-                                   match=cubes[i + 1].noproj_path,
-                                   flat=flat_p).args)
-
-        with open(flat_p, 'r') as f:
-            flat = f.read()
-
-            match = re.search(r'#\s+Average Line Offset:\s+(\S+)', flat)
-            avg_line_offset = float(match.group(1))
-
-            match = re.search(r'#\s+Average Sample Offset:\s+(\S+)', flat)
-            avg_samp_offset = float(match.group(1))
-
-        j = i
-        if int(c.ccdnumber) >= int(base_cube.ccdnumber):
-            j = i + 1
-
-        cubes[j].line_offset = avg_line_offset
-        cubes[j].samp_offset = avg_samp_offset
+    (cubes, _) = add_offsets(cubes, int(base_cube.ccdnumber), temp_token, keep=keep)
 
     # Mosaic noproj'ed ccds using average line/sample offset
-    shutil.copyfile(base_cube.noproj_path, out_p)
+    shutil.copyfile(base_cube.next_path, out_p)
     logging.info('Original Perl hard codes this file copy from RED5, even if '
                  'another cube is selected as the base_ccd.')
 
@@ -237,27 +285,9 @@ def HiNoProj(cubes: list, base_cube, outcub_path: os.PathLike, conf: dict, keep=
 
     logging.info(isis.editlab(out_p, option='addkey', grpname='Instrument',
                               keyword='ImageJitterCorrected', value=0).args)
-    logging.info(isis.editlab(out_p, option='modkey', grpname='Archive',
-                              keyword='ProductId',
-                              value='{}_{}'.format(str(cubes[0].get_obsid()),
-                                                   cubes[0].ccdname)).args)
-    logging.info(isis.editlab(out_p, option='modkey', grpname='Instrument',
-                              keyword='MatchedCube',
-                              value=str(base_cube)).args)
-
-    # Fix ck kernel in InstrumentPointing in RED label
-    # This doesn't seem to be needed, maybe it was HiROC-specific.
-
-    #  Add SourceProductIds to Archive group in label
-    logging.info('Original Perl just assumes that both channels are included '
-                 'in the balance cube.')
-    source_ids = list()
-    for c in cubes:
-        source_ids.append(isis.getkey_k(c.path, 'Instrument', 'StitchedProductIds'))
-
-    logging.info(isis.editlab(out_p, option='ADDKEY', grpname='Archive',
-                              keyword='SourceProductId',
-                              value='({})'.format(', '.join(source_ids))).args)
+    fix_labels(cubes, out_p, base_cube,
+               '{}_{}'.format(str(cubes[0].get_obsid()),
+                              cubes[0].ccdname))
 
     if not keep:
         to_del.unlink()
