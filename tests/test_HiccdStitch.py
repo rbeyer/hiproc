@@ -234,6 +234,8 @@ class TestMock(unittest.TestCase):
 
     def test_AnalyzeStats(self):
         m = mock_open(read_data=self.cubenorm_data)
+        m.return_value.__iter__ = lambda self: self
+        m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
         with patch('PyRISE.HiccdStitch.open', m):
             self.assertAlmostEqual(2.371842000000029e-06,
                                    hcs.AnalyzeStats('dummy_cubenormout',
@@ -246,6 +248,8 @@ class TestMock(unittest.TestCase):
     @patch('PyRISE.HiStitch.isis.crop')
     def test_CubeNormStep(self, mock_crop, mock_cubenorm, mock_getkey, mock_PathSetunlink):
         m = mock_open(read_data=self.cubenorm_data)
+        m.return_value.__iter__ = lambda self: self
+        m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
         with patch('PyRISE.HiccdStitch.open', m):
             c = hcs.HiccdStitchCube('dummy/PSP_010502_2090_RED5_0')
             new_c = hcs.CubeNormStep(c, self.conf['HiccdStitch'])
