@@ -88,7 +88,7 @@ def main():
 class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
     '''A class for collecting and analyzing jitter statistics.'''
 
-    def __init__(self, arg, config=Path(__file__).resolve().parent.parent / 'resources' / 'HiJitReg.conf'):
+    def __init__(self, arg, config=Path(__file__).resolve().parent.parent / 'resources' / 'HiJitReg.conf', matchccd=None):
         if isinstance(arg, hicolor.HiColorCube):
             super().__init__(arg.path)
         else:
@@ -136,6 +136,11 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
         else:
             raise Exception
 
+        if matchccd is None:
+            self.matchccd = hicolor.CCD_Corresponence[self.get_ccd()]
+        else:
+            self.matchccd = matchccd
+
         self.dictionary['ExcludeLimit'] = self.conf['Smoothing']['Exclude_Limit']
         self.dictionary['BadnessLimit'] = self.conf['Smoothing']['Badness_Limit']
         self.dictionary['BoxcarLength'] = self.conf['Smoothing']['Boxcar_Length']
@@ -160,9 +165,14 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
         return len(self.dictionary)
 
     @staticmethod
-    def get_pair_name(cube):
+    def get_pair_name(cube, matchccd=None):
+        if matchccd is None:
+            if hasattr(cube, 'matchccd'):
+                matchccd = cube.matchccd
+            else:
+                matchccd = hicolor.CCD_Corresponence[cube.get_ccd()]
         pair_name = '{}_{}-{}'.format(str(cube.get_obsid()),
-                                      hicolor.CCD_Corresponence[cube.get_ccd()],
+                                      matchccd,
                                       cube.get_ccd())
         return pair_name
 
