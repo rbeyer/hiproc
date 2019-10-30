@@ -35,6 +35,7 @@ import logging
 import os
 import re
 import statistics
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -71,12 +72,12 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logging(args.log, args.logfile)
 
     if(len(args.cube) > 1 and (not args.output.startswith('.') or
                                not args.db.startswith('.'))):
         logging.critical('With more than one input cube file, the --output '
-                         ' and --db must start with a period, and one of them'
+                         'and --db must start with a period, and one of them '
                          f'does not: {args.output} {args.db}')
         sys.exit()
 
@@ -143,11 +144,15 @@ def main():
         # db, but since we're not interested in persistance, we can ignore it.
 
         # All the setup is done, start processing:
-        (std, diff_std, zapped, status) = HiCal(in_cube, out_cube,
-                                                ccdchan, conf,
-                                                args.conf, db,
-                                                destripe=destripe_filter,
-                                                keep=args.keep)
+        try:
+            (std, diff_std, zapped, status) = HiCal(in_cube, out_cube,
+                                                    ccdchan, conf,
+                                                    args.conf, db,
+                                                    destripe=destripe_filter,
+                                                    keep=args.keep)
+        except subprocess.CalledProcessError as err:
+            print(err.stderr)
+            raise
 
         db['HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION'] = std
         db['DESTRIPED_DIFFERENCE_STANDARD_DEVIATION'] = diff_std
@@ -491,6 +496,7 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
               lis_per: float, image_buffer_mean: float, binning: int,
               noise_filter: bool, keep=False) -> str:
 
+    to_d = isis.PathSet()
     in_cub_path = Path(in_cube)
     status = 'Standard'
 
@@ -507,16 +513,16 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
             status = 'BadCal'
 
     if noise_filter:
-        mask_cube = in_cub_path.with_suffix('.mask.cub')
+        mask_cube = to_d.add(in_cub_path.with_suffix('.mask.cub'))
         mask(in_cub_path, mask_cube,
              conf['NoiseFilter']['NoiseFilter_Raw_Min'],
              conf['NoiseFilter']['NoiseFilter_Raw_Max'], binning)
         logging.info(isis.hical(mask_cube, **hical_args).args)
-        mask_cube.unlink()
     else:
         logging.info(isis.hical(in_cub_path, **hical_args).args)
 
     if not keep:
+        to_d.unlink()
         pid = hirise.get_ProdID_fromfile(hical_cub)
         Path(hical_cub).with_name(str(pid)).with_suffix('.hical.log').unlink()
 

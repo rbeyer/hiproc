@@ -62,7 +62,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logging(args.log, args.logfile)
 
     if(len(args.img) > 1 and
        not args.output.startswith('.')):

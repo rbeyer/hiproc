@@ -30,6 +30,9 @@ def parent_parser() -> argparse.ArgumentParser:
     parent.add_argument('-l', '--log',  required=False, default='WARNING',
                         help="The log level to show for this program, can be a "
                         "named log level or a numerical level.")
+    parent.add_argument('--logfile',  required=False,
+                        help="The log file to write log messages to instead of "
+                        "the terminal.")
     parent.add_argument('-k', '--keep', required=False, default=False,
                         action='store_true',
                         help="Normally, the program will clean up any "
@@ -38,7 +41,7 @@ def parent_parser() -> argparse.ArgumentParser:
     return parent
 
 
-def set_logging(i) -> None:
+def set_logging(i, filename=None) -> None:
     '''Sets the log level and basic configuration.'''
 
     log_level = 0
@@ -47,7 +50,11 @@ def set_logging(i) -> None:
     else:
         log_level = getattr(logging, i.upper(), logging.WARNING)
 
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+    if filename is None:
+        logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+    else:
+        logging.basicConfig(filename=filename, format='%(levelname)s: %(message)s',
+                            level=log_level)
     return
 
 
