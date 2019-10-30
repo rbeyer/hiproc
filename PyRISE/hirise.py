@@ -27,7 +27,6 @@ phase_names = ('INT', 'CAL', 'ATL', 'KSC', 'LAU', 'CRU', 'APR', 'AEB',
                'TRA', 'PSP',  # 'REL'
                'ESP')
 
-
 phase_max_orbit = dict(zip(phase_names, repeat(0)),
                        TRA=1000, PSP=11248, ESP=None)
 
@@ -36,8 +35,6 @@ phase_re = re.compile("|".join(phase_names))
 orbit_re = re.compile(r"\d{1,6}")
 lat_re = re.compile(r"[0-3]?\d?\d?[05]")
 
-# obsid_re = re.compile(r"("+phase_re.pattern+r")_("+orbit_re.pattern+r")_("+lat_re.pattern+r")")
-# obsid_re = re.compile( r"({})_({})_({})".format(phase_re.pattern, orbit_re.pattern, lat_re.pattern) )
 obsid_core_re = re.compile(fr"(?P<phase>{phase_re.pattern})?_?(?P<orbit>{orbit_re.pattern})_(?P<latesque>{lat_re.pattern})")
 obsid_re = re.compile(fr"(?<!\w){obsid_core_re.pattern}(?!\d)")
 
@@ -55,7 +52,15 @@ prodid_re = re.compile(fr"(?<!\w){obsid_core_re.pattern}_?(?P<ccd>{ccd_re.patter
 
 
 class ObservationID:
-    """A class for HiRISE Observation IDs."""
+    """A class for HiRISE Observation IDs.
+
+       :ivar phase: The three-letter string indicating the mission phase
+       of this Observation ID.
+       :ivar orbit: The six-digit orbit number (with leading zeros) as a
+       string.
+       :ivar latesque: The four digit code (with leading zeroes) as a string,
+       which indicates where in the circle of an orbit the observation lies.
+    """
 
     def __init__(self, *args):
         if len(args) == 1:
@@ -132,7 +137,11 @@ class ObservationID:
 
 
 class CCDID(ObservationID):
-    """A class for HiRISE CCD IDs."""
+    """A class for HiRISE CCD IDs.
+
+       :ivar ccdname: The CCD name: 'RED', 'IR', or 'BG'.
+       :ivar ccdnumber: The CCD number as a string: 0 through 13.
+    """
 
     def __init__(self, *args):
         items = list(args)
@@ -201,7 +210,10 @@ class CCDID(ObservationID):
 
 
 class ChannelID(CCDID):
-    """A class for HiRISE Channel IDs."""
+    """A class for HiRISE Channel IDs.
+
+       :ivar channel: The Channel number (0 or 1) as a string.
+    """
 
     def __init__(self, *args):
         items = list(args)
@@ -216,18 +228,44 @@ class ChannelID(CCDID):
             else:
                 raise ValueError('{} did not match regex: '
                                  '{}'.format(args[0], chanid_re.pattern))
-        elif len(items) == 4 or len(items) == 5 or len(items) == 6:
-            matched = chan_re.fullmatch(items.pop())
-            if matched:
-                chan = matched.group()
+        elif len(items) >= 2 and len(items) <= 6:
+            maybechan = items.pop()
+            if isinstance(maybechan, int):
+                if maybechan == 0 or maybechan == 1:
+                    chan = maybechan
             else:
-                raise ValueError(f'The last item of {items} did not match a '
-                                 'channel {chan_re.pattern}')
+                matched = chan_re.fullmatch(maybechan)
+                if matched:
+                    chan = matched.group()
+                else:
+                    raise ValueError(f'The last item, {maybechan}, did not match a '
+                                     'channel {chan_re.pattern}')
+            if len(items) == 1:
+                if isinstance(items[0], CCDID):
+                    items = [items[0].phase,
+                             items[0].orbit_number,
+                             items[0].latesque,
+                             items[0].ccdname,
+                             items[0].ccdnumber]
+                else:
+                    raise ValueError('{} was not a CCDID object'.format(items[0]))
+
+            elif len(items) == 2:
+                (ccdname, ccdnumber) = getccdnamenumber(items.pop())
+                if isinstance(items[0], ObservationID):
+                    items = [items[0].phase,
+                             items[0].orbit_number,
+                             items[0].latesque,
+                             ccdname,
+                             ccdnumber]
+                else:
+                    raise ValueError('{} was not a ObservationID object'.format(items[0]))
+
         else:
-            raise IndexError('accepts 1, 4, 5 or 6 arguments')
+            raise IndexError('accepts 1 to 6 arguments')
         super().__init__(*items)
 
-        self.channel = chan
+        self.channel = str(chan)
 
     def __str__(self):
         return '_'.join([super().__str__(), self.channel])
@@ -440,14 +478,38 @@ def getccd(s: str) -> str:
         raise ValueError(f'{s} did not match regex: {ccd_re.pattern}')
 
 
-def getccdname(s: str) -> str:
-    '''Extracts the name of a HiRISE CCD from the string (would get
-    'RED' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').'''
-    match = ccd_name_re.search(s)
-    if match:
-        return match.group()
+def _getccdname_fromint(ccdnum) -> str:
+    if ccdnum >= 0 and ccdnum <= 9:
+        return 'RED'
+    elif ccdnum >= 10 and ccdnum <= 11:
+        return 'IR'
+    elif ccdnum >= 12 and ccdnum <= 13:
+        return 'BG'
     else:
-        raise ValueError(f'{s} did not match regex: {ccd_name_re.pattern}')
+        raise ValueError(f'The value {ccdnum} must be a value from 0 to 13.')
+
+
+def getccdname(item) -> str:
+    '''Extracts the name of a HiRISE CCD from the string (would get
+    'RED' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').  If an integer
+    is given instead of a string, it will provide the corresponding name.'''
+    try:
+        match = ccd_name_re.search(item)
+        if match:
+            return match.group()
+        else:
+            try:
+                return _getccdname_fromint(int(item))
+            except:
+                raise ValueError(f'{item} did not match regex: {ccd_name_re.pattern}')
+    except TypeError:
+        try:
+            if isinstance(item, int):
+                return _getccdname_fromint(int(item))
+            else:
+                raise TypeError('Expected string or integer object.')
+        except:
+            raise
 
 
 def getccdnumber(s: str) -> str:
@@ -460,11 +522,19 @@ def getccdnumber(s: str) -> str:
         raise ValueError(f'{s} did not match regex: {ccd_re.pattern}')
 
 
-def getccdnamenumber(s: str) -> tuple:
-    '''Extracts the name and number of a HiRISE CCD from the string (would get
+def getccdnamenumber(item) -> tuple:
+    '''Extracts the name and number of a HiRISE CCD from the input (would get
     '('RED', '5')' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').'''
-    nn = getccd(s)
-    return(getccdname(nn), getccdnumber(nn))
+    try:
+        nn = getccd(item)
+        return(getccdname(nn), getccdnumber(nn))
+    except TypeError:
+        try:
+            return(getccdname(item), str(item))
+        except:
+            raise
+    except ValueError:
+            return(getccdname(int(item)), item)
 
 
 def getccdchannel(s: str) -> tuple:

@@ -323,10 +323,21 @@ class TestChannelID(unittest.TestCase):
             with self.subTest(truth=s[0], channelid=cid):
                 self.assertEqual(s[0], str(cid))
 
+    def test_init_CCDID(self):
+        obsid = hirise.ObservationID('ESP_034783_1850')
+        ccdid = hirise.CCDID('ESP_034783_1850_RED5')
+        chanid = hirise.ChannelID('ESP_034783_1850_RED5_0')
+        cid1 = hirise.ChannelID(ccdid, '0')
+        cid2 = hirise.ChannelID(obsid, 5, 0)
+        self.assertEqual(cid1, chanid)
+        self.assertEqual(cid2, chanid)
+
     def test_init_bad_tuples(self):
         tuples = (('ESP', '034783', '1850', 'RED5'),
                   ('ESP', '034783', '1850', 'RED5', 'A'),
                   ('ESP', '034783', '1850', 'RED5', '2'),
+                  ('123456', '1235', '123'),
+                  ('123456', '1235'),
                   ('ESP', '034783', '1850', 'RED5', 'not a channel'))
         for t in tuples:
             with self.subTest(test=t):
@@ -348,8 +359,6 @@ class TestChannelID(unittest.TestCase):
     def test_init_wrong_arg_count(self):
         self.assertRaises(IndexError, hirise.ChannelID,
                           'ESP', '123456', '1235', 'RED', '5', '0', 'extra')
-        self.assertRaises(IndexError, hirise.ChannelID, '123456', '1235', '123')
-        self.assertRaises(IndexError, hirise.ChannelID, '123456', '1235')
         self.assertRaises(IndexError, hirise.ChannelID)
 
     def test_repr(self):
@@ -512,11 +521,16 @@ class TestGetters(unittest.TestCase):
         for c in self.ccds:
             with self.subTest(c):
                 s = ''.join(c)
-                self.assertEquals(hirise.getccdname(s), c[0])
+                self.assertEqual(hirise.getccdname(s), c[0])
+
+    def test_getccdname_int(self):
+        self.assertEqual(hirise.getccdname(5), 'RED')
+        self.assertEqual(hirise.getccdname(str(5)), 'RED')
 
     def test_getccdname_bad(self):
         s = 'There is no CCD name in here: ESP_057866_1670_YEL5_0'
         self.assertRaises(ValueError, hirise.getccd, s)
+        self.assertRaises(TypeError, hirise.getccdname, 5.44)
 
     def test_getccdnumber(self):
         for c in self.ccds:
@@ -533,6 +547,19 @@ class TestGetters(unittest.TestCase):
             with self.subTest(c):
                 s = ''.join(c)
                 self.assertEquals(hirise.getccdnamenumber(s), c)
+
+    def test_getccdnamenumber_just_number(self):
+        for c in self.ccds:
+            with self.subTest(c):
+                self.assertEquals(hirise.getccdnamenumber(c[1]), c)
+
+    def test_getccdnamenumber_int(self):
+        for c in self.ccds:
+            with self.subTest(c):
+                self.assertEquals(hirise.getccdnamenumber(int(c[1])), c)
+
+    def test_getccdnamenumber_bad(self):
+        self.assertRaises(ValueError, hirise.getccdnamenumber, 'RED')
 
     def test_getccdchannel_good(self):
         s = 'IR10_0 is a good CCD-channel combination.'
