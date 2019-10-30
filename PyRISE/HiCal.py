@@ -176,6 +176,7 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
     temp_token = datetime.now().strftime('HiCal-%y%m%d%H%M%S')
 
     flags = set_flags(hconf, db, ccdchan, b.index(int(db['BINNING'])))
+    logging.info(flags)
 
     # Start processing cube files
     to_delete = isis.PathSet()
