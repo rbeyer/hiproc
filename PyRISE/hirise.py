@@ -30,6 +30,10 @@ phase_names = ('INT', 'CAL', 'ATL', 'KSC', 'LAU', 'CRU', 'APR', 'AEB',
 phase_max_orbit = dict(zip(phase_names, repeat(0)),
                        TRA=1000, PSP=11248, ESP=None)
 
+ccd_numbers = dict(RED=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+                   IR=(10, 11),
+                   BG=(12, 13))
+
 # Create some compiled regex Patterns to use in this module.
 phase_re = re.compile("|".join(phase_names))
 orbit_re = re.compile(r"\d{1,6}")
@@ -478,13 +482,10 @@ def getccd(s: str) -> str:
         raise ValueError(f'{s} did not match regex: {ccd_re.pattern}')
 
 
-def _getccdname_fromint(ccdnum) -> str:
-    if ccdnum >= 0 and ccdnum <= 9:
-        return 'RED'
-    elif ccdnum >= 10 and ccdnum <= 11:
-        return 'IR'
-    elif ccdnum >= 12 and ccdnum <= 13:
-        return 'BG'
+def _getccdname_fromint(ccdnum: int) -> str:
+    for k, v in ccd_numbers.items():
+        if ccdnum in v:
+            return k
     else:
         raise ValueError(f'The value {ccdnum} must be a value from 0 to 13.')
 
