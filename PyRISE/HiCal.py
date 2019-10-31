@@ -95,7 +95,9 @@ def main():
         # directory.
         try:
             # hgf_path = util.get_path(Path(args.hgfconf), Path(args.conf).parent)
-            nf_path = util.get_path(Path(args.nfconf), Path(args.conf).parent)
+            nf_path = util.get_path(Path(args.nfconf),
+                                    (Path(args.conf).parent,
+                                     Path(__file__).resolve().parent.parent / 'resources'))
         except (TypeError, NotADirectoryError, FileNotFoundError) as err:
             logging.critical(err)
             sys.exit()
@@ -505,11 +507,12 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
                                         conf['HiCal']['HiCal_Normalization_Maximum'])
     hical_args = {'to': to_s, 'units': 'IOF'}
     if(conf['HiCal']['HiCal_ISIS_Conf'] != 'DEFAULT'):
-        conf_dir = Path(conf_path).parent
+        dirs = (Path(conf_path).parent,
+                Path(__file__).resolve().parent.parent / 'resources')
         if(lis_per < 5 and image_buffer_mean > 0):
-            hical_args['conf'] = conf_dir / conf['HiCal']['HiCal_ISIS_Conf']
+            hical_args['conf'] = util.get_path(conf['HiCal']['HiCal_ISIS_Conf'], dirs)
         else:
-            hical_args['conf'] = conf_dir / conf['HiCal']['HiCal_ISIS_Conf_Noise']
+            hical_args['conf'] = util.get_path(conf['HiCal']['HiCal_ISIS_Conf_Noise'], dirs)
             status = 'BadCal'
 
     if noise_filter:
