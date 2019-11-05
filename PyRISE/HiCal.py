@@ -519,7 +519,7 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
         mask_cube = to_d.add(in_cub_path.with_suffix('.mask.cub'))
         mask(in_cub_path, mask_cube,
              conf['NoiseFilter']['NoiseFilter_Raw_Min'],
-             conf['NoiseFilter']['NoiseFilter_Raw_Max'], binning)
+             conf['NoiseFilter']['NoiseFilter_Raw_Max'], binning, keep=keep)
         logging.info(isis.hical(mask_cube, **hical_args).args)
     else:
         logging.info(isis.hical(in_cub_path, **hical_args).args)
@@ -642,6 +642,7 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
             maxs.append(int(row['Maximum']))
 
     maxvp = max(valid_points)
+    logging.info(f'Maximum count of valid pixels: {maxvp}')
 
     # Original note:
     # # Get the median standard deviation value for all columns that have
@@ -663,6 +664,9 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
 
     std_w_maxvp.sort()
     facstd = std_w_maxvp[int((len(std_w_maxvp) - 1) * 0.95)]
+    logging.info('95th percentile standard deviation of all ' +
+                 'columns ({}) that have the '.format(len(std_w_maxvp)) +
+                 'maximum valid pixel count: {}'.format(facstd))
 
     # Original note:
     # # find the minimum of minimums and the maximum of maximums for any
