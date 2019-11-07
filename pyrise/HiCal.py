@@ -686,7 +686,9 @@ def mask(in_cube: os.PathLike, out_cube: os.PathLike, noisefilter_min: float,
         (mindn, maxdn) = analyze_cubenorm_stats(cubenorm_stats_file, binning)
     else:
         img_mean = float(pvl.loads(isis.stats(temp_cube).stdout)['Results']['Average'])
-        (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, img_mean)
+        img_mode = float(pvl.loads(isis.stats(temp_cube).stdout)['Results']['Mode'])
+        logging.info(f'{temp_cube} Mean: {img_mean}, Mode: {img_mode}')
+        (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, img_mode)
 
     util.log(isis.mask(temp_cube, mask=temp_cube, to=out_path,
                        minimum=mindn, maximum=maxdn,
