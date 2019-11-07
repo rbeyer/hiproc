@@ -105,6 +105,7 @@ def main():
                         "starts with a '.' it is considered an extension "
                         "and will be swapped with the input file's "
                         "extension to find the .json file to use.")
+    parser.add_argument('-n', '--newalg', required=False, action='store_true')
     # parser.add_argument('--hgfconf', required=False, default='HiGainFx.conf')
     parser.add_argument('--nfconf', required=False, default='NoiseFilter.conf')
     parser.add_argument('--bin2', required=False, action='store_true',
@@ -244,7 +245,7 @@ def start(cube: os.PathLike, out_cube: Path, db: dict,
 
 def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
           conf: dict, conf_path: os.PathLike, db: dict,
-          destripe=False, keep=False) -> tuple:
+          destripe=False, newalg=False, keep=False) -> tuple:
     logging.info('HiCal start.')
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
@@ -282,7 +283,7 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
     hical_status = run_hical(next_cube, hical_file, conf, conf_path,
                              lis_per, float(db['IMAGE_BUFFER_MEAN']),
                              int(db['BINNING']), flags.noise_filter,
-                             keep=keep)
+                             newalg=newalg, keep=keep)
     next_cube = hical_file
 
     if furrows_found:
@@ -511,8 +512,9 @@ def set_flags(conf: dict, db: dict, ccdchan: tuple,
                                                        'divide'])
 
     noise_filter = False
-    if ((process_this(ccdchan, conf['HiCal_Noise_Processing'])) and
-        ((float(db['IMAGE_DARK_STANDARD_DEVIATION']) >=
+    # Disabled to process RED7
+    # if ((process_this(ccdchan, conf['HiCal_Noise_Processing'])) and
+    if (((float(db['IMAGE_DARK_STANDARD_DEVIATION']) >=
           float(conf['HiCal_Noise_Bin_DarkPixel_STD'][bindex])) or
          (float(db['CAL_MASK_STANDARD_DEVIATION']) >=
           float(conf['HiCal_Noise_Bin_Mask_STD'][bindex])) or
@@ -555,7 +557,7 @@ def set_lines(skip_top: int, skip_bottom: int,
 def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
               conf: dict, conf_path: os.PathLike,
               lis_per: float, image_buffer_mean: float, binning: int,
-              noise_filter: bool, keep=False) -> str:
+              noise_filter: bool, newalg=False, keep=False) -> str:
 
     to_d = isis.PathSet()
     in_cub_path = Path(in_cube)
@@ -580,8 +582,8 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
     if noise_filter:
         mask_cube = to_d.add(in_cub_path.with_suffix('.mask.cub'))
         mask(in_cub_path, mask_cube,
-             conf['NoiseFilter']['NoiseFilter_Raw_Min'],
-             conf['NoiseFilter']['NoiseFilter_Raw_Max'], binning, keep=keep)
+             conf['NoiseFilter']['NoiseFilter_Raw_Max'], binning,
+             newalg=newalg, keep=keep)
         util.log(isis.hical(mask_cube, **hical_args).args)
     else:
         util.log(isis.hical(in_cub_path, **hical_args).args)
@@ -666,7 +668,8 @@ def furrow_nulling(cube: os.PathLike, out_cube: os.PathLike, binning: int,
 
 
 def mask(in_cube: os.PathLike, out_cube: os.PathLike, noisefilter_min: float,
-         noisefilter_max: float, binning: int, keep=False) -> None:
+         noisefilter_max: float, binning: int, newalg=False,
+         keep=False) -> None:
     """mask out unwanted pixels"""
     logging.info(mask.__doc__)
     to_del = isis.PathSet()
@@ -679,7 +682,11 @@ def mask(in_cube: os.PathLike, out_cube: os.PathLike, noisefilter_min: float,
 
     cubenorm_stats_file = to_del.add(temp_cube.with_suffix('.cn.stats'))
     util.log(isis.cubenorm(temp_cube, stats=cubenorm_stats_file).args)
-    (mindn, maxdn) = analyze_cubenorm_stats(cubenorm_stats_file, binning)
+    if not newalg:
+        (mindn, maxdn) = analyze_cubenorm_stats(cubenorm_stats_file, binning)
+    else:
+        img_mean = float(pvl.loads(isis.stats(temp_cube).stdout)['Results']['Average'])
+        (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, img_mean)
 
     util.log(isis.mask(temp_cube, mask=temp_cube, to=out_path,
                        minimum=mindn, maximum=maxdn,
@@ -767,6 +774,65 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
     else:
         mindn *= 0.5
         maxdn *= 1.5
+
+    return(mindn, maxdn)
+
+
+def analyze_cubenorm_stats2(statsfile: os.PathLike, mean: float) -> tuple:
+    # The analyze_cubenorm_stats() function is meant to make sure we
+    # don't blow away valid data, with the philosphy that it is better to
+    # let in a little bad data in order to keep the good.  However, in
+    # images with a high percentage of LIS%, there is so much bad that it
+    # swamps the good, so this approach is a little more severe.
+
+    logging.info('More severe handling of images with LIS pixels engaged.')
+
+    with open(statsfile) as csvfile:
+        valid_points = list()
+        std_devs = list()
+        mins = list()
+        maxs = list()
+        reader = csv.DictReader(csvfile, dialect=isis.cubenormfile.Dialect)
+        for row in reader:
+            valid_points.append(int(row['ValidPoints']))
+            std_devs.append(float(row['StdDev']))
+            mins.append(int(row['Minimum']))
+            maxs.append(int(row['Maximum']))
+
+    maxvp = max(valid_points)
+    logging.info(f'Maximum count of valid pixels: {maxvp}')
+
+    # Original note:
+    # # Get the median standard deviation value for all columns that have
+    # # the maximum valid pixel count
+    # #
+    # # 2016-12-02 Note: this may not pick the median standard
+    # # deviation value but the value from an index 0.95 times the number
+    # # of entries in the sorted cubenorm statistics file.
+    #
+    # That seems to be exactly what it does.  I think the term 'median'
+    # in the original (apparently pre-2016) comment is wrong.
+    # The variable is called 'facstd' and when it is used below, it refers
+    # to this being 'medstd + tol' which indicates that it really is
+    # meant to be a factor above the median, which it is.
+    std_w_maxvp = list()
+    for (vp, std) in zip(valid_points, std_devs):
+        if vp == maxvp:
+            std_w_maxvp.append(std)
+
+    # std_w_maxvp.sort()
+    # facstd = std_w_maxvp[int((len(std_w_maxvp) - 1) * 0.95)]
+    # logging.info('95th percentile standard deviation of all ' +
+    #              'columns ({}) that have the '.format(len(std_w_maxvp)) +
+    #              'maximum valid pixel count: {}'.format(facstd))
+
+    medstd = statistics.median_high(std_w_maxvp)
+    logging.info('median standard deviation of all ' +
+                 'columns ({}) that have the '.format(len(std_w_maxvp)) +
+                 'maximum valid pixel count: {}'.format(medstd))
+
+    mindn = mean - (10 * medstd)
+    maxdn = mean + (10 * medstd)
 
     return(mindn, maxdn)
 
