@@ -245,7 +245,7 @@ def start(cube: os.PathLike, out_cube: Path, db: dict,
 
 def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
           conf: dict, conf_path: os.PathLike, db: dict,
-          destripe=False, newalg=False, keep=False) -> tuple:
+          destripe=False, newalg=0, keep=False) -> tuple:
     logging.info('HiCal start.')
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
@@ -557,7 +557,7 @@ def set_lines(skip_top: int, skip_bottom: int,
 def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
               conf: dict, conf_path: os.PathLike,
               lis_per: float, image_buffer_mean: float, binning: int,
-              noise_filter: bool, newalg=False, keep=False) -> str:
+              noise_filter: bool, newalg=0, keep=False) -> str:
 
     to_d = isis.PathSet()
     in_cub_path = Path(in_cube)
@@ -582,6 +582,7 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
     if noise_filter:
         mask_cube = to_d.add(in_cub_path.with_suffix('.mask.cub'))
         mask(in_cub_path, mask_cube,
+             conf['NoiseFilter']['NoiseFilter_Raw_Min'],
              conf['NoiseFilter']['NoiseFilter_Raw_Max'], binning,
              newalg=newalg, keep=keep)
         util.log(isis.hical(mask_cube, **hical_args).args)
@@ -682,13 +683,18 @@ def mask(in_cube: os.PathLike, out_cube: os.PathLike, noisefilter_min: float,
 
     cubenorm_stats_file = to_del.add(temp_cube.with_suffix('.cn.stats'))
     util.log(isis.cubenorm(temp_cube, stats=cubenorm_stats_file).args)
-    if not newalg:
+    if newalg == 0:
         (mindn, maxdn) = analyze_cubenorm_stats(cubenorm_stats_file, binning)
     else:
-        img_mean = float(pvl.loads(isis.stats(temp_cube).stdout)['Results']['Average'])
-        img_mode = float(pvl.loads(isis.stats(temp_cube).stdout)['Results']['Mode'])
-        logging.info(f'{temp_cube} Mean: {img_mean}, Mode: {img_mode}')
-        (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, img_mode)
+        results = pvl.loads(isis.stats(temp_cube).stdout)['Results']
+        img_mean = float(results['Average'])
+        img_mode = float(results['Mode'])
+        img_median = float(results['Median'])
+        d = img_mean - img_mode
+        logging.info(f'{temp_cube} Mean: {img_mean}, Mode: {img_mode}, '
+                     f'diff: {d}, Median: {img_median}')
+        (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, img_mode,
+                                                 newalg)
 
     util.log(isis.mask(temp_cube, mask=temp_cube, to=out_path,
                        minimum=mindn, maximum=maxdn,
@@ -780,7 +786,7 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
     return(mindn, maxdn)
 
 
-def analyze_cubenorm_stats2(statsfile: os.PathLike, mean: float) -> tuple:
+def analyze_cubenorm_stats2(statsfile: os.PathLike, mean: float, width=10) -> tuple:
     # The analyze_cubenorm_stats() function is meant to make sure we
     # don't blow away valid data, with the philosphy that it is better to
     # let in a little bad data in order to keep the good.  However, in
@@ -833,8 +839,8 @@ def analyze_cubenorm_stats2(statsfile: os.PathLike, mean: float) -> tuple:
                  'columns ({}) that have the '.format(len(std_w_maxvp)) +
                  'maximum valid pixel count: {}'.format(medstd))
 
-    mindn = mean - (10 * medstd)
-    maxdn = mean + (10 * medstd)
+    mindn = mean - (width * medstd)
+    maxdn = mean + (width * medstd)
 
     return(mindn, maxdn)
 
