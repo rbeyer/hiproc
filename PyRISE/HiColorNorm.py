@@ -252,18 +252,13 @@ def HiColorNorm(cubes, outcub_path, conf, furrow_flag,
         mask_list = list()
         for b in (1, 2, 3):
             tmp_p = to_del.add(c.path.with_suffix(f'.{temp_token}.temp{b}.cub'))
-            logging.info(isis.mask(f'{c.path}+{b}', mask=f'{c.path}+{b}',
-                                   to=tmp_p,
-                                   minimum=0.0, maximum=2.0, preserve='INSIDE').args)
+            util.log(isis.mask(f'{c.path}+{b}', mask=f'{c.path}+{b}',
+                               to=tmp_p, minimum=0.0, maximum=2.0,
+                               preserve='INSIDE').args)
             mask_list.append(tmp_p)
 
-        # listpath = to_del.add(c.path.with_suffix(f'.{temp_token}.list.txt'))
-        # listpath.write_text('\n'.join(str(p) for p in mask_list) + '\n')
-        #
-        # c.final_path = c.path.with_suffix(f'.HiColorNorm.cub')
-        # logging.info(isis.cubeit(fromlist=listpath, to=c.final_path).args)
         c.final_path = c.path.with_suffix(f'.HiColorNorm.cub')
-        logging.info(isis.cubeit_k(mask_list, to=c.final_path).args)
+        util.log(isis.cubeit_k(mask_list, to=c.final_path).args)
 
         (cubes[i].mask_path['IR'],
          cubes[i].crop_path['IR']) = per_color(c, temp_token, 'IR', keep=keep)
@@ -280,7 +275,7 @@ def HiColorNorm(cubes, outcub_path, conf, furrow_flag,
         # listpath.write_text('\n'.join(str(c.final_path) for c in cubes) + '\n')
 
         with isis.fromlist.temp([str(c.final_path) for c in cubes]) as f:
-            logging.info(isis.hiccdstitch(fromlist=f, to=out_p).args)
+            util.log(isis.hiccdstitch(fromlist=f, to=out_p).args)
 
         for c in cubes:
             to_del.add(c.final_path)
@@ -326,22 +321,22 @@ def per_color(cube, temp_token, color_code, keep=False):
 
     # Generate the IR/RED and BG/RED ratios for each of the COLOR products
     rat_p = cube.path.with_suffix(f'.{tt}.ratio.cub')
-    logging.info(isis.ratio(num=numerator,
-                            den=denominator,
-                            to=rat_p).args)
+    util.log(isis.ratio(num=numerator,
+                        den=denominator,
+                        to=rat_p).args)
 
     # mask out invalid pixels
     # Possible future update: Make mosaic of ratio files then run cubnorm
     # correction on these for the unfiltered products, to avoid any null
     # pixels created during the ratio process.
     mask_p = cube.path.with_suffix(f'.{tt}.mask.cub')
-    logging.info(isis.mask(rat_p, mask=rat_p, to=mask_p,
-                           minimum=0.0, maximum=4.0, preserve='INSIDE').args)
+    util.log(isis.mask(rat_p, mask=rat_p, to=mask_p,
+                       minimum=0.0, maximum=4.0, preserve='INSIDE').args)
 
     # Generate the crop files
     crop_p = cube.path.with_suffix(f'.{tt}.ratcrop.cub')
-    logging.info(isis.crop(mask_p, to=crop_p, line=cube.crop_sline,
-                           nlines=cube.crop_lines).args)
+    util.log(isis.crop(mask_p, to=crop_p, line=cube.crop_sline,
+                       nlines=cube.crop_lines).args)
 
     if not keep:
             rat_p.unlink()
@@ -350,21 +345,21 @@ def per_color(cube, temp_token, color_code, keep=False):
 
 
 def make_LR_mosaic(left_path, right_path, left_samps, mosaic_path, lines, samps):
-    logging.info(isis.handmos(left_path, mosaic=mosaic_path,
-                              create='YES', nlines=lines, nsamp=samps,
-                              nbands=1, outsamp=1,
-                              outline=1, outband=1).args)
-    logging.info(isis.handmos(right_path, mosaic=mosaic_path,
-                              outsamp=(left_samps + 1),
-                              outline=1, outband=1).args)
+    util.log(isis.handmos(left_path, mosaic=mosaic_path,
+                          create='YES', nlines=lines, nsamp=samps,
+                          nbands=1, outsamp=1,
+                          outline=1, outband=1).args)
+    util.log(isis.handmos(right_path, mosaic=mosaic_path,
+                          outsamp=(left_samps + 1),
+                          outline=1, outband=1).args)
     return
 
 
 def cubenorm_stats(crpmos, mos, mosnrm, keep=False):
     # get cubenorm statistics on the crop mosaic files
     stats_p = Path(crpmos).with_suffix('.cubenorm.txt')
-    logging.info(isis.cubenorm(crpmos, stats=stats_p, format='table',
-                               direction='column', norm='average').args)
+    util.log(isis.cubenorm(crpmos, stats=stats_p, format='table',
+                           direction='column', norm='average').args)
     averages = list()
     with open(stats_p) as csvfile:
         reader = csv.DictReader(csvfile, dialect=isis.cubenormfile.Dialect)
@@ -373,10 +368,10 @@ def cubenorm_stats(crpmos, mos, mosnrm, keep=False):
     stddev = statistics.stdev(averages)
 
     # Now apply the statistics to the non-crop image
-    logging.info(isis.cubenorm(mos, fromstats=stats_p, to=mosnrm,
-                               preserve=True, statsource='table',
-                               format='table', direction='column',
-                               norm='average').args)
+    util.log(isis.cubenorm(mos, fromstats=stats_p, to=mosnrm,
+                           preserve=True, statsource='table',
+                           format='table', direction='column',
+                           norm='average').args)
 
     if not keep:
         stats_p.unlink()
@@ -393,13 +388,13 @@ def make_unfiltered(in_path, nrm_path, temp_token, color_code, color_band,
     shutil.copyfile(in_p, unfiltered_p)
     # run ISIS algebra program to create unfiltered (normalized-IR/RED)*RED files
     alg_unfiltered_path = in_p.with_suffix(f'.{tt}.algebra.cub')
-    logging.info(isis.algebra(nrm_path,
-                              from2='{}+2'.format(in_p),
-                              to=alg_unfiltered_path, operator='MULTIPLY').args)
+    util.log(isis.algebra(nrm_path,
+                          from2='{}+2'.format(in_p),
+                          to=alg_unfiltered_path, operator='MULTIPLY').args)
     # Update the output file with the non-filtered normalized IR and BG bands
-    logging.info(isis.handmos(alg_unfiltered_path, mosaic=unfiltered_p,
-                              outsample=1, outline=1, matchbandbin=False,
-                              outband=color_band).args)
+    util.log(isis.handmos(alg_unfiltered_path, mosaic=unfiltered_p,
+                          outsample=1, outline=1, matchbandbin=False,
+                          outband=color_band).args)
     if not keep:
         alg_unfiltered_path.unlink()
     return unfiltered_p
@@ -425,12 +420,12 @@ def lpfz_triplefilter(from_path: os.PathLike, to_path: os.PathLike,
 
 def lpfz_filtering(from_path: os.PathLike, to_path: os.PathLike,
                    boxl: int, boxs: int) -> None:
-    logging.info(isis.lowpass(from_path, to=to_path,
-                              lines=boxl, samples=boxs,
-                              filter='OUTSIDE', minopt='PERCENTAGE',
-                              minimum=25, low=0.00, high=2.0,
-                              null=True, HRS=True, HIS=True,
-                              LIS=True, LRS=True).args)
+    util.log(isis.lowpass(from_path, to=to_path,
+                          lines=boxl, samples=boxs,
+                          filter='OUTSIDE', minopt='PERCENTAGE',
+                          minimum=25, low=0.00, high=2.0,
+                          null=True, HRS=True, HIS=True,
+                          LIS=True, LRS=True).args)
 
 
 def per_band(cubes, out_p, temp_token, color_code, furrow_flag, unfiltered, keep=False) -> float:
@@ -465,8 +460,8 @@ def per_band(cubes, out_p, temp_token, color_code, furrow_flag, unfiltered, keep
         samp = 1
         for i, c in enumerate(cubes):
             cubes[i].nrm_path[color_code] = c.path.with_suffix(f'.{temp_token}.{color_code}.norm.cub')
-            logging.info(isis.crop(mosnrm_p, to=cubes[i].nrm_path[color_code],
-                                   sample=samp, nsamples=c.samps).args)
+            util.log(isis.crop(mosnrm_p, to=cubes[i].nrm_path[color_code],
+                               sample=samp, nsamples=c.samps).args)
             samp += c.samps
     else:
         # If there was only one file then all we need to do is rename files
@@ -503,8 +498,8 @@ def per_band(cubes, out_p, temp_token, color_code, furrow_flag, unfiltered, keep
             lowpass_args['samples'] = 1
 
         lpf_path = to_del.add(c.path.with_suffix(f'.{temp_token}.{color_code}.lpf.cub'))
-        logging.info(isis.lowpass(c.nrm_path[color_code], to=lpf_path,
-                                  **lowpass_args).args)
+        util.log(isis.lowpass(c.nrm_path[color_code], to=lpf_path,
+                              **lowpass_args).args)
 
         # Perform lpfz filters to interpolate null pixels due to furrows or
         #   bad pixels
@@ -516,13 +511,13 @@ def per_band(cubes, out_p, temp_token, color_code, furrow_flag, unfiltered, keep
 
         # run ISIS algebra program to created (normalized-IR/RED)*RED files
         alg_path = to_del.add(c.path.with_suffix(f'.{temp_token}.{color_code}.algebra.cub'))
-        logging.info(isis.algebra(lpfz_path, from2=f'{c.path}+2',
-                                  to=alg_path, operator='MULTIPLY').args)
+        util.log(isis.algebra(lpfz_path, from2=f'{c.path}+2',
+                              to=alg_path, operator='MULTIPLY').args)
 
         # Update the output file with the normalized IR and BG bands
-        logging.info(isis.handmos(alg_path, mosaic=c.final_path,
-                                  outsample=1, outline=1,
-                                  outband=c.band[color_code], matchbandbin=False).args)
+        util.log(isis.handmos(alg_path, mosaic=c.final_path,
+                              outsample=1, outline=1,
+                              outband=c.band[color_code], matchbandbin=False).args)
 
     if not keep:
         to_del.unlink()

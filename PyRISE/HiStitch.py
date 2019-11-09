@@ -348,41 +348,41 @@ def HiFurrow_Fix(in_cube: os.PathLike, out_cube: os.PathLike,
     # DN=0 for furrow area
     eqn = f'\(1*(sample<{dn_range[0]})+ 1*(sample>{dn_range[1]}) + 0)'
     fx_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.fx.cub'))
-    logging.info(isis.fx(to=fx_cub, mode='OUTPUTONLY', lines=lines, samples=samps,
-                         equation=eqn).args)
+    util.log(isis.fx(to=fx_cub, mode='OUTPUTONLY', lines=lines, samples=samps,
+                     equation=eqn).args)
 
     # Create a file where the furrow area is set to null
     mask1_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.mask1.cub'))
-    logging.info(isis.mask(in_cub, mask=fx_cub, to=mask1_cub, min_=1, max_=1,
-                           preserve='INSIDE', spixels='NULL').args)
+    util.log(isis.mask(in_cub, mask=fx_cub, to=mask1_cub, min_=1, max_=1,
+                       preserve='INSIDE', spixels='NULL').args)
 
     # Lowpass filter to fill in the null pixel area
     lpf_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.lpf.cub'))
-    logging.info(isis.lowpass(mask1_cub, to=lpf_cub, sample=lpf_samp, line=lpf_line,
-                              null=True, hrs=False, his=False, lis=False).args)
+    util.log(isis.lowpass(mask1_cub, to=lpf_cub, sample=lpf_samp, line=lpf_line,
+                          null=True, hrs=False, his=False, lis=False).args)
 
     # Create a file where non-furrow columns are set to null
     mask2_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.mask2.cub'))
-    logging.info(isis.mask(in_cub, mask=fx_cub, to=mask2_cub, min_=0, max_=0,
-                           preserve='INSIDE', spixels='NULL').args)
+    util.log(isis.mask(in_cub, mask=fx_cub, to=mask2_cub, min_=0, max_=0,
+                       preserve='INSIDE', spixels='NULL').args)
 
     # Highpass filter the furrow region
     hpf_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.hpf.cub'))
-    logging.info(isis.highpass(mask2_cub, to=hpf_cub, sample=1,
-                               line=lpf_line).args)
+    util.log(isis.highpass(mask2_cub, to=hpf_cub, sample=1,
+                           line=lpf_line).args)
 
     # Add lowpass and highpass together to achieve desired result
     alg_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.alg.cub'))
-    logging.info(isis.algebra(from_=lpf_cub, from2=hpf_cub, to=alg_cub,
-                 operator='ADD', A=1.0, B=1.0).args)
+    util.log(isis.algebra(from_=lpf_cub, from2=hpf_cub, to=alg_cub,
+                          operator='ADD', A=1.0, B=1.0).args)
 
     # copy the input file to the output file then mosaic the
     # furrow area as needed.
     logging.info(f'Copy {in_cub} to {out_cube}.')
     shutil.copyfile(in_cub, out_cube)
-    logging.info(isis.handmos(alg_cub, mosaic=out_cube, outsample=1,
-                              outline=1, outband=1, insample=1, inline=1,
-                              inband=1, create='NO').args)
+    util.log(isis.handmos(alg_cub, mosaic=out_cube, outsample=1,
+                          outline=1, outband=1, insample=1, inline=1,
+                          inband=1, create='NO').args)
 
     if not keep:
         to_del.unlink()

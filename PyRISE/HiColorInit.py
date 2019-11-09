@@ -152,28 +152,28 @@ def HiColorInit(red: HiColorCube, ir: HiColorCube, bg: HiColorCube,
 
         if mag_ratio < 1:
             s = 1 / mag_ratio
-            logging.info(isis.reduce(c.path, to=rescaled, sscale=s,
-                                     lscale=bin_ratio, validper=1,
-                                     algorithm='nearest',
-                                     vper_replace='nearest').args)
+            util.log(isis.reduce(c.path, to=rescaled, sscale=s,
+                                 lscale=bin_ratio, validper=1,
+                                 algorithm='nearest',
+                                 vper_replace='nearest').args)
         else:
-            logging.info(isis.enlarge(c.path, to=rescaled, sscale=mag_ratio,
-                                      lscale=bin_ratio, interp='bilinear').args)
+            util.log(isis.enlarge(c.path, to=rescaled, sscale=mag_ratio,
+                                  lscale=bin_ratio, interp='bilinear').args)
 
         # The original Perl had an additional step to divide c.bin by the
         # bin_ratio, and provide that to value= below, but that's
         # mathematically just red.bin, so we'll skip a calculation:
-        logging.info(isis.editlab(rescaled, options='modkey',
-                                  grpname='Instrument', keyword='Summing',
-                                  value=red.bin).args)
+        util.log(isis.editlab(rescaled, options='modkey',
+                              grpname='Instrument', keyword='Summing',
+                              value=red.bin).args)
 
         # trim by placing in a new image
-        logging.info(isis.handmos(rescaled,
-                                  mosaic=c.path.with_suffix(outsuffix),
-                                  create='Y',
-                                  nlines=red.lines, nsamp=red.samps,
-                                  nband=1, outline=offset,
-                                  outsamp=1, outband=1).args)
+        util.log(isis.handmos(rescaled,
+                              mosaic=c.path.with_suffix(outsuffix),
+                              create='Y',
+                              nlines=red.lines, nsamp=red.samps,
+                              nband=1, outline=offset,
+                              outsamp=1, outband=1).args)
 
         if not keep:
             rescaled.unlink()

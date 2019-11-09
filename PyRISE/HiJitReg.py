@@ -522,12 +522,12 @@ def run_HiJitReg(red: hicolor.HiColorCube, color: JitterCube, params: dict,
         write_regdef(color.regdef_path, params)
 
     tmp_control = color.cnet_path.with_suffix('.net')
-    logging.info(isis.hijitreg(red.path, match=color.path,
-                               regdef=color.regdef_path,
-                               rows=params['ROWS'], columns=params['COLS'],
-                               flat=color.flattab_path,
-                               cnet=tmp_control).args)
-    logging.info(isis.cnetbin2pvl(tmp_control, to=color.cnet_path).args)
+    util.log(isis.hijitreg(red.path, match=color.path,
+                           regdef=color.regdef_path,
+                           rows=params['ROWS'], columns=params['COLS'],
+                           flat=color.flattab_path,
+                           cnet=tmp_control).args)
+    util.log(isis.cnetbin2pvl(tmp_control, to=color.cnet_path).args)
     if not keep:
         tmp_control.unlink()
     return

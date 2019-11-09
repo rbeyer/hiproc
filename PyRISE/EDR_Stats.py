@@ -99,7 +99,7 @@ def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
         raise err
 
     # Convert to .cub
-    logging.info(isis.hi2isis(img, to=out_cube).args)
+    util.log(isis.hi2isis(img, to=out_cube).args)
 
     histat_complete = isis.histat(out_cube, useoffsets=True,
                                   leftimage=0,     rightimage=1,
@@ -107,7 +107,7 @@ def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
                                   leftcaldark=3,   rightcaldark=1,
                                   leftbuffer=3,    rightbuffer=1,
                                   leftdark=3,      rightdark=1)
-    logging.info(histat_complete.args)
+    util.log(histat_complete.args)
     histats = parse_histat(histat_complete.stdout)
 
     # Get some info from the new cube:
@@ -213,7 +213,7 @@ def get_dncnt(cub, hmin=0.01, hmax=99.99, keep=False) -> int:
 
     histfile = Path(cub).with_suffix('.hist')
     if not histfile.is_file():
-        logging.info(isis.hist(cub, to=histfile).args)
+        util.log(isis.hist(cub, to=histfile).args)
 
     h = isis.Histogram(histfile)
 

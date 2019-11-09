@@ -141,33 +141,33 @@ def match_red(cubes: list, base_cube, flat_path, elargement_ratio=1.0006):
 
         # scale cubes as needed
         if mag > 1:
-            logging.info(isis.enlarge(c.path, to=c.next_path, sscale=mag,
-                                      lscale=bin_ratio, interp='BILINEAR').args)
+            util.log(isis.enlarge(c.path, to=c.next_path, sscale=mag,
+                                  lscale=bin_ratio, interp='BILINEAR').args)
         elif mag < 1:
-            logging.info(isis.reduce(c.path, to=c.next_path, sscale=mag,
-                                     lscale=bin_ratio, mode='SCALE').args)
+            util.log(isis.reduce(c.path, to=c.next_path, sscale=mag,
+                                 lscale=bin_ratio, mode='SCALE').args)
         else:
             shutil.copy(c.path, c.next_path)
 
         if c.ccdname != 'RED':
             offset = (200 * (c.bin - base_cube.bin) + c.tdi - base_cube.tdi) / base_cube.bin
             mos_path = c.next_path.with_suffix('.mosaiced.cub')
-            logging.info(isis.handmos(c.next_path, mosaic=mos_path, create='Y',
-                                      nlines=base_cube.lines,
-                                      nsamples=base_cube.samps,
-                                      nbands=1, outline=offset,
-                                      outsamp=1, outband=1).args)
+            util.log(isis.handmos(c.next_path, mosaic=mos_path, create='Y',
+                                  nlines=base_cube.lines,
+                                  nsamples=base_cube.samps,
+                                  nbands=1, outline=offset,
+                                  outsamp=1, outband=1).args)
             shutil.move(mos_path, c.next_path)
 
         if bin_ratio != 1:
-            logging.info(isis.editlab(c.next_path, options='MODKEY',
-                                      grpname='INSTRUMENT', KEYWORD='SUMMING',
-                                      value=base_cube.bin).args)
+            util.log(isis.editlab(c.next_path, options='MODKEY',
+                                  grpname='INSTRUMENT', KEYWORD='SUMMING',
+                                  value=base_cube.bin).args)
 
     # This section creates flat.tabs for RED4-RED5 pair only
     rows = int(red5.lines / 50)
-    logging.info(isis.hijitreg(red4.next_path, match=red5.next_path, row=rows,
-                               flat=flat_path).args)
+    util.log(isis.hijitreg(red4.next_path, match=red5.next_path, row=rows,
+                           flat=flat_path).args)
 
     return
 
@@ -439,11 +439,11 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
 
     with isis.fromlist.temp(inlist) as inlist_f:
         with isis.fromlist.temp(outlist) as outlist_f:
-            logging.info(isis.hijitter(fromlist=inlist_f,
-                                       jitter=jitter_path,
-                                       regdef=hijitregdef_p,
-                                       tolist=outlist_f,
-                                       jitterck=jitterck_p).args)
+            util.log(isis.hijitter(fromlist=inlist_f,
+                                   jitter=jitter_path,
+                                   regdef=hijitregdef_p,
+                                   tolist=outlist_f,
+                                   jitterck=jitterck_p).args)
     # Mosaic dejittered cubs
     # Remember hijitter makes all the individual cubes the size of the entire image.
     #  with the image data in the appropriate space for the ccd.
@@ -478,9 +478,9 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
     ir_p = out_root.with_name(out_root.name + '_IR.NOPROJ.cub')
     (ir_cubes, _) = hnp.add_offsets(filter(lambda x: x.ccdname == 'IR', cubes),
                                     5, temp_token, keep=keep)
-    logging.info(isis.handmos(ir_cubes[1].next_path, mosaic=ir_p,
-                              create='yes', nlines=base_cube.lines,
-                              nsamples=base_cube.samps, nbands=1).args)
+    util.log(isis.handmos(ir_cubes[1].next_path, mosaic=ir_p,
+                          create='yes', nlines=base_cube.lines,
+                          nsamples=base_cube.samps, nbands=1).args)
     mosaic_dejittered(ir_cubes, ir_p,
                       '{}_IR'.format(str(ir_cubes[0].get_obsid())))
 
@@ -488,16 +488,16 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
     bg_p = out_root.with_name(out_root.name + '_BG.NOPROJ.cub')
     (bg_cubes, _) = hnp.add_offsets(filter(lambda x: x.ccdname == 'BG', cubes),
                                     5, temp_token, keep=keep)
-    logging.info(isis.handmos(bg_cubes[1].next_path, mosaic=bg_p,
-                              create='yes', nlines=base_cube.lines,
-                              nsamples=base_cube.samps, nbands=1).args)
+    util.log(isis.handmos(bg_cubes[1].next_path, mosaic=bg_p,
+                          create='yes', nlines=base_cube.lines,
+                          nsamples=base_cube.samps, nbands=1).args)
     mosaic_dejittered(bg_cubes, bg_p,
                       '{}_BG'.format(str(bg_cubes[0].get_obsid())))
 
     #  Create color product
     irb_p = out_root.with_name(out_root.name + '_IRB.NOPROJ.cub')
     with isis.fromlist.temp(ir_p, center_red_p, bg_p) as f:
-        logging.info(isis.cubeit(fromlist=f, to=irb_p, proplab=center_red_p).args)
+        util.log(isis.cubeit(fromlist=f, to=irb_p, proplab=center_red_p).args)
 
     # Make plot of before and after flat.tab results
     dejit_flat = list(filter(lambda x: 'RED5-RED4' in x, red_flat_files))[0]

@@ -95,9 +95,9 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
     total_width = int(2 * cubes[0].samps - (48 / cubes[0].red_bin))
     import subprocess
     try:
-        logging.info(isis.handmos(cubes[0].path, mosaic=irb_out_p, outline=1,
-                                  outsample=outsample, outband=1, create='Y',
-                                  nlines=cubes[0].lines, nsamp=total_width, nbands=3).args)
+        util.log(isis.handmos(cubes[0].path, mosaic=irb_out_p, outline=1,
+                              outsample=outsample, outband=1, create='Y',
+                              nlines=cubes[0].lines, nsamp=total_width, nbands=3).args)
     except subprocess.CalledProcessError as err:
         print(err.stdout)
         print(err.stderr)
@@ -106,8 +106,8 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
         logging.info('Warning, missing one half!')
     else:
         logging.info('Using both halves')
-        logging.info(isis.handmos(cubes[1].path, mosaic=irb_out_p,
-                                  outline=1, outsample=image_midpoint, outband=1).args)
+        util.log(isis.handmos(cubes[1].path, mosaic=irb_out_p,
+                              outline=1, outsample=image_midpoint, outband=1).args)
 
     # Nothing is actually done to the pixels here regarding the FrostStats, so
     # I'm just going to skip them here.
@@ -130,10 +130,10 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
     # synthetic blue.
     logging.info('Creating synthetic B, subtracting RED from BG')
     rgbsynthb_p = to_del.add(irb_out_p.with_suffix(f'.{temp_token}_B.cub'))
-    logging.info(isis.algebra(f'{irb_out_p}+3', from2=f'{irb_out_p}+2',
-                              op='subtract', to=rgbsynthb_p,
-                              A=conf['Beautify']['Synthetic_A_Coefficient'],
-                              B=conf['Beautify']['Synthetic_B_Coefficient']).args)
+    util.log(isis.algebra(f'{irb_out_p}+3', from2=f'{irb_out_p}+2',
+                          op='subtract', to=rgbsynthb_p,
+                          A=conf['Beautify']['Synthetic_A_Coefficient'],
+                          B=conf['Beautify']['Synthetic_B_Coefficient']).args)
 
     # HiBeautify gathers and writes a bunch of statistics to PVL that is
     # important to the HiRISE GDS, but not relevant to just producing pixels
@@ -166,8 +166,8 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
 
     # Create an RGB cube using the RED from the IRB mosaic, the BG from the IRB mosaic
     # and the synthetic B that we just made.
-    logging.info(isis.cubeit_k([f'{irb_out_p}+2', f'{irb_out_p}+3', rgbsynthb_p],
-                               to=rgb_out_p).args)
+    util.log(isis.cubeit_k([f'{irb_out_p}+2', f'{irb_out_p}+3', rgbsynthb_p],
+                           to=rgb_out_p).args)
 
     if not keep:
         to_del.unlink()
