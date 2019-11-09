@@ -115,7 +115,7 @@ class TestHiColorNorm(unittest.TestCase):
                          outline=1, outsamp=1),
                     call('right.cub', mosaic='mosaic.cub', outband=1,
                          outline=1, outsamp=11)]
-        self.assertListEqual(m_handmos.mock_calls, expected)
+        self.assertListEqual(m_handmos.call_args_list, expected)
 
     @patch('PyRISE.HiColorNorm.csv.DictReader', return_value=[{'Average': 4},
                                                               {'Average': 5}])
@@ -130,7 +130,7 @@ class TestHiColorNorm(unittest.TestCase):
                     call('mos.cub', direction='column', format='table',
                          fromstats=Path('crpmos.cubenorm.txt'), norm='average',
                          preserve=True, statsource='table', to='mosnrm.cub')]
-        self.assertListEqual(m_cubenorm.mock_calls, expected)
+        self.assertListEqual(m_cubenorm.call_args_list, expected)
 
     @patch('PyRISE.HiColorNorm.isis.handmos')
     @patch('PyRISE.HiColorNorm.isis.algebra')
@@ -140,11 +140,11 @@ class TestHiColorNorm(unittest.TestCase):
                          hcn.make_unfiltered('in_COLOR4.cub',
                                              'nrm.cub', 'ttoken', 'CC', 2,
                                              keep=True))
-        self.assertEqual(m_alg.mock_calls,
+        self.assertEqual(m_alg.call_args_list,
                          [call('nrm.cub', from2='in_COLOR4.cub+2',
                                operator='MULTIPLY',
                                to=Path('in_COLOR4.ttoken_CC.algebra.cub'))])
-        self.assertEqual(m_hand.mock_calls,
+        self.assertEqual(m_hand.call_args_list,
                          [call(Path('in_COLOR4.ttoken_CC.algebra.cub'),
                                matchbandbin=False,
                                mosaic=Path('in_UNFILTERED_COLOR4.cub'),
@@ -153,7 +153,7 @@ class TestHiColorNorm(unittest.TestCase):
     @patch('PyRISE.HiColorNorm.isis.lowpass')
     def test_lpfz_filtering(self, m_low):
         hcn.lpfz_filtering('from.cub', 'to.cub', 3, 5)
-        self.assertListEqual(m_low.mock_calls,
+        self.assertListEqual(m_low.call_args_list,
                              [call('from.cub', HIS=True, HRS=True, LIS=True,
                                    LRS=True, filter='OUTSIDE', high=2.0, lines=3,
                                    low=0.0, minimum=25, minopt='PERCENTAGE',
@@ -162,7 +162,7 @@ class TestHiColorNorm(unittest.TestCase):
     @patch('PyRISE.HiColorNorm.isis.lowpass')
     def test_lpfz_triplefilter(self, m_low):
         hcn.lpfz_triplefilter('from.cub', 'to.cub', keep=True)
-        self.assertListEqual(m_low.mock_calls,
+        self.assertListEqual(m_low.call_args_list,
                              [call(Path('from.cub'), HIS=True, HRS=True, LIS=True,
                                    LRS=True, filter='OUTSIDE', high=2.0, lines=11,
                                    low=0.0, minimum=25, minopt='PERCENTAGE',
@@ -186,14 +186,14 @@ class TestHiColorNorm(unittest.TestCase):
 
         self.assertTupleEqual((mask_p, ratc_p),
                               hcn.per_color(self.cubes[0], 'ttoken', 'IR', keep=True))
-        self.assertEqual(m_rat.mock_calls,
+        self.assertEqual(m_rat.call_args_list,
                          [call(den='dummy/PSP_010502_2090_COLOR4+2',
                                num='dummy/PSP_010502_2090_COLOR4+1',
                                to=rati_p)])
-        self.assertEqual(m_mask.mock_calls,
+        self.assertEqual(m_mask.call_args_list,
                          [call(rati_p, mask=rati_p, maximum=4.0, minimum=0.0,
                                preserve='INSIDE', to=mask_p)])
-        self.assertEqual(m_crop.mock_calls,
+        self.assertEqual(m_crop.call_args_list,
                          [call(mask_p, line=None, nlines=None, to=ratc_p)])
 
     @patch('PyRISE.HiColorNorm.isis.handmos')

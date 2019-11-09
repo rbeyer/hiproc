@@ -136,7 +136,7 @@ class TestMock(unittest.TestCase):
                                mask=fx_path,
                                max_=0, min_=0, preserve='INSIDE', spixels='NULL',
                                to=mask2_path)]
-            mock_mask.assert_has_calls(mock_calls)
+            self.assertEqual(mock_calls, mock_mask.call_args_list)
 
             lpf_path = mock_lowpass.call_args[1]['to']
             mock_lowpass.assert_called_once_with(mask1_path, his=False, hrs=False,
