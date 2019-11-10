@@ -37,6 +37,7 @@ import re
 import statistics
 import subprocess
 import sys
+import warnings
 from datetime import datetime
 from pathlib import Path
 
@@ -728,10 +729,10 @@ def HiGainFx(cube: os.PathLike, outcube: os.PathLike,
     # in the ISIS hicalbeta program but I don’t think hicalbeta was
     # ever used in the HiCal pipeline. I assume hicalbeta eventually
     # became hical.
-    #
-    # Put in a straight-up 'return' here to keep people from using this
-    # function:
-    return
+
+    warnings.warn('HiGainFx should not be used when Gain Drift correction is '
+                  'being used in ISIS hical, as HiGainFx is redundant and not '
+                  'as complete.', DeprecationWarning)
 
     logging.info(HiGainFx.__doc__)
     binning = isis.getkey_k(cube, 'Instrument', 'Summing')
