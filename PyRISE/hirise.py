@@ -60,7 +60,7 @@ class ObservationID:
 
        :ivar phase: The three-letter string indicating the mission phase
        of this Observation ID.
-       :ivar orbit: The six-digit orbit number (with leading zeros) as a
+       :ivar orbit_number: The six-digit orbit number (with leading zeros) as a
        string.
        :ivar latesque: The four digit code (with leading zeroes) as a string,
        which indicates where in the circle of an orbit the observation lies.
@@ -68,14 +68,19 @@ class ObservationID:
 
     def __init__(self, *args):
         if len(args) == 1:
-            match = obsid_re.search(str(args[0]))
-            if match:
-                parsed = match.groupdict()
-                phase = parsed['phase']
-                orbit = parsed['orbit']
-                lat = parsed['latesque']
+            if isinstance(args[0], ObservationID):
+                phase = args[0].phase
+                orbit = args[0].orbit_number
+                lat = args[0].latesque
             else:
-                raise ValueError('{} did not match regex: {}'.format(args[0], obsid_re.pattern))
+                match = obsid_re.search(str(args[0]))
+                if match:
+                    parsed = match.groupdict()
+                    phase = parsed['phase']
+                    orbit = parsed['orbit']
+                    lat = parsed['latesque']
+                else:
+                    raise ValueError('{} did not match regex: {}'.format(args[0], obsid_re.pattern))
         elif len(args) == 2:
             (phase, orbit, lat) = None, *args
         elif len(args) == 3:
@@ -83,11 +88,8 @@ class ObservationID:
         else:
             raise IndexError('accepts 1 to 3 arguments')
 
-        if orbit_re.fullmatch(orbit):
-            self.orbit_number = '{:0>6}'.format(orbit)
-        else:
-            raise ValueError(f'orbit argument, {orbit}, did not match '
-                             'regex: {orbit_re.pattern}')
+        self.orbit_number = self.format_orbit(orbit)
+        self.latesque = self.format_latesque(lat)
 
         if phase:
             if phase in phase_names:
@@ -105,12 +107,6 @@ class ObservationID:
                                  'any known HiRISE phase:' + str(phase_names))
         else:
             self.phase = getphase(orbit)
-
-        if lat_re.fullmatch(lat):
-            self.latesque = '{:0>4}'.format(lat)
-        else:
-            raise ValueError(f'latitude argument, {lat}, did not match '
-                             'regex: {lat_re.pattern}')
 
     def __str__(self):
         return f'{self.phase}_{self.orbit_number}_{self.latesque}'
@@ -138,6 +134,22 @@ class ObservationID:
 
     def __hash__(self):
         return hash((self.phase, self.orbit_number, self.latesque))
+
+    @staticmethod
+    def format_orbit(orbit) -> str:
+        if orbit_re.fullmatch(str(orbit)):
+            return '{:0>6}'.format(orbit)
+        else:
+            raise ValueError(f'orbit argument, {orbit}, did not match '
+                             'regex: {orbit_re.pattern}')
+
+    @staticmethod
+    def format_latesque(lat) -> str:
+        if lat_re.fullmatch(str(lat)):
+            return '{:0>4}'.format(lat)
+        else:
+            raise ValueError(f'latitude argument, {lat}, did not match '
+                             'regex: {lat_re.pattern}')
 
 
 class CCDID(ObservationID):
@@ -457,6 +469,16 @@ def getccdchannel(s: str) -> tuple:
         raise ValueError(f'{s} did not match regex: {ccdchan_re.pattern}')
 
 
+def reverse_recurse(path: os.PathLike, ID, name):
+    p = Path(path)
+    for part in reversed(p.parts):
+        try:
+            return ID(part)
+        except ValueError:
+            continue
+    raise ValueError(f'Could not extract a {name} from {path}')
+
+
 def get_ObsID_fromfile(path: os.PathLike) -> ObservationID:
     '''Reads the file to get the ObservationID, if an ISIS cube,
        otherwise parses the filepath.'''
@@ -504,11 +526,6 @@ def get_ChannelID_fromfile(path: os.PathLike) -> ChannelID:
     try:
         return ChannelID(isis.getkey_k(p, 'Archive', 'ProductId'))
     except (subprocess.CalledProcessError, ValueError):
-        # The CalledProcessError is if there is some problem with running
-        # getkey, the ValueError is if a ChannelID can't be extracted from
-        # the labels.  This allows this function to be called on any kind of
-        # file, as it will just try and read the ChannelID from the filename
-        # or could also reverse recurse up to directory names.
         for part in reversed(p.parts):
             try:
                 return ChannelID(part)
