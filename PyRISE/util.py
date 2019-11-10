@@ -89,7 +89,7 @@ def pid_path_w_suffix(in_path: str, template_path: os.PathLike) -> Path:
     if p.exists():
         return p
     elif(in_path.startswith('.')):
-        pid = hirise.get_ProdID_fromfile(template_path)
+        pid = hirise.get_ChannelID_fromfile(template_path)
         t_path = Path(template_path)
         d = None
         if t_path.is_dir():

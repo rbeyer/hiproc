@@ -425,11 +425,11 @@ def get_bins_fromfiles(cube: os.PathLike) -> dict:
        that belong to the same Observation.
     '''
     bins = dict()
-    pid = hirise.get_ProdID_fromfile(cube)
+    oid = hirise.get_ObsID_fromfile(cube)
     for path in cube.parent.glob('*.cub'):
         try:
-            p = hirise.get_ProdID_fromfile(path)
-            if((pid.phase, pid.orbit_number, pid.latesque) ==
+            p = hirise.get_ChannelID_fromfile(path)
+            if((oid.phase, oid.orbit_number, oid.latesque) ==
                (p.phase, p.orbit_number, p.latesque)):
                 ccd = p.get_ccd()
                 if ccd in bins:
@@ -525,8 +525,8 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
 
     if not keep:
         to_d.unlink()
-        pid = hirise.get_ProdID_fromfile(hical_cub)
-        Path(hical_cub).with_name(str(pid)).with_suffix('.hical.log').unlink()
+        cid = hirise.get_ChannelID_fromfile(hical_cub)
+        Path(hical_cub).with_name(str(cid)).with_suffix('.hical.log').unlink()
 
     return status
 

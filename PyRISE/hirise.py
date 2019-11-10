@@ -296,84 +296,6 @@ class ChannelID(CCDID):
         return hash((super().__hash__(), self.channel))
 
 
-class ProductID(ObservationID):
-    """A class for HiRISE Product IDs."""
-
-    def __init__(self, *args):  # noqa: C901
-        ccdname = None
-        ccdnumber = None
-        chan = None
-
-        items = list(args)
-
-        if len(items) == 1:
-            match = prodid_re.search(str(items[0]))
-            if match:
-                parsed = match.groupdict()
-                items = (parsed['phase'], parsed['orbit'], parsed['latesque'])
-                if parsed['ccd']:
-                    (ccdname, ccdnumber) = getccdnamenumber(parsed['ccd'])
-                chan = parsed['channel']
-            else:
-                raise ValueError('{} did not match regex: '
-                                 '{}'.format(args[0], prodid_re.pattern))
-        elif len(items) == 2:
-            pass
-        elif len(items) == 3:
-            if items[0] not in phase_names:
-                (ccdname, ccdnumber) = getccdnamenumber(items.pop())
-        elif len(items) == 4:
-            if items[0] not in phase_names:
-                (ccdname, ccdnumber, chan) = _namenumchan(items[-2], items[-1])
-                items.pop()
-                items.pop()
-            else:
-                (ccdname, ccdnumber) = getccdnamenumber(items.pop())
-        elif len(items) == 5:
-            if items[0] not in phase_names:
-                chan = _match_chan(items.pop())
-                ccdnumber = _match_num(items.pop())
-                ccdname = getccdname(items.pop())
-            else:
-                (ccdname, ccdnumber, chan) = _namenumchan(items[-2], items[-1])
-                items.pop()
-                items.pop()
-        elif len(items) == 6:
-            chan = _match_chan(items.pop())
-            ccdnumber = _match_num(items.pop())
-            ccdname = getccdname(items.pop())
-        else:
-            raise IndexError('accepts 1 to 6 arguments')
-        super().__init__(*items)
-
-        self.ccdname = ccdname
-        self.ccdnumber = ccdnumber
-        self.channel = chan
-
-    def __str__(self):
-        if self.ccdname and self.ccdnumber:
-            ccd = self.ccdname + self.ccdnumber
-            if self.channel:
-                ccd += '_' + self.channel
-            return '_'.join([self.phase, self.orbit_number, self.latesque,
-                            ccd])
-        else:
-            return super().__str__()
-
-    def __repr__(self):
-        return (f'{self.__class__.__name__}(\'{self.__str__()}\')')
-
-    def get_ccd(self) -> str:
-        try:
-            return self.ccdname + self.ccdnumber
-        except TypeError:
-            raise AttributeError('This Product ID, {}, does not have a ccdname '
-                                 'or ccdnumber'.format(str(self)))
-
-    def get_obsid(self) -> ObservationID:
-        return ObservationID(self.phase, self.orbit_number, self.latesque)
-
-
 def _match_chan(s: str):
     matched = chan_re.fullmatch(s)
     if matched:
@@ -412,14 +334,6 @@ def parseObsID(s: str) -> tuple:
         raise ValueError('{} did not match regex: {}'.format(s, obsid_re.pattern))
 
 
-def parseProdID(s: str) -> tuple:
-    '''Parses a string to find the first occurence of a valid ProductID'''
-    pid = ProductID(s)
-    items = [pid.phase, pid.orbit_number, pid.latesque,
-             pid.ccdname, pid.ccdnumber, pid.channel]
-    return tuple(filter(lambda x: x is not None, items))
-
-
 def prev_phase(s: str) -> str:
     '''Returns the name of the previous HiRISE mission phase.'''
     prev_index = phase_names.index(s) - 1
@@ -448,11 +362,6 @@ def orbit_in_phase(orbit, phase: str):
 def getObsID(s: str) -> str:
     '''Extracts a HiRISE Observation ID from the string'''
     return str(ObservationID(s))
-
-
-def getProdID(s: str) -> str:
-    '''Extracts a HiRISE Product ID from the string.'''
-    return str(ProductID(s))
 
 
 def getphase(orbit) -> str:
@@ -574,9 +483,9 @@ def get_CCDID_fromfile(path: os.PathLike) -> CCDID:
         return CCDID(isis.getkey_k(p, 'Archive', 'ProductId'))
     except (subprocess.CalledProcessError, ValueError):
         # The CalledProcessError is if there is some problem with running
-        # getkey, the ValueError is if a ProductID can't be extracted from
+        # getkey, the ValueError is if a CCDID can't be extracted from
         # the labels.  This allows this function to be called on any kind of
-        # file, as it will just try and read the ProductID from the filename
+        # file, as it will just try and read the CCDID from the filename
         # or could also reverse recurse up to directory names.
         for part in reversed(p.parts):
             try:
@@ -596,9 +505,9 @@ def get_ChannelID_fromfile(path: os.PathLike) -> ChannelID:
         return ChannelID(isis.getkey_k(p, 'Archive', 'ProductId'))
     except (subprocess.CalledProcessError, ValueError):
         # The CalledProcessError is if there is some problem with running
-        # getkey, the ValueError is if a ProductID can't be extracted from
+        # getkey, the ValueError is if a ChannelID can't be extracted from
         # the labels.  This allows this function to be called on any kind of
-        # file, as it will just try and read the ProductID from the filename
+        # file, as it will just try and read the ChannelID from the filename
         # or could also reverse recurse up to directory names.
         for part in reversed(p.parts):
             try:
@@ -606,26 +515,4 @@ def get_ChannelID_fromfile(path: os.PathLike) -> ChannelID:
             except ValueError:
                 continue
         raise ValueError('Could not extract a HiRISE Channel ID from ' +
-                         str(path))
-
-
-def get_ProdID_fromfile(path: os.PathLike) -> ProductID:
-    '''Reads the file to get the ProductID, if an ISIS cube,
-       otherwise parses the filepath.'''
-    p = Path(path)
-
-    try:
-        return ProductID(isis.getkey_k(p, 'Archive', 'ProductId'))
-    except (subprocess.CalledProcessError, ValueError):
-        # The CalledProcessError is if there is some problem with running
-        # getkey, the ValueError is if a ProductID can't be extracted from
-        # the labels.  This allows this function to be called on any kind of
-        # file, as it will just try and read the ProductID from the filename
-        # or could also reverse recurse up to directory names.
-        for part in reversed(p.parts):
-            try:
-                return ProductID(part)
-            except ValueError:
-                continue
-        raise ValueError('Could not extract a HiRISE Product ID from ' +
                          str(path))

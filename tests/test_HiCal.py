@@ -272,7 +272,7 @@ class TestNeedISISCube(unittest.TestCase):
     def setUp(self):
         self.cube = imgs[0].with_suffix('.TestHiCal_TestNeedISISCube.cub')
         isis.hi2isis(imgs[0], to=self.cube)
-        self.pid = hirise.get_ProdID_fromfile(self.cube)
+        self.pid = hirise.get_ChannelID_fromfile(self.cube)
         self.binning = int(isis.getkey_k(self.cube, 'Instrument', 'Summing'))
 
     def tearDown(self):
@@ -392,7 +392,7 @@ class TestHiCal(unittest.TestCase):
 
     def setUp(self):
         self.cube = imgs[0].with_suffix('.TestHiCal.cub')
-        self.pid = hirise.get_ProdID_fromfile(self.cube)
+        self.pid = hirise.get_ChannelID_fromfile(self.cube)
         self.db = edr.EDR_Stats(imgs[0], self.cube, gains)
         self.binning = int(isis.getkey_k(self.cube, 'Instrument', 'Summing'))
         self.conf = pvl.load(str(conf))

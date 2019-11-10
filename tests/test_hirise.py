@@ -74,18 +74,6 @@ class TestParse(unittest.TestCase):
         s = 'This is an ObservationID: ' + truth
         self.assertEqual(truth, hirise.getObsID(s))
 
-    def test_parseProdID(self):
-        truth = (('ESP', '123456', '1235'),
-                 ('PSP', '001100', '0000', 'IR', '10'),
-                 ('ESP', '123456', '1235', 'RED', '5', '0'))
-        strings = (('ESP_123456_1235'),
-                   ('PSP_1100_0000_IR10'),
-                   ('ESP_123456_1235_RED5_0'))
-        for t, s in zip(truth, strings):
-            with self.subTest(t=t, s=s):
-                tokens = hirise.parseProdID(s)
-                self.assertTupleEqual(tokens, t)
-
 
 class TestPhase(unittest.TestCase):
 
@@ -156,7 +144,7 @@ class TestObsID(unittest.TestCase):
                          ('ESP_034783_1850', 'ESP_034783_1850'))
         for s in string_tuples:
             with self.subTest():
-                oid = hirise.ProductID(s[1])
+                oid = hirise.ObservationID(s[1])
                 self.assertEqual(s[0], str(oid))
 
     def test_init_bad_tuples(self):
@@ -385,104 +373,6 @@ class TestChannelID(unittest.TestCase):
         self.assertEqual(oid, cid.get_obsid())
 
 
-class TestProdID(unittest.TestCase):
-
-    def test_init_tuple(self):
-        tuples = ((('PSP', '005632', '1225', None, None, None),
-                   ('PSP', '005632', '1225')),
-                  (('PSP', '005632', '1225', None, None, None),
-                   ('5632', '1225')),
-                  (('TRA', '000001', '0005', None, None, None),
-                   ('1', '5')),
-                  (('ESP', '057866', '1670', None, None, None),
-                   ('ESP', '57866', '1670')),
-                  (('ESP', '034783', '1850', None, None, None),
-                   ('ESP', '034783', '1850')),
-                  (('AEB', '000000', '0000', None, None, None),
-                   ('AEB', '000000', '0000')),
-                  (('ESP', '034783', '1850', 'RED', '5', None),
-                   ('ESP', '034783', '1850', 'RED', '5')),
-                  (('ESP', '034783', '1850', 'RED', '5', None),
-                   ('ESP', '034783', '1850', 'RED5')),
-                  (('ESP', '034783', '1850', 'RED', '5', None),
-                   ('034783', '1850', 'RED', '5')),
-                  (('ESP', '034783', '1850', 'RED', '5', '0'),
-                   ('034783', '1850', 'RED5', '0')),
-                  (('ESP', '034783', '1850', 'RED', '5', None),
-                   ('34783', '1850', 'RED5')),
-                  (('ESP', '034783', '1850', 'RED', '5', None),
-                   ('ESP', '034783', '1850', 'RED', '5')),
-                  (('ESP', '034783', '1850', 'RED', '5', '0'),
-                   ('034783', '1850', 'RED', '5', '0')),
-                  (('ESP', '034783', '1850', 'RED', '5', '0'),
-                   ('ESP', '034783', '1850', 'RED5', '0')),
-                  (('ESP', '034783', '1850', 'RED', '5', '0'),
-                   ('ESP', '034783', '1850', 'RED', '5', '0')))
-        for truth, t in tuples:
-            # with self.subTest():
-            oid = hirise.ProductID(*t)
-            self.assertTupleEqual(truth,
-                                  (oid.phase, oid.orbit_number,
-                                   oid.latesque, oid.ccdname,
-                                   oid.ccdnumber, oid.channel))
-
-    def test_init_string(self):
-        string_tuples = (('PSP_005632_1225', 'PSP_005632_1225'),
-                         ('PSP_005632_1225', '5632_1225'),
-                         ('PSP_005632_0005', '5632_5'),
-                         ('TRA_000001_0005', '1_5'),
-                         ('ESP_057866_1670', 'ESP_057866_1670'),
-                         ('ESP_057866_1670', 'ESP_57866_1670'),
-                         ('ESP_034783_1855', 'ESP_034783_1855'),
-                         ('ESP_034783_1850', 'ESP_034783_1850'),
-                         ('ESP_034783_1850_RED5', 'ESP_034783_1850_RED5'),
-                         ('ESP_034783_1850_RED5', '34783_1850_RED5'),
-                         ('ESP_034783_1850_RED5_0', 'ESP_034783_1850_RED5_0'),
-                         ('ESP_034783_1850_RED5_0', '034783_1850_RED5_0'))
-        for s in string_tuples:
-            with self.subTest():
-                oid = hirise.ProductID(s[1])
-                self.assertEqual(s[0], str(oid))
-
-    def test_init_bad_tuples(self):
-        tuples = (('ABCD', '123456', '1235'),
-                  ('AB',  '123456',  '1230'),
-                  ('ESP', '1234',    '1235'),
-                  ('ESP', '1234567', '1230'),
-                  ('ESP', '12345',   '12345'),
-                  ('ESP', '12345',   '123'))
-        for t in tuples:
-            with self.subTest(t):
-                self.assertRaises(ValueError, hirise.ProductID, *t)
-
-    def test_init_bad_strings(self):
-        strings = ('ABC-123456-1235',
-                   'AB_123456_1235',  'ESPA_123456_1235',
-                   'PSP_1234_1234',   'ESP_1234567_1235',
-                   'ESP_123456_12345', 'ESP_123456',
-                   'foobar')
-        for s in strings:
-            with self.subTest(s):
-                self.assertRaises(ValueError, hirise.ProductID, s)
-
-    def test_init_too_many_args(self):
-        self.assertRaises(IndexError, hirise.ProductID,
-                          'ESP', '123456', '1235', 'RED', '5', '0', 'extra')
-
-    def test_init_zero_args(self):
-        self.assertRaises(IndexError, hirise.ProductID)
-
-    def test_repr(self):
-        s = 'This is a Prod ID: ESP_034783_1850_RED5_0'
-        pid = hirise.ProductID(s)
-        self.assertEqual("ProductID('ESP_034783_1850_RED5_0')", repr(pid))
-
-    def test_get_ccd(self):
-        s = 'This is a Prod ID: ESP_034783_1850_RED5_0'
-        pid = hirise.ProductID(s)
-        self.assertEqual(pid.get_ccd(), 'RED5')
-
-
 class TestStrings(unittest.TestCase):
 
     def test_str_(self):
@@ -570,10 +460,6 @@ class TestGetters(unittest.TestCase):
         s = 'There is a CCD, BG12, but no channel here.'
         self.assertRaises(ValueError, hirise.getccdchannel, s)
 
-    def test_getProdID(self):
-        s = 'This is a Prod ID: ESP_034783_1850_RED5_0'
-        self.assertEqual('ESP_034783_1850_RED5_0', hirise.getProdID(s))
-
 
 class TestFromFile(unittest.TestCase):
 
@@ -607,13 +493,3 @@ class TestFromFile(unittest.TestCase):
     def test_get_ObsID_fail(self):
         p = Path('Not-a-file')
         self.assertRaises(ValueError, hirise.get_ObsID_fromfile, p)
-
-    def test_get_ProdID(self):
-        for t in self.paths:
-            with self.subTest(path=t[0], ProdID=t[2]):
-                oid = hirise.get_ProdID_fromfile(t[0])
-                self.assertEqual(t[2], str(oid))
-
-    def test_get_ProdID_fail(self):
-        p = Path('Not-a-file')
-        self.assertRaises(ValueError, hirise.get_ProdID_fromfile, p)
