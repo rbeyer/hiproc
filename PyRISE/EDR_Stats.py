@@ -473,8 +473,7 @@ def lut_check(cube, histats):
             threshhold['BG12'] = threshhold['RED6']
             threshhold['BG13'] = threshhold['RED6']
 
-        ccd = hirise.getccd(str(hirise.ProductID(isis.getkey_k(cube, 'Archive',
-                                                               'ProductId'))))
+        ccd = hirise.ChannelID(isis.getkey_k(cube, 'Archive', 'ProductId')).get_ccd()
         for (th, ex) in threshhold[ccd]:
             if float(histats['IMAGE_MEAN']) >= th:
                 expected_lut = ex
