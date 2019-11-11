@@ -232,7 +232,7 @@ def calc_snr(cub: os.PathLike, gainsfile: os.PathLike, histats: dict) -> float:
     '''Calculate the signal to noise ratio.'''
     logging.info(calc_snr.__doc__)
 
-    ccdchan = '{0[0]}_{0[1]}'.format(hirise.getccdchannel(str(cub)))
+    ccdchan = '{0[0]}_{0[1]}'.format(hirise.get_ccdchannel(str(cub)))
 
     gainspvl = pvl.load(str(gainsfile))
     gain = float(gainspvl['Gains'][ccdchan]['Bin' + str(histats['BINNING'])])

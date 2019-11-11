@@ -91,9 +91,9 @@ class ObservationID:
         self.orbit_number = self.format_orbit(orbit)
         self.latesque = self.format_latesque(lat)
 
-        if phase:
+        if phase is not None:
             if phase in phase_names:
-                if orbit_in_phase(self.orbit_number, phase):
+                if is_orbit_in_phase(self.orbit_number, phase):
                     self.phase = phase
                 else:
                     raise ValueError('The orbit, {}, is outside the allowed '
@@ -106,7 +106,7 @@ class ObservationID:
                 raise ValueError(f'phase argument, {phase}, did not match '
                                  'any known HiRISE phase:' + str(phase_names))
         else:
-            self.phase = getphase(orbit)
+            self.phase = get_phase(orbit)
 
     def __str__(self):
         return f'{self.phase}_{self.orbit_number}_{self.latesque}'
@@ -163,28 +163,33 @@ class CCDID(ObservationID):
         items = list(args)
 
         if len(items) == 1:
-            match = ccdid_re.search(str(items[0]))
-            if match:
-                parsed = match.groupdict()
-                items = (parsed['phase'], parsed['orbit'], parsed['latesque'])
-                (ccdname, ccdnumber) = getccdnamenumber(parsed['ccd'])
+            if isinstance(args[0], CCDID):
+                items = (args[0].phase, args[0].orbit_number, args[0].latesque)
+                ccdname = args[0].ccdname
+                ccdnumber = args[0].ccdnumber
             else:
-                raise ValueError('Could not construct a CCDID. {} did not match regex: '
-                                 '{}'.format(args[0], ccdid_re.pattern))
+                match = ccdid_re.search(str(items[0]))
+                if match:
+                    parsed = match.groupdict()
+                    items = (parsed['phase'], parsed['orbit'], parsed['latesque'])
+                    (ccdname, ccdnumber) = get_ccdnamenumber(parsed['ccd'])
+                else:
+                    raise ValueError('Could not construct a CCDID. {} did not match regex: '
+                                     '{}'.format(args[0], ccdid_re.pattern))
         elif len(items) == 3:
             try:
-                (ccdname, ccdnumber) = getccdnamenumber(items.pop())
+                (ccdname, ccdnumber) = get_ccdnamenumber(items.pop())
             except ValueError as err:
                 raise ValueError('Could not construct a CCDID. ' + str(err)) from err
         elif len(items) == 4:
             if items[0] in phase_names:
-                (ccdname, ccdnumber) = getccdnamenumber(items.pop())
+                (ccdname, ccdnumber) = get_ccdnamenumber(items.pop())
             else:
                 ccdnumber = _match_num(items.pop())
-                ccdname = getccdname(items.pop())
+                ccdname = get_ccdname(items.pop())
         elif len(items) == 5:
             ccdnumber = _match_num(items.pop())
-            ccdname = getccdname(items.pop())
+            ccdname = get_ccdname(items.pop())
         else:
             raise IndexError('CCDID accepts 1, 3, 4, or 5 arguments, '
                              f'{len(items)} were provided.')
@@ -239,23 +244,18 @@ class ChannelID(CCDID):
             if match:
                 parsed = match.groupdict()
                 items = (parsed['phase'], parsed['orbit'], parsed['latesque'])
-                items += getccdnamenumber(parsed['ccd'])
+                items += get_ccdnamenumber(parsed['ccd'])
                 chan = parsed['channel']
             else:
                 raise ValueError('{} did not match regex: '
                                  '{}'.format(args[0], chanid_re.pattern))
         elif len(items) >= 2 and len(items) <= 6:
             maybechan = items.pop()
-            if isinstance(maybechan, int):
-                if maybechan == 0 or maybechan == 1:
-                    chan = maybechan
-            else:
-                matched = chan_re.fullmatch(maybechan)
-                if matched:
-                    chan = matched.group()
-                else:
-                    raise ValueError(f'The last item, {maybechan}, did not match a '
-                                     'channel {chan_re.pattern}')
+            try:
+                chan = self.format_chan(maybechan)
+            except ValueError as err:
+                raise ValueError(f'The last item, ' + str(err))
+
             if len(items) == 1:
                 if isinstance(items[0], CCDID):
                     items = [items[0].phase,
@@ -267,7 +267,7 @@ class ChannelID(CCDID):
                     raise ValueError('{} was not a CCDID object'.format(items[0]))
 
             elif len(items) == 2:
-                (ccdname, ccdnumber) = getccdnamenumber(items.pop())
+                (ccdname, ccdnumber) = get_ccdnamenumber(items.pop())
                 if isinstance(items[0], ObservationID):
                     items = [items[0].phase,
                              items[0].orbit_number,
@@ -307,13 +307,28 @@ class ChannelID(CCDID):
     def __hash__(self):
         return hash((super().__hash__(), self.channel))
 
+    @staticmethod
+    def format_chan(chan) -> str:
+        if isinstance(chan, int):
+            if chan == 0 or chan == 1:
+                return chan
+            else:
+                raise ValueError(f'{chan}, is not zero or one.')
+        else:
+            matched = chan_re.fullmatch(chan)
+            if matched:
+                return matched.group()
+            else:
+                raise ValueError(f'{chan}, did not match a '
+                                 'channel {chan_re.pattern}')
 
-def _match_chan(s: str):
-    matched = chan_re.fullmatch(s)
-    if matched:
-        return matched.group()
-    else:
-        return None
+
+# def _match_chan(s: str):
+#     matched = chan_re.fullmatch(s)
+#     if matched:
+#         return matched.group()
+#     else:
+#         return None
 
 
 def _match_num(s: str):
@@ -324,21 +339,24 @@ def _match_num(s: str):
         return None
 
 
-def _namenumchan(one: str, two: str) -> tuple:
-    ccdname = None
-    ccdnumber = None
-    chan = None
-    try:
-        (ccdname, ccdnumber) = getccdnamenumber(one)
-        chan = _match_chan(two)
-    except ValueError:
-        ccdname = getccdname(one)
-        ccdnumber = _match_num(two)
-    return (ccdname, ccdnumber, chan)
+# def _namenumchan(one: str, two: str) -> tuple:
+#     ccdname = None
+#     ccdnumber = None
+#     chan = None
+#     try:
+#         (ccdname, ccdnumber) = get_ccdnamenumber(one)
+#         chan = _match_chan(two)
+#     except ValueError:
+#         ccdname = get_ccdname(one)
+#         ccdnumber = _match_num(two)
+#     return (ccdname, ccdnumber, chan)
 
 
 def parseObsID(s: str) -> tuple:
-    '''Parses a string to find the first occurence of a valid ObsID'''
+    '''Parses a string to find the first occurence of a valid ObsID.
+
+       Returns a tuple of strings that were matched.
+    '''
     match = obsid_re.search(str(s))
     if(match):
         return match.groups()
@@ -356,7 +374,7 @@ def prev_phase(s: str) -> str:
         return phase_names[prev_index]
 
 
-def orbit_in_phase(orbit, phase: str):
+def is_orbit_in_phase(orbit, phase: str):
     '''Determines whether the given orbit is within the given HiRISE
     mission phase.'''
     previous = prev_phase(phase)
@@ -371,14 +389,18 @@ def orbit_in_phase(orbit, phase: str):
     return True
 
 
-def getObsID(s: str) -> str:
-    '''Extracts a HiRISE Observation ID from the string'''
+def ObsIDstr(s: str) -> str:
+    '''Extracts a HiRISE Observation ID string from the given string'''
     return str(ObservationID(s))
 
 
-def getphase(orbit) -> str:
+def get_phase(orbit) -> str:
     '''Returns the name of the HiRISE mission phase based on the MRO orbit
-    number.'''
+       number.
+
+       The given orbit must be an int or something that can be converted
+       to an int via int().
+    '''
     last_phase = None
     for (k, v) in reversed(list(phase_max_orbit.items())):
         if v is not None and int(orbit) > v:
@@ -393,7 +415,7 @@ def getphase(orbit) -> str:
                          'number.')
 
 
-def getccd(s: str) -> str:
+def get_ccd(s: str) -> str:
     '''Extracts a HiRISE CCD from the string (would get
     'RED5' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').'''
     match = ccd_re.search(s)
@@ -411,7 +433,7 @@ def _getccdname_fromint(ccdnum: int) -> str:
         raise ValueError(f'The value {ccdnum} must be a value from 0 to 13.')
 
 
-def getccdname(item) -> str:
+def get_ccdname(item) -> str:
     '''Extracts the name of a HiRISE CCD from the string (would get
     'RED' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').  If an integer
     is given instead of a string, it will provide the corresponding name.'''
@@ -434,7 +456,7 @@ def getccdname(item) -> str:
             raise
 
 
-def getccdnumber(s: str) -> str:
+def get_ccdnumber(s: str) -> str:
     '''Extracts the number of a HiRISE CCD from the string (would get
     '5' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').'''
     match = ccd_re.search(s)
@@ -444,22 +466,22 @@ def getccdnumber(s: str) -> str:
         raise ValueError(f'{s} did not match regex: {ccd_re.pattern}')
 
 
-def getccdnamenumber(item) -> tuple:
+def get_ccdnamenumber(item) -> tuple:
     '''Extracts the name and number of a HiRISE CCD from the input (would get
     '('RED', '5')' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').'''
     try:
-        nn = getccd(item)
-        return(getccdname(nn), getccdnumber(nn))
+        nn = get_ccd(item)
+        return(get_ccdname(nn), get_ccdnumber(nn))
     except TypeError:
         try:
-            return(getccdname(item), str(item))
+            return(get_ccdname(item), str(item))
         except:
             raise
     except ValueError:
-            return(getccdname(int(item)), item)
+            return(get_ccdname(int(item)), item)
 
 
-def getccdchannel(s: str) -> tuple:
+def get_ccdchannel(s: str) -> tuple:
     '''Extracts a HiRISE CCD and channel number from the string (would get
     ('RED5', '1') from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').'''
     match = ccdchan_re.search(s)
@@ -469,67 +491,52 @@ def getccdchannel(s: str) -> tuple:
         raise ValueError(f'{s} did not match regex: {ccdchan_re.pattern}')
 
 
-def reverse_recurse(path: os.PathLike, ID, name):
+def _reverse_recurse(path: os.PathLike, IDclass, name):
     p = Path(path)
     for part in reversed(p.parts):
         try:
-            return ID(part)
+            return IDclass(part)
         except ValueError:
             continue
     raise ValueError(f'Could not extract a {name} from {path}')
 
 
-def get_ObsID_fromfile(path: os.PathLike) -> ObservationID:
-    '''Reads the file to get the ObservationID, if an ISIS cube,
-       otherwise parses the filepath.'''
+def _get_fromfile(path: os.PathLike, IDclass, name, archivekey):
     p = Path(path)
 
     try:
-        return ObservationID(isis.getkey_k(p, 'Archive', 'ObservationId'))
-    except (subprocess.CalledProcessError, ValueError):
-        for part in reversed(p.parts):
-            try:
-                return ObservationID(part)
-            except ValueError:
-                continue
-        raise ValueError('Could not extract a HiRISE Observation ID from ' +
-                         str(path))
-
-
-def get_CCDID_fromfile(path: os.PathLike) -> CCDID:
-    '''Reads the file to get the CCDID, if an ISIS cube,
-       otherwise parses the filepath.'''
-    p = Path(path)
-
-    try:
-        return CCDID(isis.getkey_k(p, 'Archive', 'ProductId'))
+        return IDclass(isis.getkey_k(p, 'Archive', archivekey))
     except (subprocess.CalledProcessError, ValueError):
         # The CalledProcessError is if there is some problem with running
         # getkey, the ValueError is if a CCDID can't be extracted from
         # the labels.  This allows this function to be called on any kind of
         # file, as it will just try and read the CCDID from the filename
         # or could also reverse recurse up to directory names.
-        for part in reversed(p.parts):
-            try:
-                return CCDID(part)
-            except ValueError:
-                continue
-        raise ValueError('Could not extract a HiRISE CCD ID from ' +
-                         str(path))
+        return _reverse_recurse(p, IDclass, name)
+
+
+def get_ObsID_fromfile(path: os.PathLike) -> ObservationID:
+    '''Reads the file to get the ObservationID, if an ISIS cube,
+       otherwise parses the filepath.'''
+
+    return _get_fromfile(path, ObservationID,
+                         'HiRISE Observation ID',
+                         'ObservationId')
+
+
+def get_CCDID_fromfile(path: os.PathLike) -> CCDID:
+    '''Reads the file to get the CCDID, if an ISIS cube,
+       otherwise parses the filepath.'''
+
+    return _get_fromfile(path, CCDID,
+                         'HiRISE CCD ID',
+                         'ProductId')
 
 
 def get_ChannelID_fromfile(path: os.PathLike) -> ChannelID:
     '''Reads the file to get the ChannelID, if an ISIS cube,
        otherwise parses the filepath.'''
-    p = Path(path)
 
-    try:
-        return ChannelID(isis.getkey_k(p, 'Archive', 'ProductId'))
-    except (subprocess.CalledProcessError, ValueError):
-        for part in reversed(p.parts):
-            try:
-                return ChannelID(part)
-            except ValueError:
-                continue
-        raise ValueError('Could not extract a HiRISE Channel ID from ' +
-                         str(path))
+    return _get_fromfile(path, ChannelID,
+                         'HiRISE Channel ID',
+                         'ProductId')

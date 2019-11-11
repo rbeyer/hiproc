@@ -535,7 +535,7 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
 def process_this(ccdchan: tuple, flag_list: list) -> int:
     if len(flag_list) != 28:
         raise IndexError('The list must have 28 elements')
-    ccd_number = int(hirise.getccdnumber(ccdchan[0]))
+    ccd_number = int(hirise.get_ccdnumber(ccdchan[0]))
     i = (2 * ccd_number) + int(ccdchan[1])
     return int(flag_list[i])
 
@@ -751,7 +751,7 @@ def HiGainFx(cube: os.PathLike, outcube: os.PathLike,
     with open(coef_p) as csvfile:
         reader = csv.DictReader(csvfile, skipinitialspace=True)
         for row in reader:
-            if hirise.getccdchannel(row['CCD CH']) == (ccd, chan):
+            if hirise.get_ccdchannel(row['CCD CH']) == (ccd, chan):
                 max_line = row['Max line']
                 a_coef = (row['R(0)'], row['R(1)'], row['R(2)'])
 
@@ -773,7 +773,7 @@ def Cubenorm_Filter(cubenorm_tab: os.PathLike, outfile: os.PathLike, pause=False
         raise ValueError(f'boxfilter={boxfilter} is less than 3')
 
     if chan is None:
-        chan = int(hirise.getccdchannel(Path(cubenorm_tab).name)[1])
+        chan = int(hirise.get_ccdchannel(Path(cubenorm_tab).name)[1])
 
     # Make a list to receive each column
     valid_points = list()
@@ -1089,7 +1089,7 @@ def NoiseFilter(in_cube: os.PathLike, output: os.PathLike, conf: dict,
     '''Perform salt/pepper noise removal.'''
     logging.info(NoiseFilter.__doc__)
     binning = isis.getkey_k(in_cube, 'Instrument', 'Summing')
-    (ccd, chan) = hirise.getccdchannel(isis.getkey_k(in_cube, 'Archive', 'ProductId'))
+    (ccd, chan) = hirise.get_ccdchannel(isis.getkey_k(in_cube, 'Archive', 'ProductId'))
     isisnorm = ''
     if minimum is not None and maximum is not None:
         isisnorm = '+SignedWord+{}:{}'.format(minimum, maximum)

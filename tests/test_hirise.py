@@ -41,11 +41,11 @@ class TestResources(unittest.TestCase):
 
 class TestInternal(unittest.TestCase):
 
-    def test_match_chan_yes(self):
-        self.assertEqual('1', hirise._match_chan('1'))
+    # def test_match_chan_yes(self):
+    #     self.assertEqual('1', hirise._match_chan('1'))
 
-    def test_match_chan_no(self):
-        self.assertIsNone(hirise._match_chan('5'))
+    # def test_match_chan_no(self):
+    #     self.assertIsNone(hirise._match_chan('5'))
 
     def test_match_num_yes(self):
         strings = ('1', '9', '12')
@@ -69,10 +69,10 @@ class TestParse(unittest.TestCase):
         s = 'There is no Observation ID here.'
         self.assertRaises(ValueError, hirise.parseObsID, s)
 
-    def test_getObsID(self):
+    def test_ObsIDstr(self):
         truth = 'ESP_123456_1235'
         s = 'This is an ObservationID: ' + truth
-        self.assertEqual(truth, hirise.getObsID(s))
+        self.assertEqual(truth, hirise.ObsIDstr(s))
 
 
 class TestPhase(unittest.TestCase):
@@ -99,24 +99,24 @@ class TestPhase(unittest.TestCase):
     def test_orbit_in_phase(self):
         for t in self.tuples:
             with self.subTest():
-                self.assertEqual(hirise.orbit_in_phase(t[0], t[1]), t[2])
+                self.assertEqual(hirise.is_orbit_in_phase(t[0], t[1]), t[2])
 
-    def test_getphase(self):
+    def test_get_phase(self):
         for t in filter(lambda x: int(x[0]) and x[-1], self.tuples):
             with self.subTest():
-                self.assertEqual(t[1], hirise.getphase(t[0]))
+                self.assertEqual(t[1], hirise.get_phase(t[0]))
 
-    def test_getphase_bad(self):
+    def test_get_phase_bad(self):
         for t in filter(lambda y: int(y[0]),
                         itertools.filterfalse(lambda x: x[-1],
                                               self.tuples)):
             with self.subTest():
-                self.assertNotEqual(t[1], hirise.getphase(t[0]))
+                self.assertNotEqual(t[1], hirise.get_phase(t[0]))
 
-    def test_getphase_Error(self):
+    def test_get_phase_Error(self):
         for t in filter(lambda x: int(x[0]) == 0, self.tuples):
             with self.subTest():
-                self.assertRaises(IndexError, hirise.getphase, t[0])
+                self.assertRaises(IndexError, hirise.get_phase, t[0])
 
 
 class TestObsID(unittest.TestCase):
@@ -392,73 +392,73 @@ class TestGetters(unittest.TestCase):
                      ('BG', '13'))
         self.channels = ('0', '1')
 
-    def test_getccd_good(self):
+    def test_get_ccd_good(self):
         s = 'This is a good CCD name: RED4'
         truth = 'RED4'
-        self.assertIn(hirise.getccd(s), truth)
+        self.assertIn(hirise.get_ccd(s), truth)
 
-    def test_getccd_bulk(self):
+    def test_get_ccd_bulk(self):
         for c in self.ccds:
             with self.subTest(c):
                 s = ''.join(c)
-                self.assertEquals(hirise.getccd(s), s)
+                self.assertEquals(hirise.get_ccd(s), s)
 
-    def test_getccd_bad(self):
+    def test_get_ccd_bad(self):
         s = 'There is no CCD name in here.'
-        self.assertRaises(ValueError, hirise.getccd, s)
+        self.assertRaises(ValueError, hirise.get_ccd, s)
 
-    def test_getccdname(self):
+    def test_get_ccdname(self):
         for c in self.ccds:
             with self.subTest(c):
                 s = ''.join(c)
-                self.assertEqual(hirise.getccdname(s), c[0])
+                self.assertEqual(hirise.get_ccdname(s), c[0])
 
-    def test_getccdname_int(self):
-        self.assertEqual(hirise.getccdname(5), 'RED')
-        self.assertEqual(hirise.getccdname(str(5)), 'RED')
+    def test_get_ccdname_int(self):
+        self.assertEqual(hirise.get_ccdname(5), 'RED')
+        self.assertEqual(hirise.get_ccdname(str(5)), 'RED')
 
-    def test_getccdname_bad(self):
+    def test_get_ccdname_bad(self):
         s = 'There is no CCD name in here: ESP_057866_1670_YEL5_0'
-        self.assertRaises(ValueError, hirise.getccd, s)
-        self.assertRaises(TypeError, hirise.getccdname, 5.44)
+        self.assertRaises(ValueError, hirise.get_ccd, s)
+        self.assertRaises(TypeError, hirise.get_ccdname, 5.44)
 
-    def test_getccdnumber(self):
+    def test_get_ccdnumber(self):
         for c in self.ccds:
             with self.subTest(c=c):
                 s = ''.join(c)
-                self.assertEquals(hirise.getccdnumber(s), c[1])
+                self.assertEquals(hirise.get_ccdnumber(s), c[1])
 
-    def test_getccdnumber_bad(self):
+    def test_get_ccdnumber_bad(self):
         s = 'There is no CCD number in here: ESP_057866_1670_RED_0'
-        self.assertRaises(ValueError, hirise.getccdnumber, s)
+        self.assertRaises(ValueError, hirise.get_ccdnumber, s)
 
-    def test_getccdnamenumber(self):
+    def test_get_ccdnamenumber(self):
         for c in self.ccds:
             with self.subTest(c):
                 s = ''.join(c)
-                self.assertEquals(hirise.getccdnamenumber(s), c)
+                self.assertEquals(hirise.get_ccdnamenumber(s), c)
 
-    def test_getccdnamenumber_just_number(self):
+    def test_get_ccdnamenumber_just_number(self):
         for c in self.ccds:
             with self.subTest(c):
-                self.assertEquals(hirise.getccdnamenumber(c[1]), c)
+                self.assertEquals(hirise.get_ccdnamenumber(c[1]), c)
 
-    def test_getccdnamenumber_int(self):
+    def test_get_ccdnamenumber_int(self):
         for c in self.ccds:
             with self.subTest(c):
-                self.assertEquals(hirise.getccdnamenumber(int(c[1])), c)
+                self.assertEquals(hirise.get_ccdnamenumber(int(c[1])), c)
 
-    def test_getccdnamenumber_bad(self):
-        self.assertRaises(ValueError, hirise.getccdnamenumber, 'RED')
+    def test_get_ccdnamenumber_bad(self):
+        self.assertRaises(ValueError, hirise.get_ccdnamenumber, 'RED')
 
-    def test_getccdchannel_good(self):
+    def test_get_ccdchannel_good(self):
         s = 'IR10_0 is a good CCD-channel combination.'
         truth = ('IR10', '0')
-        self.assertEquals(hirise.getccdchannel(s), truth)
+        self.assertEquals(hirise.get_ccdchannel(s), truth)
 
-    def test_getccdchannel_bad(self):
+    def test_get_ccdchannel_bad(self):
         s = 'There is a CCD, BG12, but no channel here.'
-        self.assertRaises(ValueError, hirise.getccdchannel, s)
+        self.assertRaises(ValueError, hirise.get_ccdchannel, s)
 
 
 class TestFromFile(unittest.TestCase):
