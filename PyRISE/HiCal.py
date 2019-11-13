@@ -116,10 +116,10 @@ def main():
         with open(db_path, 'r') as f:
             db = json.load(f)
 
-        pid = hirise.get_ProdID_fromfile(in_cube)
-        if str(pid) != db['PRODUCT_ID']:
+        cid = hirise.get_ChannelID_fromfile(in_cube)
+        if str(cid) != db['PRODUCT_ID']:
             logging.critical('The Product ID in the file ({}) does not match '
-                             'the one in the database ({}).'.format(str(pid),
+                             'the one in the database ({}).'.format(str(cid),
                                                                     db['PRODUCT_ID']))
             sys.exit()
 
@@ -132,7 +132,7 @@ def main():
         # functionality is now broken up and spread out to the check_destripe()
         # function, the set_flags() function, and the if statement below that
         # checks HiCal_Bypass_IR10_1
-        ccdchan = (pid.get_ccd(), pid.channel)
+        ccdchan = (cid.get_ccd(), cid.channel)
         lis_per = float(db['LOW_SATURATED_PIXELS']) / (int(db['IMAGE_LINES']) *
                                                        int(db['LINE_SAMPLES'])) * 100.0
         if (ccdchan == ('IR10', '1') and
