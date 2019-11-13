@@ -97,7 +97,7 @@ def main():
         sys.exit()
 
     conf = pvl.load(str(args.conf))
-    conf_check(conf)
+    conf_check(conf['HiNoProj'])
 
     outcub_path = hcn.set_outpath(args.output, cubes)
 
@@ -117,7 +117,7 @@ def conf_check(conf: dict) -> None:
     '''Various checks on parameters in the configuration.'''
 
     t = 'Shape'
-    util.conf_check_strings(t, ('ELLIPSOID', 'SYSTEM', 'USER'), conf['HiNoProj'][t])
+    util.conf_check_strings(t, ('ELLIPSOID', 'SYSTEM', 'USER'), conf[t])
 
     return
 
@@ -203,7 +203,8 @@ def get_offsets(cube: os.PathLike, match: os.PathLike, flat: os.PathLike) -> tup
 def add_offsets(cubes: list, base_ccdnumber: int, temp_token: str, keep=False) -> tuple:
     flats = isis.PathSet()
     for i, c in enumerate(cubes[:-1]):
-        pair = '{}-{}'.format(cubes[i].get_ccd(), cubes[i + 1].get_ccd())
+        pair = '{}-{}'.format(cubes[i + 1].get_ccd(), cubes[i].get_ccd())
+
         flat_p = flats.add(c.path.with_suffix(f'.{temp_token}.{pair}.flat.tab'))
 
         (avg_line_offset, avg_samp_offset) = get_offsets(cubes[i].next_path,

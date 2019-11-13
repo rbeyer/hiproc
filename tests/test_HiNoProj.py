@@ -56,7 +56,7 @@ class TestConf(unittest.TestCase):
 
     def test_conf_check(self):
         c = pvl.load(str(conf_path))
-        self.assertIsNone(hnp.conf_check(c))
+        self.assertIsNone(hnp.conf_check(c['HiNoProj']))
 
 
 class TestHiNoProj(unittest.TestCase):

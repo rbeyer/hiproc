@@ -34,6 +34,7 @@ mosaicks them into a single cube."""
 # emulate functionality.
 
 import argparse
+import csv
 import itertools
 import logging
 import os
@@ -43,6 +44,9 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 import pvl
 
@@ -74,12 +78,14 @@ def main():
     cubes.sort()
 
     sequences = list()
-    for k, g in itertools.groupby((int(c.ccdnumber) for c in cubes),
+    for k, g in itertools.groupby((int(c.ccdnumber) for c in filter(lambda x:
+                                                                    x.ccdname == 'RED',
+                                                                    cubes)),
                                   lambda x, c=itertools.count(): next(c) - x):
         sequences.append(list(g))
 
     if len(sequences) != 1:
-        logging.critical('The given cubes are not a single run of sequential '
+        logging.critical('The given RED cubes are not a single run of sequential '
                          'HiRISE CCDs, instead there are '
                          '{} groups with these CCD numbers: {}.'.format(len(sequences),
                                                                         sequences))
@@ -106,7 +112,7 @@ def main():
 
     except subprocess.CalledProcessError as err:
         print('Had an ISIS error:')
-        print(err.cmd)
+        print(' '.join(err.cmd))
         print(err.stdout)
         print(err.stderr)
         raise err
@@ -150,7 +156,8 @@ def match_red(cubes: list, base_cube, flat_path, elargement_ratio=1.0006):
             shutil.copy(c.path, c.next_path)
 
         if c.ccdname != 'RED':
-            offset = (200 * (c.bin - base_cube.bin) + c.tdi - base_cube.tdi) / base_cube.bin
+            offset = int((200 * (c.bin - base_cube.bin) + c.tdi -
+                          base_cube.tdi) / base_cube.bin)
             mos_path = c.next_path.with_suffix('.mosaiced.cub')
             util.log(isis.handmos(c.next_path, mosaic=mos_path, create='Y',
                                   nlines=base_cube.lines,
@@ -206,22 +213,12 @@ def determine_resjit_set(cubes: list, set_gen) -> tuple:
     raise ValueError('No suitable ccd sets found.')
 
 
-def analyze_flat(cube: hjr.JitterCube, fraction: float) -> int:
-    # Need to be concerned about the derived CanSlither value?
-    ret = hjr.Analyze_Flat(cube, 0, (fraction * 2))
-
-    # Need to override some of the checking in hjr.Analyze_Flat()
-    if ret == -1 and cube['SuspectCount'] <= 3:
-        ret = 1
-
-    return ret
-
-
 def make_flats(cubes, common_cube, conf, temp_token, keep=False):
     # If the flat files already exist, don't remake them.
     # "$OBS_ID"."_".$ccd."-".$common.".flat.tab"
     jitter_cubes = list()
-    n_row = common_cube.lines / conf['AutoRegistration']['ControlNet']['Control_Lines']
+    n_row = int(common_cube.lines /
+                conf['AutoRegistration']['ControlNet']['Control_Lines'])
 
     for c in cubes:
         if c == common_cube:
@@ -243,6 +240,7 @@ def make_flats(cubes, common_cube, conf, temp_token, keep=False):
             else:
                 redcolor = 'Color'
 
+            params['GROUP'] = 'ResolveJitter'
             params['COLS'] = confauto['ControlNet']['Control_Cols_' + redcolor]
             params['PATTERN_SAMPLES'] = confauto['PatternChip' + redcolor]['Samples']
             params['PATTERN_LINES'] = confauto['PatternChip' + redcolor]['Lines']
@@ -262,10 +260,10 @@ def make_flats(cubes, common_cube, conf, temp_token, keep=False):
             while step <= confauto['Algorithm']['Steps']:
                 logging.info(f'Step {step} begin')
 
-                hjr.run_HiJitReg(common_cube.next_path, c, params, 'ResolveJitter',
-                                 'no cnetbin2pvl?')
+                hjr.run_HiJitReg(common_cube.next_path, c, params,
+                                 temp_token, keep=keep)
 
-                ret = analyze_flat(c, min_fraction_good)
+                ret = hjr.Analyze_Flat(c, 0, (min_fraction_good * 2), hijitreg=False)
 
                 if ret == 1:
                     successful_flats.append(c.flattab_path)
@@ -277,7 +275,7 @@ def make_flats(cubes, common_cube, conf, temp_token, keep=False):
                     c.cnet_path.unlink()
                     params['TOLERANCE'] -= (confauto['Algorithm']['Increment'] * step)
             else:
-                raise RuntimeError('Flat file for {c} is not within tolerances.')
+                raise RuntimeError(f'Flat file for {c} is not within tolerances.')
 
     else:
         successful_flats = list(x.flattab_path for x in jitter_cubes)
@@ -302,15 +300,16 @@ def ResolveJitter(cubes: list, conf: dict, jitter_path: os.PathLike,
     # Not sure that this is required, so skipping.
 
     # run resolveJitter3HiJACK.m or resolveJitter4HiJACK.cc
-    rj_args = ['resolveJitter',
+    rj_args = ['/Users/rbeyer/software/HiPrecision/fromOleg/HiPrecision/resolveJitter',
                str(jitter_path.parent),
                str(common_cube.get_obsid()),
-               conf['AutoRegistration']['ControlNet']['Control_Lines']]
+               str(conf['AutoRegistration']['ControlNet']['Control_Lines'])]
 
     for f in flats:
-        rj_args.append(f)
+        rj_args.append(f.relative_to(jitter_path.parent))
         rj_args.append('-1')
 
+    logging.info(rj_args)
     subprocess.run(rj_args, check=True)
 
     # Just double-check that the file we expect was created:
@@ -335,7 +334,7 @@ def flat_reader(flat_path: os.PathLike):
     dialect.quoting = csv.QUOTE_NONE
     dialect.lineterminator = '\n'
 
-    with open(_flat, 'r') as f:
+    with open(flat_path, 'r') as f:
         flat_data = f.read()
 
     fromtime = list()
@@ -365,7 +364,7 @@ def flat_reader(flat_path: os.PathLike):
 
 def plot_flats(pre_flat, dejit_flat):
     (pre_time, pre_samp, pre_line, pre_regs, pre_regl) = flat_reader(pre_flat)
-    (dej_time, dej_samp, deg_line, deg_regs, deg_regl) = flat_reader(dejit_flat)
+    (dej_time, dej_samp, dej_line, dej_regs, dej_regl) = flat_reader(dejit_flat)
 
     plt.ioff()
     fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True)
@@ -403,9 +402,9 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
                  '{}.{}.{}'.format(cubes[0].get_obsid(),
                                    temp_token,
                                    'RED5-RED4_prehijack.flat.tab'))
-    match_red(cubes, base_cube, flat_path, keep=keep)
+    match_red(cubes, base_cube, flat_path)
 
-    jitter_path = outdir_p / (str(cubes[0].get_obsid()) + '_jitter.txt')
+    jitter_path = outdir_p / (str(cubes[0].get_obsid()) + '_jitter_cpp.txt')
     if not jitter_path.exists():
         resolvejitter_conf = Path(conf_dir) / 'ResolveJitter.conf'
         ResolveJitter(cubes, pvl.load(str(resolvejitter_conf)),
@@ -415,16 +414,16 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
 
     # HiJACK proper:
     hijack_conf = pvl.load(str(Path(conf_dir) / 'HiJACK.conf'))
-    hnp.conf_check(hijack_conf)
+    hnp.conf_check(hijack_conf['HiJACK'])
 
     polar = False
-    if hijack_conf['Shape'] == 'USER':
+    if hijack_conf['HiJACK']['Shape'] == 'USER':
         polar = hnp.is_polar(cubes, hijack_conf['Pole_Tolerance'], temp_token)
 
     for c in cubes:
         hnp.copy_and_spice(c.next_path,
                            to_del.add(c.path.with_suffix(f'.{temp_token}.spiced.cub')),
-                           hijack_conf, polar)
+                           hijack_conf['HiJACK'], polar)
     # Run hijitter
     inlist = list()
     outlist = list()
@@ -433,10 +432,16 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
         inlist.append(c.path)
         outlist.append(c.next_path)
 
-    jitterck_p = outdir_p / (str(hirise.ObservationID(cubes[0])) + '.jittery.bc')
+    jitterck_p = outdir_p / (str(cubes[0].get_obsid()) + '.jittery.bc')
 
     hijitregdef_p = Path(os.environ['ISIS3DATA']) / 'mro/calibration/hijitreg.p1745.s3070.def'
 
+    # inlist_p = to_del.add(isis.fromlist.make(inlist,
+    #                                          (outdir_p /
+    #                                           (str(cubes[0].get_obsid()) +
+    #                                            '_hijitter.inlst'))))
+    # outlist_p = to_del.add(isis.fromlist.make(outlist,
+    #                                           inlist_p.with_suffix('.outlst')))
     with isis.fromlist.temp(inlist) as inlist_f:
         with isis.fromlist.temp(outlist) as outlist_f:
             util.log(isis.hijitter(fromlist=inlist_f,
@@ -448,19 +453,23 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
     # Remember hijitter makes all the individual cubes the size of the entire image.
     #  with the image data in the appropriate space for the ccd.
 
-    out_root = outdir_p / str(hirise.ObservationID(cubes[0]))
+    out_root = outdir_p / str(cubes[0].get_obsid())
 
     # All REDs
     red_p = out_root.with_name(out_root.name + '_RED.NOPROJ.cub')
-    shutil.copyfile(base_cube.next_path, red_p)
+    red_5 = list(filter(lambda x: x.ccdname == 'RED' and x.ccdnumber == '5',
+                        cubes))[0]
+    # shutil.copyfile(base_cube.next_path, red_p)
+    shutil.copyfile(red_5.next_path, red_p)
     logging.info('Original Perl hard codes this file copy from RED5, even if '
                  'another cube is selected as the base_ccd.')
     (red_cubes,
-     red_flat_files) = hnp.add_offsets(filter(lambda x: x.ccdname == 'RED', cubes),
+     red_flat_files) = hnp.add_offsets(list(filter(lambda x: x.ccdname ==
+                                                   'RED', cubes)),
                                        5, temp_token, keep=True)
-    hnp.handmos_side(red_cubes, base_cube, red_p, left=True)
-    hnp.handmos_side(red_cubes, base_cube, red_p, left=False)
-    hnp.fix_labels(red_cubes, red_p, base_cube,
+    hnp.handmos_side(red_cubes, red_5, red_p, left=True)
+    hnp.handmos_side(red_cubes, red_5, red_p, left=False)
+    hnp.fix_labels(red_cubes, red_p, red_5,
                    '{}_RED'.format(str(red_cubes[0].get_obsid())))
 
     # Center RED for color
@@ -471,36 +480,30 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
     mosaic_dejittered(center_red_cubes, center_red_p,
                       '{}_RED4-5'.format(str(center_red_cubes[0].get_obsid())))
 
-    # for IR and BG we handmos, because I'm not sure if the dejittered cubes
-    # have the same line and sample numbers as the base_cube.  Need to
-    # experiment.  If not, may also need to do additional label fixing?
-    # IR next
     ir_p = out_root.with_name(out_root.name + '_IR.NOPROJ.cub')
-    (ir_cubes, _) = hnp.add_offsets(filter(lambda x: x.ccdname == 'IR', cubes),
+    (ir_cubes, _) = hnp.add_offsets(list(filter(lambda x: x.ccdname == 'IR',
+                                                cubes)),
                                     5, temp_token, keep=keep)
-    util.log(isis.handmos(ir_cubes[1].next_path, mosaic=ir_p,
-                          create='yes', nlines=base_cube.lines,
-                          nsamples=base_cube.samps, nbands=1).args)
+    shutil.copyfile(ir_cubes[1].next_path, ir_p)
     mosaic_dejittered(ir_cubes, ir_p,
                       '{}_IR'.format(str(ir_cubes[0].get_obsid())))
 
     # BG next
     bg_p = out_root.with_name(out_root.name + '_BG.NOPROJ.cub')
-    (bg_cubes, _) = hnp.add_offsets(filter(lambda x: x.ccdname == 'BG', cubes),
+    (bg_cubes, _) = hnp.add_offsets(list(filter(lambda x: x.ccdname == 'BG',
+                                                cubes)),
                                     5, temp_token, keep=keep)
-    util.log(isis.handmos(bg_cubes[1].next_path, mosaic=bg_p,
-                          create='yes', nlines=base_cube.lines,
-                          nsamples=base_cube.samps, nbands=1).args)
+    shutil.copyfile(bg_cubes[1].next_path, bg_p)
     mosaic_dejittered(bg_cubes, bg_p,
                       '{}_BG'.format(str(bg_cubes[0].get_obsid())))
 
     #  Create color product
     irb_p = out_root.with_name(out_root.name + '_IRB.NOPROJ.cub')
-    with isis.fromlist.temp(ir_p, center_red_p, bg_p) as f:
+    with isis.fromlist.temp([ir_p, center_red_p, bg_p]) as f:
         util.log(isis.cubeit(fromlist=f, to=irb_p, proplab=center_red_p).args)
 
     # Make plot of before and after flat.tab results
-    dejit_flat = list(filter(lambda x: 'RED5-RED4' in x, red_flat_files))[0]
+    dejit_flat = list(filter(lambda x: x.match('*RED5-RED4*'), red_flat_files))[0]
     plot_flats(flat_path, dejit_flat)
 
     if not keep:

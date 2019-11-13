@@ -123,7 +123,8 @@ jitter_params = {'COLS': 4, 'ROWS': 200, 'TOLERANCE': 0.5,
                  'PATTERN_SAMPLES': 100, 'PATTERN_LINES': 60,
                  'SEARCH_SAMPLES': 120, 'SEARCH_LINES': 100,
                  'SEARCHLONGER_SAMPLES': 130,
-                 'SEARCHLONGER_LINES': 140}
+                 'SEARCHLONGER_LINES': 140,
+                 'GROUP': 'HiJitReg'}
 
 
 def getkey(cube, group, key):
@@ -258,7 +259,7 @@ class TestHiJitReg(unittest.TestCase):
     @patch('PyRISE.HiJitReg.isis.hijitreg')
     @patch('PyRISE.HiJitReg.Path')
     def test_run_HiJitReg(self, m_Path, m_hijitreg, m_cnetbin2pvl):
-        hjr.run_HiJitReg(self.r, self.j, jitter_params, 'foo', keep=True)
+        hjr.run_HiJitReg(self.r.path, self.j, jitter_params, 'foo', keep=True)
         m_hijitreg.assert_called_once()
         m_cnetbin2pvl.assert_called_once()
 

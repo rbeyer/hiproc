@@ -112,19 +112,6 @@ class TestHiJACK(unittest.TestCase):
         rcubes.sort()
         self.assertEqual(cubes, rcubes)
 
-    @patch('PyRISE.HiNoProj.isis.getkey_k', side_effect=getkey)
-    def test_analyze_flat(self, m_get):
-        with patch('PyRISE.HiJitReg.Analyze_Flat', return_value=1):
-            self.assertEqual(1, hjk.analyze_flat(self.r5, 0.1))
-
-        with patch('PyRISE.HiJitReg.Analyze_Flat', return_value=-1):
-            j = hjr.JitterCube(self.r3, matchccd=self.r4.ccdname)
-            j['SuspectCount'] = 3
-            self.assertEqual(1, hjk.analyze_flat(j, 0.1))
-
-            j['SuspectCount'] = 4
-            self.assertEqual(-1, hjk.analyze_flat(j, 0.1))
-
     @patch('PyRISE.HiJitReg.run_HiJitReg')
     @patch('PyRISE.HiNoProj.isis.getkey_k', side_effect=getkey)
     def test_make_flats(self, m_get, m_rhjr):
@@ -160,7 +147,7 @@ class TestHiJACK(unittest.TestCase):
             s = hjk.make_flats(cubes, self.r5, conf, 'tt', keep=True)
             self.assertEqual(s, [m_path] * (len(cubes) - 1))
 
-        with patch('PyRISE.HiJACK.analyze_flat', return_value=1):
+        with patch('PyRISE.HiJitReg.Analyze_Flat', return_value=1):
             s = hjk.make_flats(cubes, self.r5, conf, 'tt', keep=True)
             flat_list = list()
             for x in (self.r3, self.r4, self.i1):
@@ -185,17 +172,20 @@ class TestHiJACK(unittest.TestCase):
             with patch('PyRISE.HiJACK.make_flats',
                        return_value=flat_list):
                 m_path = Mock(spec_set=Path)
+                m_path.parent = self.r5.path.parent
                 conf = dict(ResolveJitter=self.sets,
                             AutoRegistration={'ControlNet': {'Control_Lines':
                                                              10}})
                 hjk.ResolveJitter(cubes, conf, m_path,
                                   'tt', keep=True)
+                rjp = '/Users/rbeyer/software/HiPrecision/fromOleg/HiPrecision/resolveJitter'
                 self.assertEqual(m_run.call_args_list,
-                                 [call(['resolveJitter', str(m_path.parent),
-                                        str(self.r5.get_obsid()), 10,
-                                        flat_list[0], '-1',
-                                        flat_list[1], '-1',
-                                        flat_list[2], '-1'],
+                                 [call([rjp,
+                                        str(m_path.parent),
+                                        str(self.r5.get_obsid()), '10',
+                                        flat_list[0].relative_to(m_path.parent), '-1',
+                                        flat_list[1].relative_to(m_path.parent), '-1',
+                                        flat_list[2].relative_to(m_path.parent), '-1'],
                                        check=True)])
 
     @patch('PyRISE.HiNoProj.handmos_side')
@@ -213,6 +203,7 @@ class TestHiJACK(unittest.TestCase):
                          [call([self.r4, self.r5], out_p,
                                str(self.r5), prodid)])
 
+    @patch('PyRISE.HiJACK.Path.mkdir')
     @patch('PyRISE.HiJACK.ResolveJitter')
     @patch('PyRISE.HiNoProj.fix_labels')
     @patch('PyRISE.HiJACK.isis.PathSet')
@@ -230,11 +221,12 @@ class TestHiJACK(unittest.TestCase):
     def test_HiJACK(self, m_match, m_pvl, m_ccheck, m_cns, m_hijit,
                     m_copy, m_mosdejit, m_handmos, m_cubeit,
                     m_fromlist, m_plot, m_PathSet, m_fixlab,
-                    m_ResJit):
+                    m_ResJit, m_mkdir):
         confd = 'confdir'
         outd = 'outdir'
         with patch('PyRISE.HiNoProj.add_offsets',
-                   side_effect=[([self.r4, self.r5], ['RED5-RED4flat1', 'RED3-RED4flat2']),
+                   side_effect=[([self.r4, self.r5], [Path('RED5-RED4flat1'),
+                                                      Path('RED3-RED4flat2')]),
                                 ([self.i1, self.r3], ['irflat1', 'irflat2']),
                                 ([self.i1, self.r3], ['bgflat1', 'bgflat2'])]):
             hjk.HiJACK([self.r3, self.r4, self.r5, self.i1], self.r4,
@@ -244,4 +236,57 @@ class TestHiJACK(unittest.TestCase):
             self.assertEqual(m_pvl.call_args_list,
                              [call(confd + '/ResolveJitter.conf'),
                               call(confd + '/HiJACK.conf')])
-            print(m_ccheck.call_args_list)
+            m_ccheck.assert_called_once()
+            self.assertEqual(m_cns.call_count, 4)
+            m_hijit.assert_called_once()
+
+            oid = str(self.r5.get_obsid())
+            r5_p = Path(f'{outd}/' +
+                        self.r5.path.with_suffix('').with_suffix('.dejittered.cub').name)
+            r3_p = Path(f'{outd}/' +
+                        self.r3.path.with_suffix('').with_suffix('.dejittered.cub').name)
+            rnp = Path(f'{outd}/{oid}_RED.NOPROJ.cub')
+            r45np = Path(f'{outd}/{oid}_RED4-5.NOPROJ.cub')
+            irnp = Path(f'{outd}/{oid}_IR.NOPROJ.cub')
+            bgnp = Path(f'{outd}/{oid}_BG.NOPROJ.cub')
+            self.assertEqual(m_copy.call_args_list,
+                             [call(r5_p, rnp),
+                              call(r5_p, r45np),
+                              call(r3_p, irnp),
+                              call(r3_p, bgnp)])
+
+            self.assertEqual(m_mosdejit.call_args_list,
+                             [call([self.r4, self.r5], r45np, f'{oid}_RED4-5'),
+                              call([self.i1, self.r3], irnp, f'{oid}_IR'),
+                              call([self.i1, self.r3], bgnp, f'{oid}_BG')])
+
+            r4_p = Path(f'{outd}/' +
+                        self.r4.path.with_suffix('').with_suffix('.dejittered.cub').name)
+            self.assertEqual(m_handmos.call_args_list,
+                             [call(r4_p, mosaic=rnp, outband=1, outline=1,
+                                   outsample=1, priority='ontop')])
+
+            irbnp = Path(f'{outd}/{oid}_IRB.NOPROJ.cub')
+            self.assertEqual(m_cubeit.call_args_list[0][1]['proplab'], r45np)
+            self.assertEqual(m_cubeit.call_args_list[0][1]['to'], irbnp)
+
+            i1_p = Path(f'{outd}/' +
+                        self.i1.path.with_suffix('').with_suffix('.dejittered.cub').name)
+
+            self.assertEqual(m_fromlist.call_args_list,
+                             [call([self.r3.path, self.r4.path, self.r5.path,
+                                    self.i1.path]),
+                              call([r3_p, r4_p, r5_p, i1_p]),
+                              call([irnp, r45np, bgnp])])
+
+            m_plot.called_once()
+            m_PathSet.called_once()
+
+            self.assertEqual(m_fixlab.call_args_list,
+                             [call([self.r4, self.r5], rnp,
+                                   self.r5, f'{oid}_RED')])
+
+            self.assertEqual(m_ResJit.call_args_list[0][0][0],
+                             [self.r3, self.r4, self.r5, self.i1])
+            self.assertEqual(m_ResJit.call_args_list[0][0][2],
+                             Path(f'{outd}/{oid}_jitter_cpp.txt'))

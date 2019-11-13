@@ -435,6 +435,7 @@ def jitter_iter(red: hicolor.HiColorCube, color: hicolor.HiColorCube, conf: dict
     bin_ratio = color.bin / red.bin
 
     jit_param = dict()
+    jit_param['GROUP'] = 'HiJitReg'
     jit_param['COLS'] = conf['AutoRegistration']['ControlNet']['Control_Cols']
     jit_param['ROWS'] = conf['AutoRegistration']['ControlNet']['Control_Lines']
     jit_param['TOLERANCE'] = conf['AutoRegistration']['Algorithm']['Tolerance']
@@ -464,7 +465,7 @@ def jitter_iter(red: hicolor.HiColorCube, color: hicolor.HiColorCube, conf: dict
 
     color_jitter = JitterCube(color, conf)
 
-    run_HiJitReg(red, color_jitter, jit_param, temp_token, keep=keep)
+    run_HiJitReg(red.path, color_jitter, jit_param, temp_token, keep=keep)
 
     ret = Analyze_Flat(color_jitter, step, coverage)
 
@@ -490,7 +491,7 @@ def jitter_iter(red: hicolor.HiColorCube, color: hicolor.HiColorCube, conf: dict
     logging.info(f'Attempting hijitreg iteration #{step} for {color}')
 
     # second pass
-    run_HiJitReg(red, color_jitter, jit_param, temp_token, keep=keep)
+    run_HiJitReg(red.path, color_jitter, jit_param, temp_token, keep=keep)
 
     # analyze output again
     ret = Analyze_Flat(color_jitter, step, coverage)
@@ -505,14 +506,14 @@ def jitter_iter(red: hicolor.HiColorCube, color: hicolor.HiColorCube, conf: dict
         return True
 
 
-def run_HiJitReg(red: hicolor.HiColorCube, color: JitterCube, params: dict,
+def run_HiJitReg(red_path: os.PathLike, color: JitterCube, params: dict,
                  temptoken: str, keep=False):
     '''Examine output of control net and/or flat file to automatically remove
        out-of-bound points.'''
 
     file_status = 'OVERWRITE'
     if color.regdef_path.exists():
-        file_status = pvl.load(str(color.regdef_path))['AutoRegistration']['HiJitReg']['File_Status']
+        file_status = pvl.load(str(color.regdef_path))['AutoRegistration'][params['GROUP']]['File_Status']
 
     if file_status == 'KEEP':
         logging.info('Using existing regdef file due to KEEP file status.')
@@ -522,7 +523,7 @@ def run_HiJitReg(red: hicolor.HiColorCube, color: JitterCube, params: dict,
         write_regdef(color.regdef_path, params)
 
     tmp_control = color.cnet_path.with_suffix('.net')
-    util.log(isis.hijitreg(red.path, match=color.path,
+    util.log(isis.hijitreg(red_path, match=color.path,
                            regdef=color.regdef_path,
                            rows=params['ROWS'], columns=params['COLS'],
                            flat=color.flattab_path,
@@ -541,7 +542,7 @@ def write_regdef(out_path: os.PathLike, parameters: dict):
 
   Version = 2
 
-  Group = HiJitReg
+  Group = {GROUP}
      File_Status  = "OVERWRITE"
      Control_Cols = {COLS}
      Control_Rows = {ROWS}
@@ -570,7 +571,7 @@ End_Object
     return
 
 
-def Analyze_Flat(cube: JitterCube, step: int, fraction: float) -> int:
+def Analyze_Flat(cube: JitterCube, step: int, fraction: float, hijitreg=True) -> int:
     cube.reset()
     cube.filterCNetPVL()
 
@@ -585,7 +586,7 @@ def Analyze_Flat(cube: JitterCube, step: int, fraction: float) -> int:
         logging.warn('No points met the correlation tolerance.')
         return 0
 
-    if cube['CanSlither'] is False:
+    if hijitreg and cube['CanSlither'] is False:
         logging.warn('Too few correlated lines found for cubic slither fit.')
         return 0
 
@@ -595,11 +596,11 @@ def Analyze_Flat(cube: JitterCube, step: int, fraction: float) -> int:
         logging.info(f'Too few correlated points ({good_fraction}) found at this tolerance')
         return 0
 
-    elif good_fraction < 0.25 * fraction and step <= 2:
+    elif hijitreg and good_fraction < 0.25 * fraction and step <= 2:
         logging.info(f'Too few correlated points ({good_fraction}) found at this tolerance')
         return -1
 
-    if cube['EdgyCount'] > 2 and good_fraction > 0.8 * fraction:
+    if hijitreg and cube['EdgyCount'] > 2 and good_fraction > 0.8 * fraction:
         logging.info('More than two edgy points with search box size.')
         return -1
 
