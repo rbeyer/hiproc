@@ -27,7 +27,7 @@ from .utils import resource_check as rc
 # Hardcoding these, but I sure would like a better solution.
 HiRISE_img = Path('test-resources') / 'PSP_010502_2090_RED5_0.img'
 img = HiRISE_img
-gains = Path('resources') / 'EDR_Stats_gains_config.pvl'
+gains = Path('data') / 'EDR_Stats_gains_config.pvl'
 
 
 class TestResources(unittest.TestCase):

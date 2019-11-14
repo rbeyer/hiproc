@@ -63,7 +63,7 @@ def main():
     parser.add_argument('-o', '--output', required=False, default='.HiStitch.cub')
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources' / 'HiStitch.conf')
+                        'data' / 'HiStitch.conf')
     parser.add_argument('cube0', metavar="cube0.cub-file")
     parser.add_argument('cube1', metavar="cube1.cub-file", nargs='?')
 

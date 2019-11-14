@@ -48,7 +48,7 @@ def main():
                                      parents=[util.parent_parser()])
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources' / 'HiPrecisionInit.conf')
+                        'data' / 'HiPrecisionInit.conf')
     parser.add_argument('slither_text', metavar="slither.txt-files", nargs='+')
 
     args = parser.parse_args()

@@ -44,7 +44,7 @@ def main():
     parser.add_argument('-e', '--edr',  required=True)
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources' / 'hical.pipelines.conf')
+                        'data' / 'hical.pipelines.conf')
     parser.add_argument('mdr', metavar="MDR_file")
     parser.add_argument('-l', '--log',  required=False, default='WARNING',
                         help="The log level to show for this program, can be a "

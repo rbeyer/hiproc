@@ -55,7 +55,7 @@ def main():
     parser.add_argument('--histmax',      required=False, default=99.99)
     parser.add_argument('-g', '--gains',  required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources' / 'EDR_Stats_gains_config.pvl',
+                        'data' / 'EDR_Stats_gains_config.pvl',
                         help='Path to the gains config PVL file.')
     parser.add_argument('img', metavar="some.img-file", nargs='+',
                         help='More than one can be listed here.')

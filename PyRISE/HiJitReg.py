@@ -59,7 +59,7 @@ def main():
                                      parents=[util.parent_parser()])
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources' / 'HiJitReg.conf')
+                        'data' / 'HiJitReg.conf')
     parser.add_argument('cubes', metavar="balance.cub and balance.precolor.cub files",
                         nargs='+')
 
@@ -88,7 +88,8 @@ def main():
 class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
     '''A class for collecting and analyzing jitter statistics.'''
 
-    def __init__(self, arg, config=Path(__file__).resolve().parent.parent / 'resources' / 'HiJitReg.conf', matchccd=None):
+    def __init__(self, arg, config=Path(__file__).resolve().parent.parent /
+                 'data' / 'HiJitReg.conf', matchccd=None):
         if isinstance(arg, hicolor.HiColorCube):
             super().__init__(arg.path)
         else:

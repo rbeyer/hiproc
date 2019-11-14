@@ -27,7 +27,7 @@ import pvl
 # import PyRISE.hirise as hirise
 import PyRISE.HiNoProj as hnp
 
-conf_path = Path('resources') / 'HiNoProj.conf'
+conf_path = Path('data') / 'HiNoProj.conf'
 
 
 def getkey(cube, group, key):

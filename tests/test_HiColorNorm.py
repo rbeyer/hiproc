@@ -73,7 +73,7 @@ class TestHiColorNorm(unittest.TestCase):
 
     @unittest.skip("Tests on a real file.")
     def test_conf_check(self):
-        conf_path = Path('resources') / 'HiColorNorm.conf'
+        conf_path = Path('data') / 'HiColorNorm.conf'
         c = pvl.load(str(conf_path))
         self.assertIsNone(hcn.conf_check(c))
 

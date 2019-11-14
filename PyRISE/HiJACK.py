@@ -65,7 +65,7 @@ def main():
     parser.add_argument('-o', '--outdir', required=False, default='./HiJACK')
     parser.add_argument('-c', '--conf_dir',   required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources', help='Directory where ResolveJitter.conf '
+                        'data', help='Directory where ResolveJitter.conf '
                         'and HiJACK.conf can be found.')
     parser.add_argument('-b', '--base_ccd_number', required=False, default=5)
     parser.add_argument('cubes', metavar="balance.cub-files", nargs='+')

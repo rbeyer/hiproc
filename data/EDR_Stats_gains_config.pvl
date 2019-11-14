@@ -1,0 +1,286 @@
+/* The following gain and offset values were retrieved from /HiRISE/Documents/Planning/PSP/047/HIPHOP/hiphop_version11/hi_adc_1.txt
+ 
+ Gain values are in electrons per DN.
+ Offset values are in DN.
+
+ Values were read from the file with the conversions (per Nicholas Thomas' email):
+ HiRISE convention       hi_adc_1.txt
+    RED0                                CCD1
+    RED1                                CCD2
+       :                                             :
+    IR10                                  CCD11
+    IR11                                  CCD12
+    BG12                                 CCD13
+    BG13                                 CCD14
+  Channel 0                     Channel A
+  Channel 1                     Channel B
+     bin 1                              column 1
+     bin 2                              column 2
+     bin 3                              column 3
+     bin 4                              column 4
+     bin 8                              column 5
+*/
+
+Group = Gains
+
+   Group = RED0_0
+       Bin1 = 19.0053367
+       Bin2 = 17.64823191
+       Bin3 = 17.59556592
+       Bin4 = 17.1244899
+       Bin8 = 16.64364296
+   End_Group
+
+   Group = RED0_1
+       Bin1 = 19.88775352
+       Bin2 = 18.1984615
+       Bin3 = 18.0928998
+       Bin4 = 17.45362136
+       Bin8 = 16.99908375
+   End_Group
+
+   Group = RED1_0
+       Bin1 = 18.7235413
+       Bin2 = 17.3031336
+       Bin3 = 17.16699885
+       Bin4 = 16.71100654
+       Bin8 = 16.04474559
+   End_Group
+
+   Group = RED1_1
+       Bin1 = 19.81449668
+       Bin2 = 18.14842508
+       Bin3 = 17.94929325
+       Bin4 = 17.34539185
+       Bin8 = 16.60892298
+   End_Group
+
+   Group = RED2_0
+       Bin1 = 18.91385307
+       Bin2 = 17.55362193
+       Bin3 = 17.46846941
+       Bin4 = 16.97663167
+       Bin8 = 16.29407547
+   End_Group
+
+   Group = RED2_1
+       Bin1 = 18.2267222
+       Bin2 = 17.18313441
+       Bin3 = 17.1217045
+       Bin4 = 16.77140409
+       Bin8 = 16.13064532
+   End_Group
+
+   Group = RED3_0
+       Bin1 = 18.0437344
+       Bin2 = 17.06123619
+       Bin3 = 17.00188721
+       Bin4 = 16.66758338
+       Bin8 = 16.17586399
+   End_Group
+
+   Group = RED3_1
+       Bin1 = 19.35407703
+       Bin2 = 17.92172507
+       Bin3 = 17.86017271
+       Bin4 = 17.32309654
+       Bin8 = 16.87026262
+   End_Group
+
+   Group = RED4_0
+       Bin1 = 17.60374326
+       Bin2 = 16.61284106
+       Bin3 = 16.56918463
+       Bin4 = 16.22117902
+       Bin8 = 15.88239405
+   End_Group
+
+   Group = RED4_1
+       Bin1 = 17.72785613
+       Bin2 = 16.78604341
+       Bin3 = 16.77463943
+       Bin4 = 16.44420399
+       Bin8 = 16.15858683
+   End_Group
+
+   Group = RED5_0
+       Bin1 = 19.45180912
+       Bin2 = 17.80284418
+       Bin3 = 17.72603352
+       Bin4 = 17.0886422
+       Bin8 = 16.58352791
+   End_Group
+
+   Group = RED5_1
+       Bin1 = 20.94082959
+       Bin2 = 18.48063322
+       Bin3 = 18.39107518
+       Bin4 = 17.41201708
+       Bin8 = 16.95283044
+   End_Group
+
+   Group = RED6_0
+       Bin1 = 19.03257425
+       Bin2 = 17.03121993
+       Bin3 = 16.98750399
+       Bin4 = 16.22862892
+       Bin8 = 15.76240383
+   End_Group
+
+   Group = RED6_1
+       Bin1 = 18.31136275
+       Bin2 = 16.7201153
+       Bin3 = 16.63171235
+       Bin4 = 16.01729868
+       Bin8 = 15.42483862
+   End_Group
+
+   Group = RED7_0
+       Bin1 = 17.19965532
+       Bin2 = 16.04271212
+       Bin3 = 15.95008262
+       Bin4 = 15.49460323
+       Bin8 = 14.87196723
+   End_Group
+
+   Group = RED7_1
+       Bin1 = 18.86276396
+       Bin2 = 17.13373221
+       Bin3 = 17.04094257
+       Bin4 = 16.35125103
+       Bin8 = 15.76382014
+   End_Group
+
+   Group = RED8_0
+       Bin1 = 18.26320567
+       Bin2 = 16.90345591
+       Bin3 = 16.84315486
+       Bin4 = 16.38315615
+       Bin8 = 15.93257335
+   End_Group
+
+   Group = RED8_1
+       Bin1 = 20.79097173
+       Bin2 = 18.46101587
+       Bin3 = 18.40105843
+       Bin4 = 17.53995162
+       Bin8 = 17.16555491
+   End_Group
+
+   Group = RED9_0
+       Bin1 = 19.09522982
+       Bin2 = 17.64919749
+       Bin3 = 17.51724573
+       Bin4 = 16.93890307
+       Bin8 = 16.56542432
+   End_Group
+
+   Group = RED9_1
+       Bin1 = 20.63370226
+       Bin2 = 18.42037883
+       Bin3 = 18.34609916
+       Bin4 = 17.47094146
+       Bin8 = 17.20246615
+   End_Group
+
+   Group = IR10_0
+       Bin1 = 18.82856218
+       Bin2 = 17.25265303
+       Bin3 = 17.19214457
+       Bin4 = 16.50546331
+       Bin8 = 15.90573624
+   End_Group
+
+   Group = IR10_1
+       Bin1 = 17.67002986
+       Bin2 = 16.61803123
+       Bin3 = 16.56844341
+       Bin4 = 16.10983038
+       Bin8 = 15.5632092
+   End_Group
+
+   Group = IR11_0
+       Bin1 = 18.41468018
+       Bin2 = 16.76114365
+       Bin3 = 16.71067143
+       Bin4 = 15.98925522
+       Bin8 = 15.38743247
+   End_Group
+
+   Group = IR11_1
+       Bin1 = 18.50566736
+       Bin2 = 16.99241119
+       Bin3 = 16.95852284
+       Bin4 = 16.30305421
+       Bin8 = 15.72668283
+   End_Group
+
+   Group = BG12_0
+       Bin1 = 24.83466323
+       Bin2 = 20.73591772
+       Bin3 = 20.74193916
+       Bin4 = 19.30028738
+       Bin8 = 19.28577077
+   End_Group
+
+   Group = BG12_1
+       Bin1 = 29.18225485
+       Bin2 = 22.97952524
+       Bin3 = 22.97287363
+       Bin4 = 20.85879845
+       Bin8 = 20.74026141
+   End_Group
+
+   Group = BG13_0
+       Bin1 = 20.53527241
+       Bin2 = 19.18093568
+       Bin3 = 19.1651654
+       Bin4 = 18.52496795
+       Bin8 = 18.4983074
+   End_Group
+
+   Group = BG13_1
+       Bin1 = 19.99644063
+       Bin2 = 18.77891954
+       Bin3 = 18.77863742
+       Bin4 = 18.24371413
+       Bin8 = 18.26110458
+   End_Group
+
+End_Group
+
+
+/* These values are not used in any calculation in EDR_Stats, but are recorded here for possible future use. */
+
+Group = DN_Offsets
+
+   Offset_RED0_0 = 1333
+   Offset_RED0_1 = 1434
+   Offset_RED1_0 = 1116
+   Offset_RED1_1 = 1191
+   Offset_RED2_0 = 1250
+   Offset_RED2_1 = 1161
+   Offset_RED3_0 = 1125
+   Offset_RED3_1 = 1253
+   Offset_RED4_0 = 1159
+   Offset_RED4_1 = 1139
+   Offset_RED5_0 = 1214
+   Offset_RED5_1 = 1408
+   Offset_RED6_0 = 1052
+   Offset_RED6_1 = 1239
+   Offset_RED7_0 = 1124
+   Offset_RED7_1 = 1426
+   Offset_RED8_0 = 1320
+   Offset_RED8_1 = 1452
+   Offset_RED9_0 = 1165
+   Offset_RED9_1 = 1323
+   Offset_IR10_0 = 1208
+   Offset_IR10_1 = 1103
+   Offset_IR11_0 = 1226
+   Offset_IR11_1 = 1218
+   Offset_BG12_0 = 1060
+   Offset_BG12_1 = 1230
+   Offset_BG13_0 = 1094
+   Offset_BG13_1 = 1062
+
+End_Group

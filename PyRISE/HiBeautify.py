@@ -47,7 +47,7 @@ def main():
     parser.add_argument('-o_rgb', '--output_rgb', required=False, default='_RGB.cub')
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources' / 'HiBeautify.conf')
+                        'data' / 'HiBeautify.conf')
     # parser.add_argument('-f', '--frost', action='store_true',
     #                     help='Use the frost/ice color stretch, and disable '
     #                     'auto-detection of frost/ice.')

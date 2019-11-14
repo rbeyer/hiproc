@@ -27,7 +27,7 @@ import pvl
 import PyRISE.hirise as hirise
 import PyRISE.HiStitch as hs
 
-conf_path = Path('resources') / 'HiStitch.conf'
+conf_path = Path('data') / 'HiStitch.conf'
 
 
 class TestBasic(unittest.TestCase):

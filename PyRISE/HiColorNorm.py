@@ -167,7 +167,7 @@ def main():
     parser.add_argument('-o', '--output', required=False, default='_COLOR.cub')
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources' / 'HiColorNorm.conf')
+                        'data' / 'HiColorNorm.conf')
     parser.add_argument('-n', '--nounfiltered', action='store_false',
                         dest='Make_Unfiltered',
                         help='Stops creation of an unfiltered cube.')

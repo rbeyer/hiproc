@@ -62,7 +62,7 @@ def main():
     parser.add_argument('-o', '--output', required=False, default='_RED.NOPROJ.cub')
     parser.add_argument('-c', '--conf',   required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources' / 'HiNoProj.conf')
+                        'data' / 'HiNoProj.conf')
     parser.add_argument('-b', '--base_ccd_number', required=False, default=5)
     parser.add_argument('cubes', metavar="balance.cub-files", nargs='+')
 

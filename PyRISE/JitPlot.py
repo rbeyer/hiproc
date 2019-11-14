@@ -50,7 +50,7 @@ def main():
                                      parents=[util.parent_parser()])
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources' / 'HiJitReg.conf')
+                        'data' / 'HiJitReg.conf')
     parser.add_argument('cubes', metavar="balance.precolor.cub files",
                         nargs='+')
 

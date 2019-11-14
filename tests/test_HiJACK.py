@@ -27,8 +27,8 @@ import PyRISE.HiJitReg as hjr
 import PyRISE.HiNoProj as hnp
 import PyRISE.HiJACK as hjk
 
-hijackconf_path = Path('resources') / 'HiJACK.conf'
-resjitconf_path = Path('resources') / 'ResolveJitter.conf'
+hijackconf_path = Path('data') / 'HiJACK.conf'
+resjitconf_path = Path('data') / 'ResolveJitter.conf'
 
 
 def getkey(cube, group, key):

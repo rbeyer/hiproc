@@ -28,7 +28,7 @@ import pvl
 # import PyRISE.hirise as hirise
 import PyRISE.HiccdStitch as hcs
 
-conf_path = Path('resources') / 'HiccdStitch.conf'
+conf_path = Path('data') / 'HiccdStitch.conf'
 
 
 def getkey(cube, group, key):

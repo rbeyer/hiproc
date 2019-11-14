@@ -41,10 +41,10 @@ HiRISE_imgs = ('PSP_010502_2090_RED3_0.img', 'PSP_010502_2090_RED3_1.img',
 test_resources = Path('test-resources')
 imgs = list(map(test_resources.joinpath, HiRISE_imgs))
 
-gains = Path('resources') / 'EDR_Stats_gains_config.pvl'
-conf = Path('resources') / 'HiCal.conf'
-hgf_conf = Path('resources') / 'HiGainFx.conf'
-nf_conf = Path('resources') / 'NoiseFilter.conf'
+gains = Path('data') / 'EDR_Stats_gains_config.pvl'
+conf = Path('data') / 'HiCal.conf'
+hgf_conf = Path('data') / 'HiGainFx.conf'
+nf_conf = Path('data') / 'NoiseFilter.conf'
 
 
 class TestResources(unittest.TestCase):
@@ -311,7 +311,7 @@ class TestNeedISISCube(unittest.TestCase):
 
     # def test_HiGainFx(self):
     #     outcube = Path('test_run_HiGainFx-out.cub')
-    #     self.assertIsNone(hc.HiGainFx(self.cube, outcube, Path('resources'),
+    #     self.assertIsNone(hc.HiGainFx(self.cube, outcube, Path('data'),
     #                                   '0001', keep=True))
     #     # outcube.unlink()
 

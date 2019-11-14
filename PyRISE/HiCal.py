@@ -54,7 +54,7 @@ def main():
     parser.add_argument('-o', '--output',  required=False, default='.HiCal.cub')
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources' / 'HiCal.conf')
+                        'data' / 'HiCal.conf')
     parser.add_argument('--db',         required=False, default='.HiCat.json',
                         help="The .json file to use.  Optionally, if it starts "
                         "with a '.' it is considered an extension and will be "
@@ -98,7 +98,7 @@ def main():
             # hgf_path = util.get_path(Path(args.hgfconf), Path(args.conf).parent)
             nf_path = util.get_path(Path(args.nfconf),
                                     (Path(args.conf).parent,
-                                     Path(__file__).resolve().parent.parent / 'resources'))
+                                     Path(__file__).resolve().parent.parent / 'data'))
         except (TypeError, NotADirectoryError, FileNotFoundError) as err:
             logging.critical(err)
             sys.exit()
@@ -508,7 +508,7 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
     hical_args = {'to': to_s, 'units': 'IOF'}
     if(conf['HiCal']['HiCal_ISIS_Conf'] != 'DEFAULT'):
         dirs = (Path(conf_path).parent,
-                Path(__file__).resolve().parent.parent / 'resources')
+                Path(__file__).resolve().parent.parent / 'data')
         if(lis_per < 5 and image_buffer_mean > 0):
             hical_args['conf'] = util.get_path(conf['HiCal']['HiCal_ISIS_Conf'], dirs)
         else:
@@ -742,7 +742,7 @@ def HiGainFx(cube: os.PathLike, outcube: os.PathLike,
     coef_dir = Path(coef_path)
 
     if not coef_dir.exists() or not coef_dir.is_dir():
-        coef_dir = Path(__file__).resolve().parent.parent / 'resources'
+        coef_dir = Path(__file__).resolve().parent.parent / 'data'
         logging.warning('The HiGainFx coefficient directory {} could not be '
                         'found, using {} instead.'.format(coef_path, coef_dir))
 

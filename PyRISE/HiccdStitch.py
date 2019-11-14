@@ -171,7 +171,7 @@ def main():
     parser.add_argument('-o', '--output', required=False, default='.HiccdStitch.cub')
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
-                        'resources' / 'HiccdStitch.conf')
+                        'data' / 'HiccdStitch.conf')
     parser.add_argument('--db',         required=False, default='.HiCat.json',
                         help="The .json file to use.  Optionally, if it starts "
                         "with a '.' it is considered an extension and will be "
