@@ -72,14 +72,13 @@ def main():
         sys.exit()
 
     for i in args.img:
-        ofile_cub = util.path_w_suffix(args.output, i)
+        out_p = util.path_w_suffix(args.output, i)
 
-        histats = EDR_Stats(i, ofile_cub, args.gains,
+        histats = EDR_Stats(i, out_p, args.gains,
                             args.histmin, args.histmax,
                             keep=args.keep)
 
         # DB stuff
-        # add the contents of histats to HiCat.EDR_Products
         # for k, v in histats.items():
         #     print(f'{k}: {v}')
         db_path = util.path_w_suffix(args.db, i)
@@ -88,9 +87,9 @@ def main():
             json.dump(histats, f, indent=0, sort_keys=True)
 
 
-def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
-              keep=False) -> dict:
-    logging.info(f'EDR_Stats(in: {img}, out: {out_cube}, gains: {gains_file}, '
+def EDR_Stats(img: os.PathLike, out_path: os.PathLike, gains_path: os.PathLike,
+              histmin=0.01, histmax=99.99, keep=False) -> dict:
+    logging.info(f'EDR_Stats(in: {img}, out: {out_path}, gains: {gains_path}, '
                  f'hist min & max: {histmin} & {histmax}, keep: {keep})')
     try:
         logging.info('The LUT for this file is: ' + str(check_lut(img)))
@@ -99,9 +98,9 @@ def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
         raise err
 
     # Convert to .cub
-    util.log(isis.hi2isis(img, to=out_cube).args)
+    util.log(isis.hi2isis(img, to=out_path).args)
 
-    histat_complete = isis.histat(out_cube, useoffsets=True,
+    histat_complete = isis.histat(out_path, useoffsets=True,
                                   leftimage=0,     rightimage=1,
                                   leftcalbuffer=3, rightcalbuffer=1,
                                   leftcaldark=3,   rightcaldark=1,
@@ -111,19 +110,19 @@ def EDR_Stats(img, out_cube, gains_file, histmin=0.01, histmax=99.99,
     histats = parse_histat(histat_complete.stdout)
 
     # Get some info from the new cube:
-    histats['PRODUCT_ID'] = isis.getkey_k(out_cube, 'Archive', 'ProductId')
-    histats['IMAGE_LINES'] = int(isis.getkey_k(out_cube, 'Dimensions', 'Lines'))
-    histats['LINE_SAMPLES'] = int(isis.getkey_k(out_cube, 'Dimensions', 'Samples'))
-    histats['BINNING'] = int(isis.getkey_k(out_cube, 'Instrument', 'Summing'))
+    histats['PRODUCT_ID'] = isis.getkey_k(out_path, 'Archive', 'ProductId')
+    histats['IMAGE_LINES'] = int(isis.getkey_k(out_path, 'Dimensions', 'Lines'))
+    histats['LINE_SAMPLES'] = int(isis.getkey_k(out_path, 'Dimensions', 'Samples'))
+    histats['BINNING'] = int(isis.getkey_k(out_path, 'Instrument', 'Summing'))
 
-    histats['STD_DN_LEVELS'] = get_dncnt(out_cube, histmin, histmax, keep=keep)
-    histats['IMAGE_SIGNAL_TO_NOISE_RATIO'] = calc_snr(out_cube, gains_file, histats)
+    histats['STD_DN_LEVELS'] = get_dncnt(out_path, histmin, histmax, keep=keep)
+    histats['IMAGE_SIGNAL_TO_NOISE_RATIO'] = calc_snr(out_path, gains_path, histats)
     histats['GAP_PIXELS_PERCENT'] = (histats['GAP_PIXELS'] /
                                      (int(histats['IMAGE_LINES']) *
                                       int(histats['LINE_SAMPLES']))) * 100.0
 
-    tdi_bin_check(out_cube, histats)
-    lut_check(out_cube, histats)
+    tdi_bin_check(out_path, histats)
+    lut_check(out_path, histats)
 
     logging.info('EDR_Stats done.')
     return(histats)
@@ -201,7 +200,7 @@ def parse_histat(pvltext: str) -> dict:
     return d
 
 
-def get_dncnt(cub, hmin=0.01, hmax=99.99, keep=False) -> int:
+def get_dncnt(cub: os.PathLike, hmin=0.01, hmax=99.99, keep=False) -> int:
     '''Extract DN count from the histogram of a cub file'''
     # I'm not sure about this method.
     # The code below is the exact logic that the original Perl program has,
@@ -371,7 +370,7 @@ def check_lut(img: os.PathLike):
     return None
 
 
-def tdi_bin_check(cube, histats):
+def tdi_bin_check(cube: os.PathLike, histats: dict):
     '''This function only logs warnings and returns nothing.'''
 
     # TDI and binning check
@@ -384,7 +383,7 @@ def tdi_bin_check(cube, histats):
     return
 
 
-def lut_check(cube, histats):
+def lut_check(cube: os.PathLike, histats: dict):
     # LUT check
     lut = int(isis.getkey_k(cube, 'Instrument', 'LookupTableNumber'))
     orbit_number = int(isis.getkey_k(cube, 'Archive', 'OrbitNumber'))
