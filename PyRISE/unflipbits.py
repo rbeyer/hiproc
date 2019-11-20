@@ -87,13 +87,13 @@ def unflip(cube: os.PathLike, out_path: os.PathLike, noise_margin: int,
              1024, 512, 256, 128, 64)
 
     paths = list()
-    for s in steps:
+    for s in steps[:-1]:
         paths.append(to_del.add(in_p.with_suffix('.fx{}.cub'.format(s))))
 
-    in_paths = [in_p] + paths[:-1]
-    out_paths = paths[:-1] + [out_p]
+    in_paths = [in_p] + paths
+    out_paths = paths + [out_p]
 
-    eqn = "\(f1 + (f1{}={})*{})"
+    eqn = "\(f1 + ((f1{}={}) * {}))"
 
     for (i, o, s) in zip(in_paths, out_paths, steps):
         if s < 0:
@@ -101,7 +101,7 @@ def unflip(cube: os.PathLike, out_path: os.PathLike, noise_margin: int,
             thresh = (median - s - noise_margin)
         else:
             glt = '<'
-            thresh = (median + s + noise_margin)
+            thresh = (median - s + noise_margin)
 
         util.log(isis.fx(f1=i,
                          to=o,
