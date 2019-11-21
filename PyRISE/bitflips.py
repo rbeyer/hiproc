@@ -1,5 +1,20 @@
 #!/usr/bin/env python
-"""Deal stuck bits in HiRISE pixels."""
+"""Deal with stuck bits in HiRISE pixels.
+
+    If there is some process which is flipping one of the HiRISE
+    bits in a 14-bit pixel the wrong way, it will inadvertently add
+    or subtract a certain DN value to a pixel.  Naturally, it goes
+    from 2^13 (8192) all the way down to 2.
+
+    In practice, these 'bitflipped' pixels show up as spikes in the
+    image histogram at DN values approximately centered on the image
+    Median plus or minus the bitflip value (8192, 4096, etc.).
+
+    These are not narrow spikes and have variable width, so care
+    must be taken when dealing with them.  This program will do one
+    of two things, it will either attempt to un-flip the bits on
+    the bit-flipped pixels or it will attempt to mask them out.
+"""
 
 # Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
 #
@@ -39,6 +54,10 @@ def main():
                                      parents=[util.parent_parser()])
     parser.add_argument('-o', '--output',
                         required=False, default='.bitflip.cub')
+    parser.add_argument('-m', '--mask', required=False, action='store_true',
+                        help=('If set, the program will mask the '
+                              'bit-flipped pixels, otherwise will '
+                              'try to collapse them.'))
     parser.add_argument('cube', metavar="some.cub-file", nargs='+',
                         help='More than one can be listed here.')
 
@@ -55,10 +74,12 @@ def main():
 
     for i in args.cube:
         out_p = util.path_w_suffix(args.output, i)
-        print(out_p)
 
         try:
-            unflip(i, out_p, keep=args.keep)
+            if args.mask:
+                mask(Path(i), out_p, keep=args.keep)
+            else:
+                unflip(Path(i), out_p, keep=args.keep)
         except subprocess.CalledProcessError as err:
             print('Had an ISIS error:')
             print(' '.join(err.cmd))
@@ -68,24 +89,39 @@ def main():
     return
 
 
-def find_thresh(hist: isis.Histogram, far: float, near: float) -> int:
-    if far > near:
-        start = math.ceil(far)
-        stop = math.floor(near)
-        step = -1
-        rev = True
+def find_thresh(hist: list, start, stop, step=None,
+                findfirst=False) -> int:
+    '''Given the range specified by start, stop and step, the DNs are
+       extracted from the list of namedtuples (from kalasiris.Histogram)
+       the 'gaps' between continuous ranges of DN are found (DNs where
+       the histogram has no pixels).  The largest gap is found, and
+       then the DN value closest to start from that largest gap is
+       returned.
+
+       If step is not specified or None, it will be set to 1 or -1
+       depending on the relative values of start and stop.
+
+       If findfirst is True, then rather than finding the 'biggest'
+       gap, it will return the DN from the gap that is closest to
+       start.
+    '''
+    if start < stop:
+        start = math.floor(start)
+        stop = math.ceil(stop)
+        if step is None:
+            step = 1
     else:
-        start = math.floor(far)
-        stop = math.ceil(near)
-        step = 1
-        rev = False
+        start = math.ceil(start)
+        stop = math.floor(stop)
+        if step is None:
+            step = -1
 
     dn_window = range(start, stop, step)
 
     hist_set = set(filter(lambda d: d in dn_window,
                           (int(x.DN) for x in hist)))
 
-    missing = sorted(set(dn_window).difference(hist_set), reverse=rev)
+    missing = sorted(set(dn_window).difference(hist_set), reverse=(step < 0))
     # logging.info(f'{bs} missing: ' + str(missing))
 
     if len(missing) > 0:
@@ -95,7 +131,11 @@ def find_thresh(hist: isis.Histogram, far: float, near: float) -> int:
                                        c=itertools.count(): next(c) - (step * x))):
             sequences.append(list(g))
 
-        return max(sequences, key=len)[0]
+        if findfirst:
+            return sequences[0][0]
+        else:
+            # find biggest gap
+            return max(sequences, key=len)[0]
     else:
         # There was no gap in DN.
         # Maybe look into the 'Pixel' values of each DN, and find a minimum?
@@ -105,8 +145,8 @@ def find_thresh(hist: isis.Histogram, far: float, near: float) -> int:
 
 def subtract_over_thresh(in_path: os.PathLike, out_path: os.PathLike,
                          thresh: int, delta: int, keep=False):
-    '''For all pixels in in_path, if delta is positive, then pixels
-       with a value greater than thresh will have delta subtracted from
+    '''For all pixels in the in_path ISIS cube, if delta is positive, then
+       pixels with a value greater than thresh will have delta subtracted from
        them.  If delta is negative, then all pixels less than thresh
        will have delta added to them.
     '''
@@ -147,19 +187,52 @@ def subtract_over_thresh(in_path: os.PathLike, out_path: os.PathLike,
     return
 
 
-def unflip(cube: os.PathLike, out_path: os.PathLike, keep=False):
-    in_p = Path(cube)
-    out_p = Path(out_path)
+def histogram(in_path: Path, hist_path: Path):
+    '''This is just a convenience function to facilitate logging.'''
+    util.log(isis.hist(in_path, to=hist_path).args)
+    return isis.Histogram(hist_path)
+
+
+def mask(in_path: Path, out_path: Path, keep=False):
+    '''Attempt to mask out pixels beyond the central DNs of the median.'''
 
     to_del = isis.PathSet()
 
-    # If there is some process which is flipping one of the HiRISE bits
-    # in a 14-bit pixel the wrong way, it will inadvertently add or subtract
-    # these numbers of DN to a pixel.  Naturally, it goes all the way down
-    # the powers of two to 2 itself, but it is less certain that such small
-    # values are erroneous.  These are good guesses, but maybe some exclusion
-    # should happen based on standard deviations or something, so we don't dip
-    # too far down?
+    hist_p = in_path.with_suffix('.hist')
+    hist = histogram(in_path, hist_p)
+
+    median = math.trunc(float(hist['Median']))
+    # std = math.trunc(float(hist['Std Deviation']))
+
+    high = find_thresh(hist, median,
+                       math.trunc(float(hist['Maximum'])),
+                       findfirst=True)
+
+    low = find_thresh(hist, median,
+                      math.trunc(float(hist['Minimum'])),
+                      findfirst=True)
+
+    highdist = high - median
+    lowdist = median - low
+
+    maskmax = find_thresh(hist, median, (median + (2 * highdist)))
+    maskmin = find_thresh(hist, median, (median - (2 * lowdist)))
+
+    util.log(isis.mask(in_path, to=out_path, minimum=maskmin,
+                       maximum=maskmax).args)
+
+    if not keep:
+        hist_p.unlink()
+
+    return
+
+
+def unflip(in_p: Path, out_p: Path, keep=False):
+    '''Attempt to indentify DNs whose bits have been flipped, and
+       unflip them.
+    '''
+    to_del = isis.PathSet()
+
     deltas = (8192, 4096, 2048, 1024, 512, 256, 128, 64)
 
     count = 0
@@ -179,8 +252,7 @@ def unflip(cube: os.PathLike, out_path: os.PathLike, keep=False):
 
             try:
                 hist_p = to_del.add(this_p.with_suffix('.hist'))
-                util.log(isis.hist(this_p, to=hist_p).args)
-                hist = isis.Histogram(hist_p)
+                hist = histogram(this_p, hist_p)
             except ValueError:
                 # Already have this .hist, don't need to remake.
                 pass
