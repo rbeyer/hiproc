@@ -19,8 +19,11 @@
 
 
 import argparse
+import itertools
 import logging
+import math
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -34,8 +37,8 @@ import kalasiris as isis
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()])
-    parser.add_argument('-o', '--output', required=False, default='.unflip.cub')
-    parser.add_argument('-n', '--noise', required=False, default=20)
+    parser.add_argument('-o', '--output',
+                        required=False, default='.unflip.cub')
     parser.add_argument('cube', metavar="some.cub-file", nargs='+',
                         help='More than one can be listed here.')
 
@@ -55,7 +58,7 @@ def main():
         print(out_p)
 
         try:
-            unflip(i, out_p, args.noise, keep=args.keep)
+            unflip(i, out_p, keep=args.keep)
         except subprocess.CalledProcessError as err:
             print('Had an ISIS error:')
             print(' '.join(err.cmd))
@@ -65,16 +68,90 @@ def main():
     return
 
 
-def unflip(cube: os.PathLike, out_path: os.PathLike, noise_margin: int,
-           keep=False):
+def find_thresh(hist: isis.Histogram, far: float, near: float) -> int:
+    if far > near:
+        start = math.ceil(far)
+        stop = math.floor(near)
+        step = -1
+        rev = True
+    else:
+        start = math.floor(far)
+        stop = math.ceil(near)
+        step = 1
+        rev = False
+
+    dn_window = range(start, stop, step)
+
+    hist_set = set(filter(lambda d: d in dn_window,
+                          (int(x.DN) for x in hist)))
+
+    missing = sorted(set(dn_window).difference(hist_set), reverse=rev)
+    # logging.info(f'{bs} missing: ' + str(missing))
+
+    if len(missing) > 0:
+        sequences = list()
+        for k, g in itertools.groupby(missing,
+                                      (lambda x,
+                                       c=itertools.count(): next(c) - (step * x))):
+            sequences.append(list(g))
+
+        return max(sequences, key=len)[0]
+    else:
+        # There was no gap in DN.
+        # Maybe look into the 'Pixel' values of each DN, and find a minimum?
+        raise ValueError('There was no gap in the DN window from '
+                         f'{start} to {stop}.')
+
+
+def subtract_over_thresh(in_path: os.PathLike, out_path: os.PathLike,
+                         thresh: int, delta: int, keep=False):
+    '''For all pixels in in_path, if delta is positive, then pixels
+       with a value greater than thresh will have delta subtracted from
+       them.  If delta is negative, then all pixels less than thresh
+       will have delta added to them.
+    '''
+
+    # Originally, I wanted to just do this simply with fx:
+    # eqn = "\(f1 + ((f1{glt}={thresh}) * {(-1 * delta)}))"
+    # However, fx writes out floating point pixel values, and we really
+    # need to keep DNs as ints as long as possible.  Sigh.
+
+    shutil.copyfile(in_path, out_path)
+
+    # stats = isis.stats_k(in_path)
+    # dnmin = math.trunc(float(stats['Minimum']))
+    # dnmax = math.trunc(float(stats['Maximum']))
+
+    # suffix = f'+SignedWord+{dnmin}:{dnmax}'
+    mask_p = in_path.with_suffix('.threshmask.cub')
+    # mask_args = {'from': in_path, 'to': str(mask_p) + suffix}
+    mask_args = {'from': in_path, 'to': mask_p}
+    if delta > 0:
+        mask_args['min'] = thresh
+    else:
+        mask_args['max'] = thresh
+    util.log(isis.mask(**mask_args).args)
+
+    delta_p = in_path.with_suffix('.delta.cub')
+    # util.log(isis.algebra(mask_p, to=str(delta_p) + suffix, op='unary',
+    #                      a=0, c=delta).args)
+    util.log(isis.algebra(mask_p, from2=in_path, to=delta_p,
+                          op='add', a=0, c=(-1 * delta)).args)
+
+    util.log(isis.handmos(delta_p, mosaic=out_path).args)
+
+    if not keep:
+        mask_p.unlink()
+        delta_p.unlink()
+
+    return
+
+
+def unflip(cube: os.PathLike, out_path: os.PathLike, keep=False):
     in_p = Path(cube)
     out_p = Path(out_path)
 
     to_del = isis.PathSet()
-
-    stats = isis.stats(in_p)
-    util.log(stats.args)
-    median = int(pvl.loads(stats.stdout)['Results']['Median'])
 
     # If there is some process which is flipping one of the HiRISE bits
     # in a 14-bit pixel the wrong way, it will inadvertently add or subtract
@@ -83,29 +160,49 @@ def unflip(cube: os.PathLike, out_path: os.PathLike, noise_margin: int,
     # values are erroneous.  These are good guesses, but maybe some exclusion
     # should happen based on standard deviations or something, so we don't dip
     # too far down?
-    steps = (-4096, -2048, -1024, -512, -256, -128, -64,
-             1024, 512, 256, 128, 64)
+    deltas = (8192, 4096, 2048, 1024, 512, 256, 128, 64)
 
-    paths = list()
-    for s in steps[:-1]:
-        paths.append(to_del.add(in_p.with_suffix('.fx{}.cub'.format(s))))
+    count = 0
+    suffix = '.uf{}-{}{}.cub'
+    this_p = to_del.add(in_p.with_suffix(suffix.format(count, 0, 0)))
+    this_p.symlink_to(in_p)
 
-    in_paths = [in_p] + paths
-    out_paths = paths + [out_p]
+    median = math.trunc(float(isis.stats_k(in_p)['Median']))
 
-    eqn = "\(f1 + ((f1{}={}) * {}))"
+    for (sign, pm, extrema) in ((+1, 'm', 'Maximum'),
+                                (-1, 'p', 'Minimum')):
+        logging.info(pm)
+        for delt in deltas:
+            d = sign * delt
+            far = median + d
+            near = median + (d / 2)
 
-    for (i, o, s) in zip(in_paths, out_paths, steps):
-        if s < 0:
-            glt = '>'
-            thresh = (median - s - noise_margin)
-        else:
-            glt = '<'
-            thresh = (median - s + noise_margin)
+            try:
+                hist_p = to_del.add(this_p.with_suffix('.hist'))
+                util.log(isis.hist(this_p, to=hist_p).args)
+                hist = isis.Histogram(hist_p)
+            except ValueError:
+                # Already have this .hist, don't need to remake.
+                pass
 
-        util.log(isis.fx(f1=i,
-                         to=o,
-                         equation=eqn.format(glt, thresh, s)).args)
+            logging.info(f'bitflip position {pm}{delt}, near: {near} '
+                         f'far: {far}, extrema: {hist[extrema]}')
+            if((sign > 0 and far < float(hist[extrema])) or
+               (sign < 0 and far > float(hist[extrema]))):
+                count += 1
+                s = suffix.format(count, pm, delt)
+                next_p = to_del.add(this_p.with_suffix('').with_suffix(s))
+                try:
+                    thresh = find_thresh(hist, far, near)
+                except ValueError:
+                    logging.info('No threshold found.')
+                    count -= 1
+                    break
+                subtract_over_thresh(this_p, next_p, thresh, d, keep=keep)
+                this_p = next_p
+            else:
+                logging.info("The far value was beyond the extrema. "
+                             "Didn't bother.")
 
     if not keep:
         to_del.unlink()
