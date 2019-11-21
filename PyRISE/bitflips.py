@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Unflip stuck bits in HiRISE pixels."""
+"""Deal stuck bits in HiRISE pixels."""
 
 # Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
 #
@@ -38,7 +38,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()])
     parser.add_argument('-o', '--output',
-                        required=False, default='.unflip.cub')
+                        required=False, default='.bitflip.cub')
     parser.add_argument('cube', metavar="some.cub-file", nargs='+',
                         help='More than one can be listed here.')
 
@@ -163,7 +163,7 @@ def unflip(cube: os.PathLike, out_path: os.PathLike, keep=False):
     deltas = (8192, 4096, 2048, 1024, 512, 256, 128, 64)
 
     count = 0
-    suffix = '.uf{}-{}{}.cub'
+    suffix = '.bf{}-{}{}.cub'
     this_p = to_del.add(in_p.with_suffix(suffix.format(count, 0, 0)))
     this_p.symlink_to(in_p)
 

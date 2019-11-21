@@ -1,5 +1,0 @@
-#!/usr/bin/env python
-
-import PyRISE.unflipbits as ufb
-
-ufb.main()
