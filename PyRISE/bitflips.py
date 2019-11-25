@@ -89,8 +89,27 @@ def main():
     return
 
 
-def find_thresh(hist: list, start, stop, step=None,
-                findfirst=False) -> int:
+def get_range(start, stop, step=None):
+    '''Returns a range object given floating point start and
+       stop values (the optional step must be an int).  If
+       step is none, it will be set to 1 or -1 depending on the
+       relative values of start and stop.
+    '''
+    if start < stop:
+        start = math.floor(start)
+        stop = math.ceil(stop)
+        if step is None:
+            step = 1
+    else:
+        start = math.ceil(start)
+        stop = math.floor(stop)
+        if step is None:
+            step = -1
+
+    return range(start, stop, step)
+
+
+def find_gap(hist: list, start, stop, step=None, findfirst=False) -> int:
     '''Given the range specified by start, stop and step, the DNs are
        extracted from the list of namedtuples (from kalasiris.Histogram)
        the 'gaps' between continuous ranges of DN are found (DNs where
@@ -105,30 +124,21 @@ def find_thresh(hist: list, start, stop, step=None,
        gap, it will return the DN from the gap that is closest to
        start.
     '''
-    if start < stop:
-        start = math.floor(start)
-        stop = math.ceil(stop)
-        if step is None:
-            step = 1
-    else:
-        start = math.ceil(start)
-        stop = math.floor(stop)
-        if step is None:
-            step = -1
-
-    dn_window = range(start, stop, step)
+    dn_window = get_range(start, stop, step)
 
     hist_set = set(filter(lambda d: d in dn_window,
                           (int(x.DN) for x in hist)))
 
-    missing = sorted(set(dn_window).difference(hist_set), reverse=(step < 0))
+    missing = sorted(set(dn_window).difference(hist_set),
+                     reverse=(dn_window.step < 0))
     # logging.info(f'{bs} missing: ' + str(missing))
 
     if len(missing) > 0:
         sequences = list()
         for k, g in itertools.groupby(missing,
                                       (lambda x,
-                                       c=itertools.count(): next(c) - (step * x))):
+                                       c=itertools.count(): next(c) -
+                                       (dn_window.step * x))):
             sequences.append(list(g))
 
         if findfirst:
@@ -138,9 +148,22 @@ def find_thresh(hist: list, start, stop, step=None,
             return max(sequences, key=len)[0]
     else:
         # There was no gap in DN.
-        # Maybe look into the 'Pixel' values of each DN, and find a minimum?
         raise ValueError('There was no gap in the DN window from '
                          f'{start} to {stop}.')
+
+
+def find_min_dn(hist: list, start, stop, step=None):
+    '''Given how the min() mechanics work, this should return the first
+       DN value of the entry with the lowest pixel count, in range order
+       (if there is more than one).
+    '''
+    r = get_range(start, stop, step)
+    hist_list = sorted(filter(lambda x: int(x.DN) in r, hist),
+                       key=lambda x: int(x.DN),
+                       reverse=(r.step < 0))
+
+    h = min(hist_list, key=lambda x: int(x.Pixels))
+    return int(h.DN)
 
 
 def subtract_over_thresh(in_path: os.PathLike, out_path: os.PathLike,
@@ -204,19 +227,19 @@ def mask(in_path: Path, out_path: Path, keep=False):
     median = math.trunc(float(hist['Median']))
     # std = math.trunc(float(hist['Std Deviation']))
 
-    high = find_thresh(hist, median,
-                       math.trunc(float(hist['Maximum'])),
-                       findfirst=True)
+    high = find_gap(hist, median,
+                    math.trunc(float(hist['Maximum'])),
+                    findfirst=True)
 
-    low = find_thresh(hist, median,
-                      math.trunc(float(hist['Minimum'])),
-                      findfirst=True)
+    low = find_gap(hist, median,
+                   math.trunc(float(hist['Minimum'])),
+                   findfirst=True)
 
     highdist = high - median
     lowdist = median - low
 
-    maskmax = find_thresh(hist, median, (median + (2 * highdist)))
-    maskmin = find_thresh(hist, median, (median - (2 * lowdist)))
+    maskmax = find_gap(hist, median, (median + (2 * highdist)))
+    maskmin = find_gap(hist, median, (median - (2 * lowdist)))
 
     util.log(isis.mask(in_path, to=out_path, minimum=maskmin,
                        maximum=maskmax).args)
@@ -227,13 +250,34 @@ def mask(in_path: Path, out_path: Path, keep=False):
     return
 
 
+def get_unflip_thresh(hist, far, near, lowlimit):
+    try:
+        thresh = find_gap(hist, far, near)
+    except ValueError:
+        logging.info('No zero threshold found.')
+        if d >= lowlimit:
+            thresh = find_min_dn(hist, far, near)
+            logging.info(f'Found a minimum threshold: {thresh}')
+            if(thresh == far or thresh == near):
+                raise ValueError(f'Minimum, {thresh}, at edge of range.')
+        else:
+            raise ValueError(f'Below {lowlimit}, skipping.')
+    return thresh
+
+
 def unflip(in_p: Path, out_p: Path, keep=False):
     '''Attempt to indentify DNs whose bits have been flipped, and
        unflip them.
     '''
     to_del = isis.PathSet()
 
-    deltas = (8192, 4096, 2048, 1024, 512, 256, 128, 64)
+    # This full suite of deltas works well for the reverse-clock area
+    # and even 'dark' images, but not 'real' images.
+    # deltas = (8192, 4096, 2048, 1024, 512, 256, 128, 64)
+
+    # Restricting the number of deltas might help, but this seems
+    # arbitrary.
+    deltas = (8192, 4096, 2048, 1024)
 
     count = 0
     suffix = '.bf{}-{}{}.cub'
@@ -244,7 +288,7 @@ def unflip(in_p: Path, out_p: Path, keep=False):
 
     for (sign, pm, extrema) in ((+1, 'm', 'Maximum'),
                                 (-1, 'p', 'Minimum')):
-        logging.info(pm)
+        # logging.info(pm)
         for delt in deltas:
             d = sign * delt
             far = median + d
@@ -265,9 +309,9 @@ def unflip(in_p: Path, out_p: Path, keep=False):
                 s = suffix.format(count, pm, delt)
                 next_p = to_del.add(this_p.with_suffix('').with_suffix(s))
                 try:
-                    thresh = find_thresh(hist, far, near)
-                except ValueError:
-                    logging.info('No threshold found.')
+                    thresh = get_unflip_thresh(hist, far, near, d)
+                except ValueError as err:
+                    logging.info(err)
                     count -= 1
                     break
                 subtract_over_thresh(this_p, next_p, thresh, d, keep=keep)
@@ -276,7 +320,10 @@ def unflip(in_p: Path, out_p: Path, keep=False):
                 logging.info("The far value was beyond the extrema. "
                              "Didn't bother.")
 
+    shutil.move(this_p, out_p)
+
     if not keep:
+        to_del.remove(this_p)
         to_del.unlink()
 
     return
