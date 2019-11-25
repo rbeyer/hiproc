@@ -42,6 +42,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import numpy as np
+from scipy.signal import find_peaks
+
 import pvl
 
 import PyRISE.hirise as hirise
@@ -217,7 +220,60 @@ def histogram(in_path: Path, hist_path: Path):
 
 
 def mask(in_path: Path, out_path: Path, keep=False):
-    '''Attempt to mask out pixels beyond the central DNs of the median.'''
+    '''Attempt to mask out pixels beyond the central DNs of the median
+       based on minima in the histogram.'''
+
+    import matplotlib.pyplot as plt
+
+    to_del = isis.PathSet()
+
+    hist_p = in_path.with_suffix('.hist')
+    hist = histogram(in_path, hist_p)
+
+    median = math.trunc(float(hist['Median']))
+
+    hist_list = sorted(hist, key=lambda x: int(x.DN))
+    pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
+    dn = np.fromiter((int(x.DN) for x in hist_list), int)
+
+    negpix = np.negative(pixel_counts)
+
+    minima, prop = find_peaks(negpix)
+    # print(minima)
+    # print(hist_list[minima[0]])
+
+    print(prop)
+
+    peak_index = np.argmax(pixel_counts)
+
+    minindex = max(filter(lambda i: i < peak_index, minima))
+    maxindex = min(filter(lambda i: i > peak_index, minima))
+
+    plt.yscale('log')
+    plt.axvline(x=np.where(dn == median), c='gray')
+    plt.axvline(x=peak_index, c='lime', ls='--')
+    plt.plot(pixel_counts)
+    plt.plot(minima, pixel_counts[minima], "x")
+    plt.plot(minindex, pixel_counts[minindex], "o", c='red')
+    plt.plot(maxindex, pixel_counts[maxindex], "o", c='red')
+    plt.show()
+
+    # util.log(isis.mask(in_path, to=out_path, minimum=maskmin,
+    #                    maximum=maskmax).args)
+
+    if not keep:
+        hist_p.unlink()
+    return
+
+
+def mask_gap(in_path: Path, out_path: Path, keep=False):
+    '''Attempt to mask out pixels beyond the central DNs of the median
+       based on gaps in the histogram.'''
+
+    # This approach worked well based on 'ideal' reverse-clocked data
+    # or 'dark' images, but in 'real' HiRISE images of Mars, the reality
+    # is that there are 'gaps' everywhere along the DN range, and this
+    # approach ends up being too 'dumb'.
 
     to_del = isis.PathSet()
 
