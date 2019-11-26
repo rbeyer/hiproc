@@ -51,8 +51,6 @@ import pyrise.hirise as hirise
 import pyrise.util as util
 import kalasiris as isis
 
-from PyRISE.HiCal import analyze_cubenorm_stats2
-
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
@@ -224,6 +222,7 @@ def histogram(in_path: Path, hist_path: Path):
 def mask(in_path: Path, out_path: Path, keep=False):
     """Attempt to mask out pixels beyond the central DNs of the median
     based on minima in the histogram."""
+    from PyRISE.HiCal import analyze_cubenorm_stats2
 
     to_del = isis.PathSet()
 
@@ -273,7 +272,8 @@ def find_minima_index(central_idx: int, limit_idx: int,
         logging.info(str(inrange_i) + ' are the indexes inside the range.')
 
         value = min(np.take(pixel_counts, inrange_i))
-        logging.info(f'{value} is the minimum DN value amongst those indexes.')
+        logging.info(f'{value} is the minimum Pixel count amongst those '
+                     'indexes.')
 
         idx = inrange_i[np.asarray(pixel_counts[inrange_i] ==
                                    value).nonzero()][select_idx]
@@ -333,7 +333,7 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
         plt.plot(max_i, pixel_counts[max_i], "o", c='red')
         plt.show()
 
-    return (mindn, maxdn)
+    return (dn[min_i], dn[max_i])
 
 
 def mask_gap(in_path: Path, out_path: Path, keep=False):

@@ -87,6 +87,7 @@ from pathlib import Path
 
 import pvl
 import kalasiris as isis
+from PyRISE.bitflips import find_smart_window
 
 import pyrise.hirise as hirise
 import pyrise.util as util
@@ -690,10 +691,18 @@ def mask(in_cube: os.PathLike, out_cube: os.PathLike, noisefilter_min: float,
         img_mean = float(results['Average'])
         img_mode = float(results['Mode'])
         img_median = float(results['Median'])
+
+        hist_p = to_del.add(temp_cube.with_suffix('.hist'))
+        util.log(isis.hist(temp_cube, to=hist_p).args)
+        hist = isis.Histogram(hist_p)
+        # median = math.trunc(float(hist['Median']))
+
         d = img_mean - img_mode
         logging.info(f'{temp_cube} Mean: {img_mean}, Mode: {img_mode}, '
                      f'diff: {d}, Median: {img_median}')
-        (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, img_mode,
+
+        (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file,
+                                                 img_median, hist,
                                                  newalg)
 
     util.log(isis.mask(temp_cube, mask=temp_cube, to=out_path,
@@ -787,7 +796,7 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
 
 
 def analyze_cubenorm_stats2(statsfile: os.PathLike, central: float,
-                            width=10) -> tuple:
+                            hist: list, width=10) -> tuple:
     # The analyze_cubenorm_stats() function is meant to make sure we
     # don't blow away valid data, with the philosphy that it is better to
     # let in a little bad data in order to keep the good.  However, in
@@ -843,7 +852,7 @@ def analyze_cubenorm_stats2(statsfile: os.PathLike, central: float,
     mindn = central - (width * medstd)
     maxdn = central + (width * medstd)
 
-    return(mindn, maxdn)
+    return find_smart_window(hist, mindn, maxdn, central, plot=False)
 
 
 def HiGainFx(cube: os.PathLike, outcube: os.PathLike,
