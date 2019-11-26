@@ -786,7 +786,8 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
     return(mindn, maxdn)
 
 
-def analyze_cubenorm_stats2(statsfile: os.PathLike, mean: float, width=10) -> tuple:
+def analyze_cubenorm_stats2(statsfile: os.PathLike, central: float,
+                            width=10) -> tuple:
     # The analyze_cubenorm_stats() function is meant to make sure we
     # don't blow away valid data, with the philosphy that it is better to
     # let in a little bad data in order to keep the good.  However, in
@@ -839,8 +840,8 @@ def analyze_cubenorm_stats2(statsfile: os.PathLike, mean: float, width=10) -> tu
                  'columns ({}) that have the '.format(len(std_w_maxvp)) +
                  'maximum valid pixel count: {}'.format(medstd))
 
-    mindn = mean - (width * medstd)
-    maxdn = mean + (width * medstd)
+    mindn = central - (width * medstd)
+    maxdn = central + (width * medstd)
 
     return(mindn, maxdn)
 

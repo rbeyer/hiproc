@@ -51,6 +51,8 @@ import pyrise.hirise as hirise
 import pyrise.util as util
 import kalasiris as isis
 
+from PyRISE.HiCal import analyze_cubenorm_stats2
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
@@ -232,30 +234,77 @@ def mask(in_path: Path, out_path: Path, keep=False):
 
     median = math.trunc(float(hist['Median']))
 
+    cubenorm_stats_file = to_del.add(in_path.with_suffix('.cn.stats'))
+    util.log(isis.cubenorm(in_path, stats=cubenorm_stats_file).args)
+    (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, median,
+                                             5)
+
     hist_list = sorted(hist, key=lambda x: int(x.DN))
     pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
     dn = np.fromiter((int(x.DN) for x in hist_list), int)
 
+    mindn_i = (np.abs(dn - mindn)).argmin()
+    maxdn_i = (np.abs(dn - maxdn)).argmin()
+
     negpix = np.negative(pixel_counts)
 
-    minima, prop = find_peaks(negpix)
+    minima_i, prop = find_peaks(negpix)
     # print(minima)
     # print(hist_list[minima[0]])
 
-    print(prop)
+    peak_i = np.argmax(pixel_counts)
 
-    peak_index = np.argmax(pixel_counts)
+    print('Looking for min inside range ...')
+    try:
+        inrange_i = np.fromiter(filter(lambda i: i < np.where(dn == median) and
+                                       i >= mindn_i, minima_i), int)
+        print(str(inrange_i) + ' are the indexes inside the range.')
+        min_value = min(np.take(pixel_counts, inrange_i))
+        print(f'{min_value} is the minimum DN value amongst those indexes.')
+        # minindex = np.asarray(pixel_counts == min_value).nonzero()[0][0]
+        # foo = np.asarray(pixel_counts == min_value).nonzero()
+        # print(foo)
+        # minindex = foo[0][0]
+        min_i = inrange_i[np.asarray(pixel_counts[inrange_i] ==
+                                     min_value).nonzero()][0]
 
-    minindex = max(filter(lambda i: i < peak_index, minima))
-    maxindex = min(filter(lambda i: i > peak_index, minima))
+        # minindex = min(filter(lambda i: i < np.where(dn == median) and i > mindn_index, minima))
+    except ValueError:
+        print('Looking for min outside range ...')
+        min_i = max(filter(lambda i: i < mindn_i, minima_i))
+    print(f'{min_i} is the minimum index.')
+
+    # maxindex = min(filter(lambda i: i > median, minima))
+    print('Looking for max inside range ...')
+    try:
+        inrange_i = np.fromiter(filter(lambda i: i > np.where(dn == median) and
+                                       i <= maxdn_i, minima_i), int)
+        print(str(inrange_i) + ' are the indexes inside the range.')
+        max_value = min(np.take(pixel_counts, inrange_i))
+        print(f'{max_value} is the minimum DN value amongst those indexes.')
+        # max_i = np.asarray(pixel_counts == max_value).nonzero()[0][-1]
+        # maxindex = max(filter(lambda i: i > np.where(dn == median) and i < maxdn_index, minima))
+        max_i = inrange_i[np.asarray(pixel_counts[inrange_i] ==
+                                     max_value).nonzero()][-1]
+    except ValueError:
+        print('Looking for max outside range ...')
+        max_i = min(filter(lambda i: i > maxdn_i, minima_i))
+    print(f'{max_i} is the maximum index.')
+
+    indices = np.arange(0, len(pixel_counts))
+
+    dn_window = np.fromiter(map((lambda i: i >= mindn_i and i <= maxdn_i),
+                                (x for x in range(len(pixel_counts)))),
+                            dtype=bool)
 
     plt.yscale('log')
+    plt.fill_between(indices, pixel_counts, where=dn_window, color='lightgray')
     plt.axvline(x=np.where(dn == median), c='gray')
-    plt.axvline(x=peak_index, c='lime', ls='--')
+    plt.axvline(x=peak_i, c='lime', ls='--')
     plt.plot(pixel_counts)
-    plt.plot(minima, pixel_counts[minima], "x")
-    plt.plot(minindex, pixel_counts[minindex], "o", c='red')
-    plt.plot(maxindex, pixel_counts[maxindex], "o", c='red')
+    plt.plot(minima_i, pixel_counts[minima_i], "x")
+    plt.plot(min_i, pixel_counts[min_i], "o", c='red')
+    plt.plot(max_i, pixel_counts[max_i], "o", c='red')
     plt.show()
 
     # util.log(isis.mask(in_path, to=out_path, minimum=maskmin,
