@@ -225,8 +225,6 @@ def mask(in_path: Path, out_path: Path, keep=False):
     """Attempt to mask out pixels beyond the central DNs of the median
     based on minima in the histogram."""
 
-    import matplotlib.pyplot as plt
-
     to_del = isis.PathSet()
 
     hist_p = in_path.with_suffix('.hist')
@@ -238,74 +236,8 @@ def mask(in_path: Path, out_path: Path, keep=False):
     util.log(isis.cubenorm(in_path, stats=cubenorm_stats_file).args)
     (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, median,
                                              5)
-
-    hist_list = sorted(hist, key=lambda x: int(x.DN))
-    pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
-    dn = np.fromiter((int(x.DN) for x in hist_list), int)
-
-    mindn_i = (np.abs(dn - mindn)).argmin()
-    maxdn_i = (np.abs(dn - maxdn)).argmin()
-
-    negpix = np.negative(pixel_counts)
-
-    minima_i, prop = find_peaks(negpix)
-    # print(minima)
-    # print(hist_list[minima[0]])
-
-    peak_i = np.argmax(pixel_counts)
-
-    print('Looking for min inside range ...')
-    try:
-        inrange_i = np.fromiter(filter(lambda i: i < np.where(dn == median) and
-                                       i >= mindn_i, minima_i), int)
-        print(str(inrange_i) + ' are the indexes inside the range.')
-        min_value = min(np.take(pixel_counts, inrange_i))
-        print(f'{min_value} is the minimum DN value amongst those indexes.')
-        # minindex = np.asarray(pixel_counts == min_value).nonzero()[0][0]
-        # foo = np.asarray(pixel_counts == min_value).nonzero()
-        # print(foo)
-        # minindex = foo[0][0]
-        min_i = inrange_i[np.asarray(pixel_counts[inrange_i] ==
-                                     min_value).nonzero()][0]
-
-        # minindex = min(filter(lambda i: i < np.where(dn == median) and i > mindn_index, minima))
-    except ValueError:
-        print('Looking for min outside range ...')
-        min_i = max(filter(lambda i: i < mindn_i, minima_i))
-    print(f'{min_i} is the minimum index.')
-
-    # maxindex = min(filter(lambda i: i > median, minima))
-    print('Looking for max inside range ...')
-    try:
-        inrange_i = np.fromiter(filter(lambda i: i > np.where(dn == median) and
-                                       i <= maxdn_i, minima_i), int)
-        print(str(inrange_i) + ' are the indexes inside the range.')
-        max_value = min(np.take(pixel_counts, inrange_i))
-        print(f'{max_value} is the minimum DN value amongst those indexes.')
-        # max_i = np.asarray(pixel_counts == max_value).nonzero()[0][-1]
-        # maxindex = max(filter(lambda i: i > np.where(dn == median) and i < maxdn_index, minima))
-        max_i = inrange_i[np.asarray(pixel_counts[inrange_i] ==
-                                     max_value).nonzero()][-1]
-    except ValueError:
-        print('Looking for max outside range ...')
-        max_i = min(filter(lambda i: i > maxdn_i, minima_i))
-    print(f'{max_i} is the maximum index.')
-
-    indices = np.arange(0, len(pixel_counts))
-
-    dn_window = np.fromiter(map((lambda i: i >= mindn_i and i <= maxdn_i),
-                                (x for x in range(len(pixel_counts)))),
-                            dtype=bool)
-
-    plt.yscale('log')
-    plt.fill_between(indices, pixel_counts, where=dn_window, color='lightgray')
-    plt.axvline(x=np.where(dn == median), c='gray')
-    plt.axvline(x=peak_i, c='lime', ls='--')
-    plt.plot(pixel_counts)
-    plt.plot(minima_i, pixel_counts[minima_i], "x")
-    plt.plot(min_i, pixel_counts[min_i], "o", c='red')
-    plt.plot(max_i, pixel_counts[max_i], "o", c='red')
-    plt.show()
+    (maskmin, maskmax) = find_smart_window(hist, mindn, maxdn, median,
+                                           plot=True)
 
     # util.log(isis.mask(in_path, to=out_path, minimum=maskmin,
     #                    maximum=maskmax).args)
@@ -313,6 +245,95 @@ def mask(in_path: Path, out_path: Path, keep=False):
     if not keep:
         hist_p.unlink()
     return
+
+
+def find_minima_index(central_idx: int, limit_idx: int,
+                      minima_idxs: np.ndarray, pixel_counts: np.ndarray) -> int:
+    '''Searches the pixel_counts at the minima_idxs positions between
+       central_idx and limit_idx to find the one with the lowest pixel_count
+       value (if multiple, choose the closest to the limit_idx position).
+
+       If no minima_idx values are found in the range, the next value in
+       minima_idx past the limit_idx will be returned.
+    '''
+    info_str = 'Looking for {} {} range ...'
+    try:
+        if limit_idx < central_idx:
+            logging.info(info_str.format('min', 'inside'))
+            inrange_iter = filter(lambda i: i < central_idx and i >= limit_idx,
+                                  minima_idxs)
+            select_idx = 0
+        else:
+            logging.info(info_str.format('max', 'inside'))
+            inrange_iter = filter(lambda i: i > central_idx and i <= limit_idx,
+                                  minima_idxs)
+            select_idx = -1
+
+        inrange_i = np.fromiter(inrange_iter, int)
+        logging.info(str(inrange_i) + ' are the indexes inside the range.')
+
+        value = min(np.take(pixel_counts, inrange_i))
+        logging.info(f'{value} is the minimum DN value amongst those indexes.')
+
+        idx = inrange_i[np.asarray(pixel_counts[inrange_i] ==
+                                   value).nonzero()][select_idx]
+    except ValueError:
+        if limit_idx < central_idx:
+            logging.info(info_str.format('min', 'outside'))
+            idx = max(filter(lambda i: i < limit_idx, minima_idxs))
+        else:
+            logging.info(info_str.format('max', 'outside'))
+            idx = min(filter(lambda i: i > limit_idx, minima_idxs))
+
+    logging.info(f'{idx} is the minimum index.')
+    return idx
+
+
+def find_smart_window(hist: list, mindn: int, maxdn: int,
+                      centraldn: int, plot=False) -> tuple:
+    '''Returns a minimum and maximum DN value from hist which are
+       based on using the find_minima_index() function with the
+       given mindn, maxdn, and centraldn values.
+
+       If plot is True, this function will display a plot describing
+       its work.  The curve represents the hist values, the shaded
+       area marks the window between the given mindn and maxdn.  The
+       'x'es mark all the detected minima, and the red dots indicate
+       the minimum and maximum DN values that this function will
+       return.
+    '''
+    hist_list = sorted(hist, key=lambda x: int(x.DN))
+    pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
+    dn = np.fromiter((int(x.DN) for x in hist_list), int)
+
+    mindn_i = (np.abs(dn - mindn)).argmin()
+    maxdn_i = (np.abs(dn - maxdn)).argmin()
+    central_i = np.where(dn == centraldn)
+
+    minima_i, _ = find_peaks(np.negative(pixel_counts))
+
+    min_i = find_minima_index(central_i, mindn_i, minima_i, pixel_counts)
+    max_i = find_minima_index(central_i, maxdn_i, minima_i, pixel_counts)
+
+    if plot:
+        import matplotlib.pyplot as plt
+
+        indices = np.arange(0, len(pixel_counts))
+        dn_window = np.fromiter(map((lambda i: i >= mindn_i and i <= maxdn_i),
+                                    (x for x in range(len(pixel_counts)))),
+                                dtype=bool)
+        plt.yscale('log')
+        plt.fill_between(indices, pixel_counts, where=dn_window,
+                         color='lightgray')
+        plt.axvline(x=central_i, c='gray')
+        plt.axvline(x=np.argmax(pixel_counts), c='lime', ls='--')
+        plt.plot(pixel_counts)
+        plt.plot(minima_i, pixel_counts[minima_i], "x")
+        plt.plot(min_i, pixel_counts[min_i], "o", c='red')
+        plt.plot(max_i, pixel_counts[max_i], "o", c='red')
+        plt.show()
+
+    return (mindn, maxdn)
 
 
 def mask_gap(in_path: Path, out_path: Path, keep=False):
