@@ -796,7 +796,7 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
 
 
 def analyze_cubenorm_stats2(statsfile: os.PathLike, central: float,
-                            hist: list, width=10) -> tuple:
+                            hist: list, width=10, plot=False) -> tuple:
     # The analyze_cubenorm_stats() function is meant to make sure we
     # don't blow away valid data, with the philosphy that it is better to
     # let in a little bad data in order to keep the good.  However, in
@@ -852,7 +852,7 @@ def analyze_cubenorm_stats2(statsfile: os.PathLike, central: float,
     mindn = central - (width * medstd)
     maxdn = central + (width * medstd)
 
-    return find_smart_window(hist, mindn, maxdn, central, plot=False)
+    return find_smart_window(hist, mindn, maxdn, central, plot=plot)
 
 
 def HiGainFx(cube: os.PathLike, outcube: os.PathLike,

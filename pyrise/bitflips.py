@@ -234,9 +234,14 @@ def mask(in_path: Path, out_path: Path, keep=False):
     cubenorm_stats_file = to_del.add(in_path.with_suffix('.cn.stats'))
     util.log(isis.cubenorm(in_path, stats=cubenorm_stats_file).args)
     (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, median,
-                                             5)
-    (maskmin, maskmax) = find_smart_window(hist, mindn, maxdn, median,
-                                           plot=True)
+                                             hist, width=5, plot=True)
+
+    # To bypass the 'medstd' calculations in analyze_cubenorm_stats2(),
+    # this mechanism can be used to set the limits directly.
+    # (mindn, maxdn) = find_smart_window(hist,
+    #                                    math.trunc(float(hist['Minimum'])),
+    #                                    math.trunc(float(hist['Maximum'])),
+    #                                    median, plot=True)
 
     # util.log(isis.mask(in_path, to=out_path, minimum=maskmin,
     #                    maximum=maskmax).args)
@@ -278,14 +283,20 @@ def find_minima_index(central_idx: int, limit_idx: int,
         idx = inrange_i[np.asarray(pixel_counts[inrange_i] ==
                                    value).nonzero()][select_idx]
     except ValueError:
-        if limit_idx < central_idx:
-            logging.info(info_str.format('min', 'outside'))
-            idx = max(filter(lambda i: i < limit_idx, minima_idxs))
-        else:
-            logging.info(info_str.format('max', 'outside'))
-            idx = min(filter(lambda i: i > limit_idx, minima_idxs))
+        try:
+            if limit_idx < central_idx:
+                logging.info(info_str.format('min', 'outside'))
+                idx = max(filter(lambda i: i < limit_idx, minima_idxs))
+            else:
+                logging.info(info_str.format('max', 'outside'))
+                idx = min(filter(lambda i: i > limit_idx, minima_idxs))
 
-    logging.info(f'{idx} is the minimum index.')
+            logging.info(f'{idx} is the minimum index.')
+        except ValueError:
+            logging.info('Could not find a valid minima, returning '
+                         f'the limit index: {limit_idx}.')
+            idx = limit_idx
+
     return idx
 
 
