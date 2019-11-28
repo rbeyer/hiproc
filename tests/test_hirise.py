@@ -131,7 +131,8 @@ class TestObsID(unittest.TestCase):
         for truth, t in tuples:
             with self.subTest():
                 oid = hirise.ObservationID(*t)
-                self.assertTupleEqual(truth, (oid.phase, oid.orbit_number, oid.latesque))
+                self.assertTupleEqual(truth, (oid.phase, oid.orbit_number,
+                                              oid.latesque))
 
     def test_init_string(self):
         string_tuples = (('PSP_005632_1225', 'PSP_005632_1225'),
@@ -401,7 +402,7 @@ class TestGetters(unittest.TestCase):
         for c in self.ccds:
             with self.subTest(c):
                 s = ''.join(c)
-                self.assertEquals(hirise.get_ccd(s), s)
+                self.assertEqual(hirise.get_ccd(s), s)
 
     def test_get_ccd_bad(self):
         s = 'There is no CCD name in here.'
@@ -426,7 +427,7 @@ class TestGetters(unittest.TestCase):
         for c in self.ccds:
             with self.subTest(c=c):
                 s = ''.join(c)
-                self.assertEquals(hirise.get_ccdnumber(s), c[1])
+                self.assertEqual(hirise.get_ccdnumber(s), c[1])
 
     def test_get_ccdnumber_bad(self):
         s = 'There is no CCD number in here: ESP_057866_1670_RED_0'
@@ -436,17 +437,17 @@ class TestGetters(unittest.TestCase):
         for c in self.ccds:
             with self.subTest(c):
                 s = ''.join(c)
-                self.assertEquals(hirise.get_ccdnamenumber(s), c)
+                self.assertEqual(hirise.get_ccdnamenumber(s), c)
 
     def test_get_ccdnamenumber_just_number(self):
         for c in self.ccds:
             with self.subTest(c):
-                self.assertEquals(hirise.get_ccdnamenumber(c[1]), c)
+                self.assertEqual(hirise.get_ccdnamenumber(c[1]), c)
 
     def test_get_ccdnamenumber_int(self):
         for c in self.ccds:
             with self.subTest(c):
-                self.assertEquals(hirise.get_ccdnamenumber(int(c[1])), c)
+                self.assertEqual(hirise.get_ccdnamenumber(int(c[1])), c)
 
     def test_get_ccdnamenumber_bad(self):
         self.assertRaises(ValueError, hirise.get_ccdnamenumber, 'RED')
@@ -454,7 +455,7 @@ class TestGetters(unittest.TestCase):
     def test_get_ccdchannel_good(self):
         s = 'IR10_0 is a good CCD-channel combination.'
         truth = ('IR10', '0')
-        self.assertEquals(hirise.get_ccdchannel(s), truth)
+        self.assertEqual(hirise.get_ccdchannel(s), truth)
 
     def test_get_ccdchannel_bad(self):
         s = 'There is a CCD, BG12, but no channel here.'

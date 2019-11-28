@@ -177,8 +177,7 @@ class TestJitterCube(unittest.TestCase):
 
     @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_get_control_measures(self, m_getkey):
-        self.assertEquals(len(hjr.JitterCube._get_control_measures(cnet_pvl)),
-                          1)
+        self.assertEqual(len(hjr.JitterCube._get_control_measures(cnet_pvl)), 1)
 
     @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_parseCNetPVL(self, mock_getkey):
@@ -272,12 +271,14 @@ class TestHiJitReg(unittest.TestCase):
                    mock_open(read_data=flat_tab_text)):
             with patch('PyRISE.HiJitReg.pvl.load',
                        side_effect=[reg_def, cnet_pvl, reg_def, cnet_pvl]):
-                self.assertFalse(hjr.jitter_iter(self.r, self.c, self.conf, keep=True))
+                self.assertFalse(hjr.jitter_iter(self.r, self.c, self.conf,
+                                                 keep=True))
 
             with patch('PyRISE.HiJitReg.pvl.load',
                        side_effect=[reg_def, cnet_pvl, reg_def, cnet_pvl]):
                 with patch('PyRISE.HiJitReg.Analyze_Flat', return_value=1):
-                    self.assertTrue(hjr.jitter_iter(self.r, self.c, self.conf, keep=True))
+                    self.assertTrue(hjr.jitter_iter(self.r, self.c, self.conf,
+                                                    keep=True))
 
     @patch('PyRISE.HiJitReg.jitter_iter', return_value=True)
     def test_HiJitReg(self, m_jit_it):

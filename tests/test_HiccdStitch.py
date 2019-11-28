@@ -64,12 +64,12 @@ class TestHiccdStitchCube(unittest.TestCase):
     def test_set_balance(self, mock_getkey):
         c = hcs.HiccdStitchCube('dummy/PSP_010502_2090_RED5_0')
         c.set_balance(1, 1, {2: [1, 1]}, 1)
-        self.assertEquals(2, c.ss_balance_left)
-        self.assertEquals(1, c.ns_balance_left)
-        self.assertEquals(1023, c.ss_balance_right)
-        self.assertEquals(1, c.ns_balance_right)
-        self.assertEquals(1, c.sl_balance)
-        self.assertEquals(0, c.nl_balance)
+        self.assertEqual(2, c.ss_balance_left)
+        self.assertEqual(1, c.ns_balance_left)
+        self.assertEqual(1023, c.ss_balance_right)
+        self.assertEqual(1, c.ns_balance_right)
+        self.assertEqual(1, c.sl_balance)
+        self.assertEqual(0, c.nl_balance)
 
     @patch('PyRISE.HiStitch.isis.getkey_k', side_effect=getkey)
     def test_set_ls_path(self, mock_getkey):
@@ -143,7 +143,7 @@ class TestBasic(unittest.TestCase):
         c2.lmag = 1
         new_c, to_del = hcs.crop_and_scale([c1, c2])
         p = Path('dummy/PSP_010502_2090_RED5_0.left.crop.cub')
-        self.assertEquals(p, new_c[0].ls_path)
+        self.assertEqual(p, new_c[0].ls_path)
         self.assertIn(p, to_del)
 
     @patch('PyRISE.HiStitch.isis.getkey_k', side_effect=getkey)
@@ -246,15 +246,16 @@ class TestMock(unittest.TestCase):
     @patch('PyRISE.HiStitch.isis.getkey_k', side_effect=getkey)
     @patch('PyRISE.HiStitch.isis.cubenorm')
     @patch('PyRISE.HiStitch.isis.crop')
-    def test_CubeNormStep(self, mock_crop, mock_cubenorm, mock_getkey, mock_PathSetunlink):
+    def test_CubeNormStep(self, mock_crop, mock_cubenorm, mock_getkey,
+                          mock_PathSetunlink):
         m = mock_open(read_data=self.cubenorm_data)
         m.return_value.__iter__ = lambda self: self
         m.return_value.__next__ = lambda self: next(iter(self.readline, ''))
         with patch('PyRISE.HiccdStitch.open', m):
             c = hcs.HiccdStitchCube('dummy/PSP_010502_2090_RED5_0')
             new_c = hcs.CubeNormStep(c, self.conf['HiccdStitch'])
-            self.assertEquals(Path('dummy/PSP_010502_2090_RED5_0.cubenorm.cub'),
-                              new_c.nextpath)
+            self.assertEqual(Path('dummy/PSP_010502_2090_RED5_0.cubenorm.cub'),
+                             new_c.nextpath)
 
     @patch('PyRISE.HiStitch.isis.algebra')
     @patch('PyRISE.HiStitch.isis.getkey_k', side_effect=getkey)
@@ -291,10 +292,12 @@ class TestMock(unittest.TestCase):
         c5 = hcs.HiccdStitchCube('dummy/PSP_010502_2090_RED5')
         c6 = hcs.HiccdStitchCube('dummy/PSP_010502_2090_RED6')
 
-        cubes = hcs.BalanceStep([c1, c2, c3, c4, c5, c6], self.conf['HiccdStitch'])
+        cubes = hcs.BalanceStep([c1, c2, c3, c4, c5, c6],
+                                self.conf['HiccdStitch'])
         self.assertEqual(1, cubes[0].lstats)
         self.assertEqual(1, cubes[0].correction)
-        self.assertEqual(Path('dummy/PSP_010502_2090_RED1.balance.cub'), cubes[0].nextpath)
+        self.assertEqual(Path('dummy/PSP_010502_2090_RED1.balance.cub'),
+                         cubes[0].nextpath)
 
     @patch('PyRISE.HiccdStitch.isis.editlab')
     @patch('PyRISE.HiccdStitch.isis.getkey_k', side_effect=getkey)
@@ -324,7 +327,8 @@ class TestMock(unittest.TestCase):
             hcs.SpecialProcessingFlags(c)
             m_editlab.assert_has_calls([call(p, grpname='Instrument',
                                              keyword='Special_Processing_Flag',
-                                             option='ADDKEY', value='CUBENORM')])
+                                             option='ADDKEY',
+                                             value='CUBENORM')])
 
     @patch('PyRISE.HiccdStitch.isis.getkey_k', side_effect=getkey)
     def test_SNR_Check(self, m_getkey):
@@ -337,7 +341,6 @@ class TestMock(unittest.TestCase):
         with self.assertLogs(level='WARN'):
             self.assertIsNone(hcs.SNR_Check([c1, c2], 50))
 
-    @patch('kalasiris.k_funcs.isis.fromlist.open_fl', mock_open())
     @patch('PyRISE.HiccdStitch.SNR_Check')
     @patch('PyRISE.HiccdStitch.isis.hiccdstitch')
     @patch('PyRISE.HiccdStitch.SpecialProcessingFlags')
@@ -352,7 +355,8 @@ class TestMock(unittest.TestCase):
         p = 'out-dummy/foo.cub'
         hcs.HiccdStitch([c1, c2], p, self.conf)
         m_CubeNormStep.assert_not_called()
-        m_Balance.assert_has_calls([call([c1, c2], self.conf['HiccdStitch'], keep=False)])
+        m_Balance.assert_has_calls([call([c1, c2], self.conf['HiccdStitch'],
+                                         keep=False)])
         m_Special.assert_has_calls([call(c1), call(c2)])
         m_hiccdstitch.assert_called_once()
         m_SNR.assert_has_calls([call([c1, c2], 50)])

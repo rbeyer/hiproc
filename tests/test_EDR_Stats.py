@@ -79,7 +79,7 @@ class TestNeedHiCube(unittest.TestCase):
 
     def test_get_dncnt(self):
         c = edr.get_dncnt(self.hicube)
-        self.assertEquals(c, 80)
+        self.assertEqual(c, 80)
 
     def test_calc_snr(self):
         histats = edr.parse_histat(isis.histat(self.hicube).stdout)

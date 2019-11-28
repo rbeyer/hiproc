@@ -39,9 +39,9 @@ class TestBasic(unittest.TestCase):
         cube_list = list()
         for p in cid_list:
             cube_list.append(p + '.EDR_Stats.HiCal.cub')
-        self.assertEquals(cid_list[0:2], tuple(map(str,
-                                               hs.get_chids(cube_list[0:2]))))
-        self.assertEquals(cid_list[-1], str(hs.get_chids((cube_list[-1],))[0]))
+        self.assertEqual(cid_list[0:2], tuple(map(str,
+                                              hs.get_chids(cube_list[0:2]))))
+        self.assertEqual(cid_list[-1], str(hs.get_chids((cube_list[-1],))[0]))
         self.assertRaises(ValueError, hs.get_chids, cube_list[1:3])
         with contextlib.suppress(FileNotFoundError):
             Path('print.prt').unlink()
@@ -50,10 +50,10 @@ class TestBasic(unittest.TestCase):
         d = Path('dummy-directory')
         output = Path('foo')
         chid = hirise.CCDID('PSP_010502_2090_RED5_0')
-        self.assertEquals(output, hs.set_outpath(output, chid, d))
+        self.assertEqual(output, hs.set_outpath(output, chid, d))
         suffix = '.foo'
         with_suffix = d / Path('PSP_010502_2090_RED5.foo')
-        self.assertEquals(with_suffix, hs.set_outpath(suffix, chid, d))
+        self.assertEqual(with_suffix, hs.set_outpath(suffix, chid, d))
 
 
 class TestConf(unittest.TestCase):
@@ -70,11 +70,11 @@ class TestMock(unittest.TestCase):
         cub1 = 'PSP_010502_2090_RED4_1'
         with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=[cub0[-1],
                                                                  cub1[-1]]):
-            self.assertEquals((cub0, cub1), hs.sort_input_cubes(cub0, cub1))
+            self.assertEqual((cub0, cub1), hs.sort_input_cubes(cub0, cub1))
 
         with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=[cub1[-1],
                                                                  cub0[-1]]):
-            self.assertEquals((cub0, cub1), hs.sort_input_cubes(cub1, cub0))
+            self.assertEqual((cub0, cub1), hs.sort_input_cubes(cub1, cub0))
 
         with patch('PyRISE.HiStitch.isis.getkey_k', return_value=0):
             self.assertRaises(RuntimeError, hs.sort_input_cubes, cub0, cub0)
@@ -89,14 +89,15 @@ class TestMock(unittest.TestCase):
         _ = 'dummy_path'
         with patch('PyRISE.HiStitch.open', mock_open(read_data='dummy')):
             with patch('PyRISE.HiStitch.json.load', side_effect=dbs):
-                self.assertRaises(IndexError, hs.sort_databases, (_, _, _), chids)
+                self.assertRaises(IndexError, hs.sort_databases, (_, _, _),
+                                  chids)
             with patch('PyRISE.HiStitch.json.load', side_effect=dbs):
                 self.assertRaises(LookupError, hs.sort_databases,
                                   (_, _), (chids[0], chids[0]))
             with patch('PyRISE.HiStitch.json.load', side_effect=dbs):
-                self.assertEquals(dbs, hs.sort_databases((_, _), chids))
+                self.assertEqual(dbs, hs.sort_databases((_, _), chids))
             with patch('PyRISE.HiStitch.json.load', side_effect=reversed(dbs)):
-                self.assertEquals(dbs, hs.sort_databases((_, _), chids))
+                self.assertEqual(dbs, hs.sort_databases((_, _), chids))
 
     @patch('PyRISE.HiStitch.isis.fx')
     @patch('PyRISE.HiStitch.isis.mask')
@@ -108,9 +109,11 @@ class TestMock(unittest.TestCase):
     def test_HiFurrow_Fix(self, mock_copyfile, mock_handmos, mock_algebra,
                           mock_highpass, mock_lowpass, mock_mask, mock_fx):
         with patch('PyRISE.HiStitch.isis.getkey_k', return_value=1):
-            self.assertRaises(ValueError, hs.HiFurrow_Fix, 'dum_in', 'dum_out', 0)
+            self.assertRaises(ValueError, hs.HiFurrow_Fix,
+                              'dum_in', 'dum_out', 0)
         with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=[2, 1, 1]):
-            self.assertRaises(ValueError, hs.HiFurrow_Fix, 'dum_in', 'dum_out', 0)
+            self.assertRaises(ValueError, hs.HiFurrow_Fix,
+                              'dum_in', 'dum_out', 0)
         with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=['2',
                                                                  '1024',
                                                                  '1024']):
@@ -119,7 +122,7 @@ class TestMock(unittest.TestCase):
             hs.HiFurrow_Fix(in_cube, out_cube, 1000, keep=True)
 
             mock_fx.assert_called_once()
-            eqn = '\(1*(sample<512)+ 1*(sample>513) + 0)'
+            eqn = r'\(1*(sample<512)+ 1*(sample>513) + 0)'
             fx_path = mock_fx.call_args[1]['to']
             mock_fx.assert_called_once_with(equation=eqn,
                                             lines=1024, mode='OUTPUTONLY',
@@ -130,21 +133,25 @@ class TestMock(unittest.TestCase):
             mask2_path = mock_mask.call_args_list[1][1]['to']
             mock_calls = [call(Path(in_cube),
                                mask=fx_path,
-                               max_=1, min_=1, preserve='INSIDE', spixels='NULL',
+                               max_=1, min_=1,
+                               preserve='INSIDE', spixels='NULL',
                                to=mask1_path),
                           call(Path(in_cube),
                                mask=fx_path,
-                               max_=0, min_=0, preserve='INSIDE', spixels='NULL',
+                               max_=0, min_=0,
+                               preserve='INSIDE', spixels='NULL',
                                to=mask2_path)]
             self.assertEqual(mock_calls, mock_mask.call_args_list)
 
             lpf_path = mock_lowpass.call_args[1]['to']
-            mock_lowpass.assert_called_once_with(mask1_path, his=False, hrs=False,
+            mock_lowpass.assert_called_once_with(mask1_path,
+                                                 his=False, hrs=False,
                                                  line=41, lis=False, null=True,
                                                  sample=5, to=lpf_path)
 
             hpf_path = mock_highpass.call_args[1]['to']
-            mock_highpass.assert_called_once_with(mask2_path, line=41, sample=1,
+            mock_highpass.assert_called_once_with(mask2_path,
+                                                  line=41, sample=1,
                                                   to=hpf_path)
 
             alg_path = mock_algebra.call_args[1]['to']
@@ -152,8 +159,8 @@ class TestMock(unittest.TestCase):
                                                  from_=lpf_path, operator='ADD',
                                                  to=alg_path)
 
-            mock_handmos.assert_called_once_with(alg_path, create='NO', inband=1,
-                                                 inline=1, insample=1,
+            mock_handmos.assert_called_once_with(alg_path, create='NO',
+                                                 inband=1, inline=1, insample=1,
                                                  mosaic=out_cube, outband=1,
                                                  outline=1, outsample=1)
 
@@ -197,20 +204,20 @@ class TestHiStitch(unittest.TestCase):
 
     def test_set_flags(self):
         b = 1, 2, 4, 8, 16
-        self.assertEquals((True, True, False), hs.set_flags(self.my_c,
-                                                            self.my_dbs,
-                                                            5, b.index(2),
-                                                            6491.35))
-        self.my_c['HiStitch_Equalize'] = True
-        self.assertEquals((True, True, True), hs.set_flags(self.my_c,
+        self.assertEqual((True, True, False), hs.set_flags(self.my_c,
                                                            self.my_dbs,
                                                            5, b.index(2),
                                                            6491.35))
+        self.my_c['HiStitch_Equalize'] = True
+        self.assertEqual((True, True, True), hs.set_flags(self.my_c,
+                                                          self.my_dbs,
+                                                          5, b.index(2),
+                                                          6491.35))
         self.my_dbs[0]['zapped'] = True
-        self.assertEquals((False, True, True), hs.set_flags(self.my_c,
-                                                            self.my_dbs,
-                                                            5, b.index(2),
-                                                            6491.35))
+        self.assertEqual((False, True, True), hs.set_flags(self.my_c,
+                                                           self.my_dbs,
+                                                           5, b.index(2),
+                                                           6491.35))
 
     def test_HiStitchStep(self):
         cubes = ('dummy1.in', 'dummy2.in')
@@ -260,11 +267,11 @@ class TestHiStitch(unittest.TestCase):
             return values[key]
 
         with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=getkey):
-            self.assertEquals((0, 3), hs.HiStitch(cubes, out_c,
-                                                  self.my_c, self.my_dbs,
-                                                  5, keep=True))
+            self.assertEqual((0, 3), hs.HiStitch(cubes, out_c,
+                                                 self.my_c, self.my_dbs,
+                                                 5, keep=True))
 
         with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=getkey):
-            self.assertEquals((None, None), hs.HiStitch([cubes, ], out_c,
-                                                        self.my_c, self.my_dbs,
-                                                        5, keep=True))
+            self.assertEqual((None, None), hs.HiStitch([cubes, ], out_c,
+                                                       self.my_c, self.my_dbs,
+                                                       5, keep=True))

@@ -584,11 +584,11 @@ def Analyze_Flat(cube: JitterCube, step: int, fraction: float, hijitreg=True) ->
     logging.info('Suspect Points        = {}'.format(cube['SuspectCount']))
 
     if cube['AvgSampleOffset'] is None or cube['AvgLineOffset'] is None:
-        logging.warn('No points met the correlation tolerance.')
+        logging.warning('No points met the correlation tolerance.')
         return 0
 
     if hijitreg and cube['CanSlither'] is False:
-        logging.warn('Too few correlated lines found for cubic slither fit.')
+        logging.warning('Too few correlated lines found for cubic slither fit.')
         return 0
 
     good_fraction = (cube['MatchedCount'] - cube['SuspectCount']) / cube['RegisterCount']

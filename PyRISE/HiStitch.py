@@ -346,7 +346,7 @@ def HiFurrow_Fix(in_cube: os.PathLike, out_cube: os.PathLike,
     # Create a mask file
     # DN=1 for non-furrow area
     # DN=0 for furrow area
-    eqn = f'\(1*(sample<{dn_range[0]})+ 1*(sample>{dn_range[1]}) + 0)'
+    eqn = rf'\(1*(sample<{dn_range[0]})+ 1*(sample>{dn_range[1]}) + 0)'
     fx_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.fx.cub'))
     util.log(isis.fx(to=fx_cub, mode='OUTPUTONLY', lines=lines, samples=samps,
                      equation=eqn).args)

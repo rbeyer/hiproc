@@ -60,52 +60,36 @@ class TestResources(unittest.TestCase):
 
 class TestBasic(unittest.TestCase):
 
-    def test_conf_check_strings(self):
-        self.assertIsNone(hc.conf_check_strings('foo', ('YES', 'NO'), 'YES'))
-        self.assertRaises(KeyError, hc.conf_check_strings('foo', ('YES', 'NO'),
-                                                          'MAYBE'))
-
-    def test_conf_check_count(self):
-        self.assertIsNone(hc.conf_check_count('foo', 3, 'what', ['one',
-                                                                 'two',
-                                                                 'three']))
-        self.assertRaises(KeyError, hc.conf_check_count('foo', 3, 'what',
-                                                        ['one, two']))
-
-    def test_conf_check_bounds(self):
-        self.assertIsNone(hc.conf_check_bounds('foo', (0.1, 1), '0.5'))
-        self.assertRaises(KeyError, hc.conf_check_bounds('foo', (0.1, 1), '1.5'))
-
     def test_furrow_setup(self):
         self.assertEqual(hc.furrow_setup('RED0', 4)[0], 8000)
         self.assertRaises(KeyError, hc.furrow_setup, 'RED5', 1)
 
     def test_samp_setup(self):
         chansamp = hc.chan_samp_setup(1, 2)
-        self.assertEquals(chansamp.samp[1], 511)
-        self.assertEquals(chansamp.ssamp, 1)
-        self.assertEquals(chansamp.nsamp, 502)
+        self.assertEqual(chansamp.samp[1], 511)
+        self.assertEqual(chansamp.ssamp, 1)
+        self.assertEqual(chansamp.nsamp, 502)
 
     def test_pause_slicer(self):
-        self.assertEquals(slice(4, 7), hc.pause_slicer(5, 3))
-        self.assertEquals(slice(2, 5), hc.pause_slicer(5, -3))
+        self.assertEqual(slice(4, 7), hc.pause_slicer(5, 3))
+        self.assertEqual(slice(2, 5), hc.pause_slicer(5, -3))
 
     def test_cut_size(self):
-        self.assertEquals((6, 6), hc.cut_size(0, 10))
-        self.assertEquals((50, 6), hc.cut_size(0, 255))
-        self.assertEquals((6, 40), hc.cut_size(1, 511))
+        self.assertEqual((6, 6), hc.cut_size(0, 10))
+        self.assertEqual((50, 6), hc.cut_size(0, 255))
+        self.assertEqual((6, 40), hc.cut_size(1, 511))
 
     def test_set_lines(self):
-        self.assertEquals((1, 500), hc.set_lines(0, 0, 1, 500))
-        self.assertEquals((2, 3998), hc.set_lines(2, 2, 2, 4000))
+        self.assertEqual((1, 500), hc.set_lines(0, 0, 1, 500))
+        self.assertEqual((2, 3998), hc.set_lines(2, 2, 2, 4000))
         self.assertRaises(ZeroDivisionError, hc.set_lines, 0, 0, 0, 0)
 
     def test_process_this(self):
         flags = (1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0)
-        self.assertEquals(0, hc.process_this(('RED5', 0), flags))
-        self.assertEquals(1, hc.process_this(('RED0', 1), flags))
-        self.assertEquals(0, hc.process_this(('BG13', 1), flags))
+        self.assertEqual(0, hc.process_this(('RED5', 0), flags))
+        self.assertEqual(1, hc.process_this(('RED0', 1), flags))
+        self.assertEqual(0, hc.process_this(('BG13', 1), flags))
 
     def test_set_flags(self):
         my_c = {'HiCal_Noise_Processing': (1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0,
@@ -119,14 +103,14 @@ class TestBasic(unittest.TestCase):
                  'CAL_MASK_STANDARD_DEVIATION': 17.974952301437,
                  'LOW_SATURATED_PIXELS': 0}
         b = 1, 2, 4, 8, 16
-        self.assertEquals((False, False, True), hc.set_flags(my_c, my_db,
-                                                             ('RED5', 0),
-                                                             b.index(2)))
+        self.assertEqual((False, False, True), hc.set_flags(my_c, my_db,
+                                                            ('RED5', 0),
+                                                            b.index(2)))
         my_db['LOW_SATURATED_PIXELS'] = 1
         my_c['HiCal_HPF_Cubenorm'] = 'SUBTRACT'
-        self.assertEquals((True, True, False), hc.set_flags(my_c, my_db,
-                                                            ('RED1', 1),
-                                                            b.index(2)))
+        self.assertEqual((True, True, False), hc.set_flags(my_c, my_db,
+                                                           ('RED1', 1),
+                                                           b.index(2)))
 
     def test_getHistVal(self):
         histogram = isis.Histogram("""Total Pixels:    2048000
@@ -155,14 +139,14 @@ DN,Pixels,CumulativePixels,Percent,CumulativePercent
         conf = dict(NoiseFilter_HighEnd_Percent=99.999,
                     NoiseFilter_Hard_Tolmax=1.5,
                     NoiseFilter_Hard_HighEnd_Percent=99.9)
-        self.assertEquals((0, 8095), hc.getHistVal(histogram, conf))
+        self.assertEqual((0, 8095), hc.getHistVal(histogram, conf))
 
         bad_conf = dict(conf)
         bad_conf['NoiseFilter_HighEnd_Percent'] = 150
         self.assertRaises(ValueError, hc.getHistVal, histogram, bad_conf)
 
         histogram.dictionary['Lis Pixels'] = int(histogram['Total Pixels']) / 2
-        self.assertEquals((50, 7304), hc.getHistVal(histogram, conf))
+        self.assertEqual((50, 7304), hc.getHistVal(histogram, conf))
 
     def test_FurrowCheck(self):
         vpnts = [1000, 1000, 1000]
@@ -182,9 +166,9 @@ DN,Pixels,CumulativePixels,Percent,CumulativePercent
 
         truthlist = [4000, 4000, 0, 4000, 4000, 4000, 4000, 4000]
 
-        self.assertEquals(truthlist,
-                          hc.Cubenorm_Filter_filter_boxfilter(mylist, orig,
-                                                              2, 50))
+        self.assertEqual(truthlist,
+                         hc.Cubenorm_Filter_filter_boxfilter(mylist, orig,
+                                                             2, 50))
 
 
 class TestMock(unittest.TestCase):
@@ -197,18 +181,19 @@ class TestMock(unittest.TestCase):
         with patch('PyRISE.HiCal.isis.getkey_k', return_value='2'):
             with patch('pathlib.Path.glob', return_value=cubes):
                 d = hc.get_bins_fromfiles(cubes[0])
-                self.assertEquals(len(cubes) / 2, len(d))
+                self.assertEqual(len(cubes) / 2, len(d))
 
     def test_check_destripe(self):
         bins = dict(RED3=2, RED4=2, RED5=2, IR10=4, IR11=4, BG12=4, BG13=4)
         powered = 'Off, Off, Off, On, On, On, On, On, On, On, Off, Off, Off, Off'
 
-        self.assertEquals(False, hc.check_destripe('dummy', 0, True, True))
-        self.assertEquals(True, hc.check_destripe('dummy', 2, True, True))
-        self.assertEquals(False, hc.check_destripe('dummy', 0, False, False))
+        self.assertEqual(False, hc.check_destripe('dummy', 0, True, True))
+        self.assertEqual(True, hc.check_destripe('dummy', 2, True, True))
+        self.assertEqual(False, hc.check_destripe('dummy', 0, False, False))
         with patch('PyRISE.HiCal.get_bins_fromfiles', return_value=bins):
             with patch('PyRISE.HiCal.isis.getkey_k', return_value=powered):
-                self.assertEquals(False, hc.check_destripe('dummy', 2, None, None))
+                self.assertEqual(False, hc.check_destripe('dummy', 2,
+                                                          None, None))
 
 
 class TestConf(unittest.TestCase):
@@ -236,8 +221,8 @@ class TestNeedCubenormStatsFile(unittest.TestCase):
             Path('print.prt').unlink()
 
     def test_analyze_cubenorm_stats(self):
-        self.assertEquals((3349.2, 9486.4),
-                          hc.analyze_cubenorm_stats(self.statsfile, 2))
+        self.assertEqual((3349.2, 9486.4),
+                         hc.analyze_cubenorm_stats(self.statsfile, 2))
 
     def test_NoiseFilter_cubenorm_edit(self):
         conf = dict(NoiseFilter_Zap_Fraction=0.4,
@@ -256,8 +241,8 @@ class TestNeedCubenormStatsFile(unittest.TestCase):
                 vpnts.append(int(row.pop('ValidPoints')))
                 averages.append(float(row.pop('Average')))
 
-        self.assertEquals(1, hc.Cubenorm_Filter_filter(averages, 5, 50, 0,
-                                                       True, vpnts, True)[-1])
+        self.assertEqual(1, hc.Cubenorm_Filter_filter(averages, 5, 50, 0,
+                                                      True, vpnts, True)[-1])
 
     def test_Cubenorm_Filter(self):
         with patch('PyRISE.HiCal.csv.DictWriter'):
@@ -304,9 +289,9 @@ class TestNeedISISCube(unittest.TestCase):
                                      NoiseFilter_Raw_Max='16383')
         outcube = Path('test_run_hical-out.cub')
 
-        self.assertEquals('Standard', hc.run_hical(self.cube, outcube, myconf,
-                                                   conf, 3, 3, self.binning,
-                                                   True, keep=False))
+        self.assertEqual('Standard', hc.run_hical(self.cube, outcube, myconf,
+                                                  conf, 3, 3, self.binning,
+                                                  True, keep=False))
         outcube.unlink()
 
     # def test_HiGainFx(self):
@@ -383,7 +368,8 @@ class TestNeedISISCube(unittest.TestCase):
 
         self.assertAlmostEqual(0.000101402295171637,
                                hc.Hidestripe(calcube, outcube, self.binning,
-                                             minimum=0.0, maximum=1.5, hidcorr='ADD',
+                                             minimum=0.0, maximum=1.5,
+                                             hidcorr='ADD',
                                              line_samples=samps, keep=False))
         to_del.unlink()
 
@@ -411,6 +397,6 @@ class TestHiCal(unittest.TestCase):
                          self.db, destripe=False, keep=False)
         self.assertEqual((None, False, 'Standard'), hical[1:])
         # This stddev was with HiGainFx in the mix:
-        # self.assertAlmostEquals(0.006452488, hical[0])
-        self.assertAlmostEquals(0.00645841, hical[0])
+        # self.assertAlmostEqual(0.006452488, hical[0])
+        self.assertAlmostEqual(0.00645841, hical[0])
         outcube.unlink()

@@ -47,33 +47,41 @@ class TestUtil(unittest.TestCase):
     def test_logging(self):
         util.set_logging('WARNING')
         logger = logging.getLogger()
-        self.assertEquals(30, logger.getEffectiveLevel())
+        self.assertEqual(30, logger.getEffectiveLevel())
 
     def test_path_w_suffix(self):
-        self.assertEquals('bar.foo', str(util.path_w_suffix('.foo', 'bar.cub')))
-        self.assertEquals('foo.foo', str(util.path_w_suffix('foo.foo', 'bar.cub')))
+        self.assertEqual('bar.foo',
+                         str(util.path_w_suffix('.foo', 'bar.cub')))
+        self.assertEqual('foo.foo',
+                         str(util.path_w_suffix('foo.foo', 'bar.cub')))
 
     def test_pid_path_w_suffix(self):
-        self.assertRaises(FileNotFoundError, util.pid_path_w_suffix, 'foo.foo', 'dummy')
+        self.assertRaises(FileNotFoundError, util.pid_path_w_suffix,
+                          'foo.foo', 'dummy')
         self.assertRaises(FileNotFoundError, util.pid_path_w_suffix, '.foo',
                           'PSP_010502_2090_RED5_0.dummy')
-        self.assertEquals(img,
-                          util.pid_path_w_suffix('.img', img.with_suffix('.foo.foo')))
+        self.assertEqual(img,
+                         util.pid_path_w_suffix('.img',
+                                                img.with_suffix('.foo.foo')))
 
     def test_get_path(self):
         self.assertRaises(ValueError, util.get_path, 'dummy')
         self.assertRaises(TypeError, util.get_path, 'dummy', 42)
-        self.assertRaises(NotADirectoryError, util.get_path, 'dummy', 'not_a_dir')
+        self.assertRaises(NotADirectoryError, util.get_path, 'dummy',
+                          'not_a_dir')
         self.assertRaises(FileNotFoundError, util.get_path, 'dummy', 'PyRISE')
-        self.assertRaises(FileNotFoundError, util.get_path, 'dummy', Path('PyRISE'))
+        self.assertRaises(FileNotFoundError, util.get_path, 'dummy',
+                          Path('PyRISE'))
         self.assertRaises(FileNotFoundError, util.get_path, 'dummy',
                           ['PyRISE', 'tests'])
-        self.assertEquals(Path('PyRISE/util.py'), util.get_path('util.py', 'PyRISE'))
+        self.assertEqual(Path('PyRISE/util.py'), util.get_path('util.py',
+                                                               'PyRISE'))
 
     def test_conf_check_strings(self):
         self.assertIsNone(util.conf_check_strings('foo', ('YES', 'NO'), 'YES'))
         self.assertRaises(AssertionError,
-                          util.conf_check_strings, 'foo', ('YES', 'NO'), 'MAYBE')
+                          util.conf_check_strings, 'foo', ('YES', 'NO'),
+                          'MAYBE')
 
     def test_conf_check_count(self):
         self.assertIsNone(util.conf_check_count('foo', 3, 'what', ['one',

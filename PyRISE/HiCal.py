@@ -755,7 +755,7 @@ def HiGainFx(cube: os.PathLike, outcube: os.PathLike,
                 max_line = row['Max line']
                 a_coef = (row['R(0)'], row['R(1)'], row['R(2)'])
 
-    eqn = "\((F1/({0}+({1}*line)+({2}*line*line)))*(line<{3}) + (F1*(line>={3})))".format(*a_coef, max_line)
+    eqn = r"\((F1/({0}+({1}*line)+({2}*line*line)))*(line<{3}) + (F1*(line>={3})))".format(*a_coef, max_line)
 
     tfile = outcube.with_suffix('.tempfx.cub')
     util.log(isis.fx(f1=cube, to=tfile, mode='CUBES', equation=eqn).args)
