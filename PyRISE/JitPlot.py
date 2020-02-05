@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """JitPlot converts the control network that HiJitReg creates and outputs
-   a simple text data file that can be plotted."""
+a simple text data file that can be plotted.
+"""
 
 # Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
 #
@@ -27,9 +28,9 @@
 #
 # Since that suite of software is under the GPL, none of it can be directly
 # incorporated in this program, since I wish to distribute this software
-# under the Apache 2 license.  Elements of this software (written in an entirely
-# different language) are based on that software but rewritten from scratch to
-# emulate functionality.
+# under the Apache 2 license.  Elements of this software (written in an
+# entirely different language) are based on that software but rewritten
+# from scratch to emulate functionality.
 
 import argparse
 import logging

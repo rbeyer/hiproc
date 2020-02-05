@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-"""HiJitReg registers color CCDs to corresponding red CCDs by using the ISIS tool
-   hijitreg to perform a deconvolution of jittered image data."""
+"""HiJitReg registers color CCDs to corresponding red CCDs by using the
+ISIS tool hijitreg to perform a deconvolution of jittered image data."""
 
 # Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
 #
@@ -18,11 +18,13 @@
 
 
 # This program is based on HiColor version 1.99 2017/10/10
-# and on the Perl HiColorInit program: ($Revision: 1.37 $ $Date: 2011/01/31 20:10:26 $)
+# and on the Perl HiColorInit program: ($Revision: 1.37 $
+#                                       $Date: 2011/01/31 20:10:26 $)
 # by Guy McArthur
 # which is Copyright(C) 2007 Arizona Board of Regents, under the GNU GPL.
 #
-# This program is based on JitStats.pm ($Revision: 1.16 $ $Date: 2015/07/28 18:39:17 $)
+# This program is based on JitStats.pm ($Revision: 1.16 $
+#                                       $Date: 2015/07/28 18:39:17 $)
 # by Guy McArthur
 # which is Copyright(C) 2015 Arizona Board of Regents, under the GNU GPL.
 #
@@ -42,6 +44,7 @@ import math
 import os
 import re
 import statistics
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -57,27 +60,28 @@ import PyRISE.HiColorInit as hicolor
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()])
-    parser.add_argument('-c', '--conf',    required=False,
+    parser.add_argument('-c', '--conf', required=False,
                         default=Path(__file__).resolve().parent.parent /
                         'data' / 'HiJitReg.conf')
-    parser.add_argument('cubes', metavar="balance.cub and balance.precolor.cub files",
+    parser.add_argument('cubes',
+                        metavar="balance.cub and balance.precolor.cub files",
                         nargs='+')
 
     args = parser.parse_args()
 
     util.set_logging(args.log)
 
-    conf = pvl.load(str(args.conf))
-
-    cubes = list(map(hicolor.HiColorCube, args.cubes))
-    (red4, red5, ir10, ir11, bg12, bg13) = hicolor.separate_ccds(cubes)
-
     try:
-        successful_ccds = HiJitReg(red4, red5, ir10, ir11, bg12, bg13,
-                                   conf, keep=args.keep)
+        successful_ccds = start(args.cubes, args.conf, keep=args.keep)
     except RuntimeError as err:
         logging.critical('Unable to continue. ' + str(err))
         sys.exit()
+    except subprocess.CalledProcessError as err:
+        print('Had an ISIS error:')
+        print(' '.join(err.cmd))
+        print(err.stdout)
+        print(err.stderr)
+        raise err
 
     print('Successful CCDs are:')
     for c in successful_ccds:
@@ -85,8 +89,17 @@ def main():
     return
 
 
+def start(cube_paths: list, conf_path: os.PathLike, keep=False):
+    conf = pvl.load(str(conf_path))
+
+    cubes = list(map(hicolor.HiColorCube, cube_paths))
+    (red4, red5, ir10, ir11, bg12, bg13) = hicolor.separate_ccds(cubes)
+
+    return HiJitReg(red4, red5, ir10, ir11, bg12, bg13, conf, keep=keep)
+
+
 class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
-    '''A class for collecting and analyzing jitter statistics.'''
+    """A class for collecting and analyzing jitter statistics."""
 
     def __init__(self, arg, config=Path(__file__).resolve().parent.parent /
                  'data' / 'HiJitReg.conf', matchccd=None):
@@ -142,9 +155,10 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
         else:
             self.matchccd = matchccd
 
-        self.dictionary['ExcludeLimit'] = self.conf['Smoothing']['Exclude_Limit']
-        self.dictionary['BadnessLimit'] = self.conf['Smoothing']['Badness_Limit']
-        self.dictionary['BoxcarLength'] = self.conf['Smoothing']['Boxcar_Length']
+        sm = self.conf['Smoothing']
+        self.dictionary['ExcludeLimit'] = sm['Exclude_Limit']
+        self.dictionary['BadnessLimit'] = sm['Badness_Limit']
+        self.dictionary['BoxcarLength'] = sm['Boxcar_Length']
 
         self.cnet_path = self.get_cnet_path(self)
         self.regdef_path = self.get_regdef_path(self)
@@ -201,8 +215,8 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
         self.parseCNetPVL(self.cnet_path)
 
     def parseRegDefs(self, path=None):
-        '''Parse the register definition file to obtain the search and pattern
-        sizes.'''
+        """Parse the register definition file to obtain the search and pattern
+        sizes."""
         if path is None:
             path = self.regdef_path
 
@@ -214,8 +228,8 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
         return
 
     def parseFlatTab(self, path=None):
-        '''Parses the flat file to obtain jitter registration result
-        statistics.'''
+        """Parses the flat file to obtain jitter registration result
+        statistics."""
         if path is None:
             path = self.flattab_path
 
@@ -239,11 +253,13 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
             match = re.search(r'#\s+Number Suspect:\s+(\S+)', flat)
             self['SuspectCount'] = int(match.group(1))
 
-            match = re.search(r'#\s+Average Sample Offset:\s+(\S+)\s+StdDev:\s+(\S+)', flat)
+            match = re.search(
+                r'#\s+Average Sample Offset:\s+(\S+)\s+StdDev:\s+(\S+)', flat)
             self['AvgSampleOffset'] = float(match.group(1))
             self['STDSampleOffset'] = float(match.group(2))
 
-            match = re.search(r'#\s+Average Line Offset:\s+(\S+)\s+StdDev:\s+(\S+)', flat)
+            match = re.search(
+                r'#\s+Average Line Offset:\s+(\S+)\s+StdDev:\s+(\S+)', flat)
             self['AvgLineOffset'] = float(match.group(1))
             self['STDLineOffset'] = float(match.group(2))
 
@@ -265,28 +281,38 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
 
             lineCount = 0
             for row in reader:
-                # how many pixels in x is the edge of the pattern box from the reg point
-                deltaSamp = abs(float(row['RegSamp']) - int(row['MatchSamp'])) + self['PatternSamples'] / 2
-                # how many pixels in y is the edge of the pattern box from the reg point
-                deltaLine = abs(float(row['RegLine']) - int(row['MatchLine'])) + self['PatternLines'] / 2
+                # how many pixels in x is the edge of the pattern box from
+                # the reg point
+                deltaSamp = (abs(float(row['RegSamp']) -
+                                 int(row['MatchSamp'])) +
+                             self['PatternSamples'] / 2)
+                # how many pixels in y is the edge of the pattern box from
+                # the reg point
+                deltaLine = (abs(float(row['RegLine']) -
+                                 int(row['MatchLine'])) +
+                             self['PatternLines'] / 2)
 
-                # if the edge of the pattern box is more than two pixels away from
-                # the search box, increment the count of marginal control points
+                # if the edge of the pattern box is more than two pixels away
+                # from the search box, increment the count of marginal
+                # control points
                 if((deltaSamp > (self['SearchSamples'] / 2 - 2)) or
                    (deltaLine > (self['SearchLines'] / 2 - 2))):
                     self['EdgyCount'] += 1
 
                     logging.info('Marginal register {} lines, {} samples to '
-                                 'edge.'.format(deltaLine - self['SearchLines'] / 2,
-                                                deltaSamp - self['SearchSamples'] / 2))
+                                 'edge.'.format(deltaLine -
+                                                self['SearchLines'] / 2,
+                                                deltaSamp -
+                                                self['SearchSamples'] / 2))
                 lineCount += 1
             self['MatchedLineCount'] = lineCount
         return
 
     def parseCNetPVL(self, path=None):
-        '''Parses the control net output from hijitreg, performs smoothing,
-           and sets the array of ignorable points based on smoothing and
-           badness ("goodness of fit").'''
+        """Parses the control net output from hijitreg, performs smoothing,
+        and sets the array of ignorable points based on smoothing and
+        badness ("goodness of fit").
+        """
 
         if path is None:
             path = self.cnet_path
@@ -308,8 +334,8 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
 
             if self['BoxcarLength'] > (len(self.control_measures) - i):
                 # offset not changed
-                length = int(self['BoxcarLength'] / 2 + (len(self.control_measures)
-                                                         - i))
+                length = int(self['BoxcarLength'] / 2 +
+                             (len(self.control_measures) - i))
 
             boxcar = map(lambda x: x['ErrorMagnitude'],
                          self.control_measures[offset:offset + length])
@@ -364,11 +390,13 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
                     continue
 
                 if cm['MeasureType'] == 'RegisteredPixel':
-                    cm['ErrorMagnitude'] = math.hypot(cm['SampleResidual'].value,
-                                                      cm['LineResidual'].value)
+                    cm['ErrorMagnitude'] = math.hypot(
+                        cm['SampleResidual'].value,
+                        cm['LineResidual'].value)
                     # Tack on a few extra values here, and then append
                     cm['PointId'] = cp['PointId']
-                    match = re.search(r'Row\s+(\d+)\s+Column\s+(\d+)', cp['PointId'])
+                    match = re.search(r'Row\s+(\d+)\s+Column\s+(\d+)',
+                                      cp['PointId'])
                     if match:
                         cm['Row'] = int(match.group(1))
                         cm['Column'] = int(match.group(2))
@@ -377,7 +405,7 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
         return control_measures
 
     def filterCNetPVL(self, path=None):
-        '''Filters the CNET file and adds Ignored point information.'''
+        """Filters the CNET file and adds Ignored point information."""
 
         if len(self.IgnoredPoints) == 0:
             return
@@ -392,7 +420,8 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
         badness = 0
         for (k, v) in p['ControlNetwork'].items():
             if k == 'ControlPoint':
-                if v['PointId'] in self.IgnoredPoints and 'Ignore' not in v.keys():
+                if(v['PointId'] in self.IgnoredPoints
+                   and 'Ignore' not in v.keys()):
                     v.append('Ignore', True)
                     badness += 1
                     logging.info('Ignoring point {}'.format(v['PointId']))
@@ -406,7 +435,8 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
             pvl.dump(new_pvl, stream)
 
 
-def HiJitReg(red4, red5, ir10, ir11, bg12, bg13, conf: dict, keep=False) -> list:
+def HiJitReg(red4, red5, ir10, ir11, bg12, bg13, conf: dict,
+             keep=False) -> list:
     successful_ccds = list()
     if red4 is not None:
         for c in [ir10, bg12]:
@@ -427,28 +457,29 @@ def HiJitReg(red4, red5, ir10, ir11, bg12, bg13, conf: dict, keep=False) -> list
     return successful_ccds
 
 
-def jitter_iter(red: hicolor.HiColorCube, color: hicolor.HiColorCube, conf: dict,
-                keep=False) -> bool:
-    '''Iterates through hijitreg for the color cube.'''
+def jitter_iter(red: hicolor.HiColorCube, color: hicolor.HiColorCube,
+                conf: dict, keep=False) -> bool:
+    """Iterates through hijitreg for the color cube."""
 
     temp_token = datetime.now().strftime('HiJitReg-%y%m%d%H%M%S')
 
     bin_ratio = color.bin / red.bin
 
     jit_param = dict()
+    conf_ar = conf['AutoRegistration']
     jit_param['GROUP'] = 'HiJitReg'
-    jit_param['COLS'] = conf['AutoRegistration']['ControlNet']['Control_Cols']
-    jit_param['ROWS'] = conf['AutoRegistration']['ControlNet']['Control_Lines']
-    jit_param['TOLERANCE'] = conf['AutoRegistration']['Algorithm']['Tolerance']
-    jit_param['PATTERN_SAMPLES'] = conf['AutoRegistration']['PatternChip']['Samples']
-    jit_param['PATTERN_LINES'] = conf['AutoRegistration']['PatternChip']['Lines']
-    jit_param['SEARCH_SAMPLES'] = conf['AutoRegistration']['SearchChip']['Samples']
-    jit_param['SEARCH_LINES'] = conf['AutoRegistration']['SearchChip']['Lines']
-    jit_param['SEARCHLONGER_SAMPLES'] = conf['AutoRegistration']['SearchLongerChip']['Samples']
-    jit_param['SEARCHLONGER_LINES'] = conf['AutoRegistration']['SearchLongerChip']['Lines']
+    jit_param['COLS'] = conf_ar['ControlNet']['Control_Cols']
+    jit_param['ROWS'] = conf_ar['ControlNet']['Control_Lines']
+    jit_param['TOLERANCE'] = conf_ar['Algorithm']['Tolerance']
+    jit_param['PATTERN_SAMPLES'] = conf_ar['PatternChip']['Samples']
+    jit_param['PATTERN_LINES'] = conf_ar['PatternChip']['Lines']
+    jit_param['SEARCH_SAMPLES'] = conf_ar['SearchChip']['Samples']
+    jit_param['SEARCH_LINES'] = conf_ar['SearchChip']['Lines']
+    jit_param['SEARCHLONGER_SAMPLES'] = conf_ar['SearchLongerChip']['Samples']
+    jit_param['SEARCHLONGER_LINES'] = conf_ar['SearchLongerChip']['Lines']
 
     if bin_ratio > 3:
-        hit_param['TOLERANCE'] -= conf['AutoRegistration']['Algorithm']['INCREMENT']
+        hit_param['TOLERANCE'] -= conf_ar['Algorithm']['INCREMENT']
 
     channels = isis.getkey_k(color.path, 'Instrument', 'StitchedProductIds')
 
@@ -458,8 +489,8 @@ def jitter_iter(red: hicolor.HiColorCube, color: hicolor.HiColorCube, conf: dict
         coverage /= 2
         jit_param['COLS'] += jit_param['COLS'] / 2
 
-    # A two-step process with completely different outcomes at each step, so we
-    # can't really make a loop.
+    # A two-step process with completely different outcomes at each step,
+    # so we can't really make a loop.
     step = 1
 
     logging.info(f'Attempting hijitreg iteration #{step} for {color}')
@@ -475,7 +506,8 @@ def jitter_iter(red: hicolor.HiColorCube, color: hicolor.HiColorCube, conf: dict
         if jit_param['SEARCH_LINES'] == jit_param['SEARCHLONGER_LINES']:
             return True
         else:
-            # use larger search box for all subsequent iterations (other CCDs too)
+            # use larger search box for all subsequent iterations
+            # (other CCDs too)
             jit_param['SEARCH_SAMPLES'] = jit_param['SEARCHLONGER_SAMPLES']
             jit_param['SEARCH_LINES'] = jit_param['SEARCHLONGER_LINES']
     elif ret == 0:
@@ -509,12 +541,14 @@ def jitter_iter(red: hicolor.HiColorCube, color: hicolor.HiColorCube, conf: dict
 
 def run_HiJitReg(red_path: os.PathLike, color: JitterCube, params: dict,
                  temptoken: str, keep=False):
-    '''Examine output of control net and/or flat file to automatically remove
-       out-of-bound points.'''
+    """Examine output of control net and/or flat file to automatically remove
+    out-of-bound points."""
 
     file_status = 'OVERWRITE'
     if color.regdef_path.exists():
-        file_status = pvl.load(str(color.regdef_path))['AutoRegistration'][params['GROUP']]['File_Status']
+        file_status = pvl.load(
+            str(color.regdef_path))[
+                'AutoRegistration'][params['GROUP']]['File_Status']
 
     if file_status == 'KEEP':
         logging.info('Using existing regdef file due to KEEP file status.')
@@ -536,7 +570,7 @@ def run_HiJitReg(red_path: os.PathLike, color: JitterCube, params: dict,
 
 
 def write_regdef(out_path: os.PathLike, parameters: dict):
-    '''Writes PVL file that will be given to HiJitReg.'''
+    """Writes PVL file that will be given to HiJitReg."""
     out_p = Path(out_path)
 
     pvl_text = """Object = AutoRegistration
@@ -572,12 +606,13 @@ End_Object
     return
 
 
-def Analyze_Flat(cube: JitterCube, step: int, fraction: float, hijitreg=True) -> int:
+def Analyze_Flat(cube: JitterCube, step: int, fraction: float,
+                 hijitreg=True) -> int:
     cube.reset()
     cube.filterCNetPVL()
 
-    logging.info('Matched Registers     = {} of {}'.format(cube['MatchedCount'],
-                                                           cube['RegisterCount']))
+    logging.info('Matched Registers     = {} of {}'.format(
+        cube['MatchedCount'], cube['RegisterCount']))
     logging.info('Average Sample Offset = {}'.format(cube['AvgSampleOffset']))
     logging.info('Average Line Offset   = {}'.format(cube['AvgLineOffset']))
     logging.info('Edgy Count            = {}'.format(cube['EdgyCount']))
@@ -588,17 +623,21 @@ def Analyze_Flat(cube: JitterCube, step: int, fraction: float, hijitreg=True) ->
         return 0
 
     if hijitreg and cube['CanSlither'] is False:
-        logging.warning('Too few correlated lines found for cubic slither fit.')
+        logging.warning(
+            'Too few correlated lines found for cubic slither fit.')
         return 0
 
-    good_fraction = (cube['MatchedCount'] - cube['SuspectCount']) / cube['RegisterCount']
+    good_fraction = (
+        cube['MatchedCount'] - cube['SuspectCount']) / cube['RegisterCount']
 
     if good_fraction < 0.5 * fraction and step <= 1:
-        logging.info(f'Too few correlated points ({good_fraction}) found at this tolerance')
+        logging.info(f'Too few correlated points ({good_fraction}) '
+                     'found at this tolerance.')
         return 0
 
     elif hijitreg and good_fraction < 0.25 * fraction and step <= 2:
-        logging.info(f'Too few correlated points ({good_fraction}) found at this tolerance')
+        logging.info(f'Too few correlated points ({good_fraction}) '
+                     'found at this tolerance.')
         return -1
 
     if hijitreg and cube['EdgyCount'] > 2 and good_fraction > 0.8 * fraction:

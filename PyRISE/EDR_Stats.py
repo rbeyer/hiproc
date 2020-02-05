@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""Create an ISIS cube from a HiRISE EDR .img file and place HiRISE EDR image statistics into HiCat's EDR_Products table."""
+"""Create an ISIS cube from a HiRISE EDR .img file and record some
+statistics."""
 
 # Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
 #
@@ -17,7 +18,8 @@
 
 
 # This program is based on EDR_Stats version 2.16.1 (2016/06/16),
-# and on the Perl EDR_Stats program: ($Revision: 1.38 $ $Date: 2016/08/16 23:43:17 $)
+# and on the Perl EDR_Stats program: ($Revision: 1.38 $
+#                                     $Date: 2016/08/16 23:43:17 $)
 # by Eric Eliason and Audrie Fennema
 # which is Copyright(C) 2004 Arizona Board of Regents, under the GNU GPL.
 #
@@ -45,12 +47,13 @@ import kalasiris as isis
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()])
-    parser.add_argument('-o', '--output', required=False, default='.EDR_Stats.cub')
-    parser.add_argument('--db',         required=False, default='.HiCat.json',
-                        help="The .json file to output.  Optionally, if it starts "
-                        "with a '.' it is considered an extension and will be "
-                        "swapped with the input file's extension to determine the "
-                        "file to write.")
+    parser.add_argument('-o', '--output', required=False,
+                        default='.EDR_Stats.cub')
+    parser.add_argument('--db', required=False, default='.HiCat.json',
+                        help="The .json file to output.  Optionally, if it "
+                        "starts with a '.' it is considered an extension and "
+                        "will be swapped with the input file's extension to "
+                        "determine the file to write.")
     parser.add_argument('--histmin',      required=False, default=0.01)
     parser.add_argument('--histmax',      required=False, default=99.99)
     parser.add_argument('-g', '--gains',  required=False,
@@ -111,12 +114,15 @@ def EDR_Stats(img: os.PathLike, out_path: os.PathLike, gains_path: os.PathLike,
 
     # Get some info from the new cube:
     histats['PRODUCT_ID'] = isis.getkey_k(out_path, 'Archive', 'ProductId')
-    histats['IMAGE_LINES'] = int(isis.getkey_k(out_path, 'Dimensions', 'Lines'))
-    histats['LINE_SAMPLES'] = int(isis.getkey_k(out_path, 'Dimensions', 'Samples'))
+    histats['IMAGE_LINES'] = int(isis.getkey_k(out_path, 'Dimensions',
+                                               'Lines'))
+    histats['LINE_SAMPLES'] = int(isis.getkey_k(out_path, 'Dimensions',
+                                                'Samples'))
     histats['BINNING'] = int(isis.getkey_k(out_path, 'Instrument', 'Summing'))
 
     histats['STD_DN_LEVELS'] = get_dncnt(out_path, histmin, histmax, keep=keep)
-    histats['IMAGE_SIGNAL_TO_NOISE_RATIO'] = calc_snr(out_path, gains_path, histats)
+    histats['IMAGE_SIGNAL_TO_NOISE_RATIO'] = calc_snr(out_path, gains_path,
+                                                      histats)
     histats['GAP_PIXELS_PERCENT'] = (histats['GAP_PIXELS'] /
                                      (int(histats['IMAGE_LINES']) *
                                       int(histats['LINE_SAMPLES']))) * 100.0
@@ -169,7 +175,8 @@ def parse_histat(pvltext: str) -> dict:
 
     # Image Buffer Area
     d['IMAGE_BUFFER_MEAN'] = p['IMAGE_BUFFER']['Average']
-    d['IMAGE_BUFFER_STANDARD_DEVIATION'] = p['IMAGE_BUFFER']['StandardDeviation']
+    d['IMAGE_BUFFER_STANDARD_DEVIATION'] = p[
+        'IMAGE_BUFFER']['StandardDeviation']
     d['IMAGE_BUFFER_MINIMUM'] = p['IMAGE_BUFFER']['Minimum']
     d['IMAGE_BUFFER_MAXIMUM'] = p['IMAGE_BUFFER']['Maximum']
 
@@ -187,13 +194,15 @@ def parse_histat(pvltext: str) -> dict:
 
     # Calibration Dark Ramp Area
     d['CAL_DARK_RAMP_MEAN'] = p['CAL_DARK_RAMP']['Average']
-    d['CAL_DARK_RAMP_STANDARD_DEVIATION'] = p['CAL_DARK_RAMP']['StandardDeviation']
+    d['CAL_DARK_RAMP_STANDARD_DEVIATION'] = p[
+        'CAL_DARK_RAMP']['StandardDeviation']
     d['CAL_DARK_RAMP_MINIMUM'] = p['CAL_DARK_RAMP']['Minimum']
     d['CAL_DARK_RAMP_MAXIMUM'] = p['CAL_DARK_RAMP']['Maximum']
 
     # Image Post Ramp Area
     d['IMAGE_POST_RAMP_MEAN'] = p['IMAGE_POSTRAMP']['Average']
-    d['IMAGE_POST_RAMP_STANDARD_DEVIATION'] = p['IMAGE_POSTRAMP']['StandardDeviation']
+    d['IMAGE_POST_RAMP_STANDARD_DEVIATION'] = p[
+        'IMAGE_POSTRAMP']['StandardDeviation']
     d['IMAGE_POST_RAMP_MINIMUM'] = p['IMAGE_POSTRAMP']['Minimum']
     d['IMAGE_POST_RAMP_MAXIMUM'] = p['IMAGE_POSTRAMP']['Maximum']
 
@@ -265,7 +274,8 @@ def check_lut(img: os.PathLike):
     logging.info(check_lut.__doc__)
 
     img_pvl = pvl.load(str(img))
-    lut_type = img_pvl['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_TABLE_TYPE']
+    lut_type = img_pvl[
+        'INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_TABLE_TYPE']
     if 'STORED' in lut_type:
         lut = dict()
         # dec.28.06 zero-filled LUT (ie, the image was not LUT'ed)
@@ -375,7 +385,8 @@ def tdi_bin_check(cube: os.PathLike, histats: dict):
 
     # TDI and binning check
     if float(histats['IMAGE_MEAN']) >= 8000:
-        logging.warning('Channel mean greater than 8000 (TDI or binning too high).')
+        logging.warning(
+            'Channel mean greater than 8000 (TDI or binning too high).')
     elif float(histats['IMAGE_MEAN']) < 2500:
         tdi = isis.getkey_k(cube, 'Instrument', 'Tdi')
         if tdi == '32' or tdi == '64':
@@ -454,8 +465,9 @@ def lut_check(cube: os.PathLike, histats: dict):
             threshhold['RED0'] = ((14057, 21), (11676, 22), (9295, 23),
                                   (7152, 24), (5248, 25), (3343, 26),
                                   (1200, 27))
-            threshhold['RED1'] = ((13857 + 1, 14), (11476 + 1, 15), (9095 + 1, 16),
-                                  (6952 + 1, 17), (5048 + 1, 18), (3143 + 1, 19),
+            threshhold['RED1'] = ((13857 + 1, 14), (11476 + 1, 15),
+                                  (9095 + 1, 16), (6952 + 1, 17),
+                                  (5048 + 1, 18), (3143 + 1, 19),
                                   (1000, 20))
             threshhold['RED2'] = threshhold['RED1']
             threshhold['RED3'] = threshhold['RED1']
@@ -472,7 +484,8 @@ def lut_check(cube: os.PathLike, histats: dict):
             threshhold['BG12'] = threshhold['RED6']
             threshhold['BG13'] = threshhold['RED6']
 
-        ccd = hirise.ChannelID(isis.getkey_k(cube, 'Archive', 'ProductId')).get_ccd()
+        ccd = hirise.ChannelID(isis.getkey_k(cube, 'Archive',
+                                             'ProductId')).get_ccd()
         for (th, ex) in threshhold[ccd]:
             if float(histats['IMAGE_MEAN']) >= th:
                 expected_lut = ex
@@ -487,8 +500,8 @@ def lut_check(cube: os.PathLike, histats: dict):
                 direction = 'to the right'
             else:
                 direction = 'to the left'
-            logging.warning('LUT is {} column(s) ({}) from ideal settings '
-                            '- image overcompressed.'.format(lut_diff, direction))
+            logging.warning(f'LUT is {lut_diff} column(s) ({direction}) from '
+                            'ideal settings - image overcompressed.')
     return
 
 

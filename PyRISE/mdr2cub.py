@@ -40,15 +40,16 @@ import kalasiris as isis
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('-o', '--output',  required=False, default='.mdr.iof.cub')
+    parser.add_argument('-o', '--output', required=False,
+                        default='.mdr.iof.cub')
     parser.add_argument('-e', '--edr',  required=True)
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
                         'data' / 'hical.pipelines.conf')
     parser.add_argument('mdr', metavar="MDR_file")
     parser.add_argument('-l', '--log',  required=False, default='WARNING',
-                        help="The log level to show for this program, can be a "
-                        "named log level or a numerical level.")
+                        help="The log level to show for this program, can "
+                        "be a named log level or a numerical level.")
     parser.add_argument('-k', '--keep', required=False, default=False,
                         action='store_true',
                         help="Normally, the program will clean up any "
@@ -87,20 +88,24 @@ def main():
 
     if h2i_s != mdr_s:
         label = pvl.load(str(h2i_path))
-        hirise_cal_info = get_one(label, 'Table', 'HiRISE Calibration Ancillary')
+        hirise_cal_info = get_one(label, 'Table',
+                                  'HiRISE Calibration Ancillary')
 
-        buffer_pixels = get_one(hirise_cal_info, 'Field', 'BufferPixels')['Size']
+        buffer_pixels = get_one(hirise_cal_info, 'Field',
+                                'BufferPixels')['Size']
         dark_pixels = get_one(hirise_cal_info, 'Field', 'DarkPixels')['Size']
         rev_mask_tdi_lines = hirise_cal_info['Records']
 
         if h2i_s + buffer_pixels + dark_pixels == mdr_s:
-            logging.info(f'The file {mdr_cub_path} has {buffer_pixels + dark_pixels} more sample pixels '
-                         f'than {h2i_path}, assuming those are dark and buffer '
-                         f'pixels and will crop accordingly.')
+            logging.info(f'The file {mdr_cub_path} has '
+                         f'{buffer_pixels + dark_pixels} more sample pixels '
+                         f'than {h2i_path}, assuming those are dark and '
+                         'buffer pixels and will crop accordingly.')
             if h2i_l + rev_mask_tdi_lines != mdr_l:
-                logging.critical('Even assuming this is a "full" channel image, '
-                                 'this has the wrong number of lines. '
-                                 f'{mdr_cub_path} should have {h2i_l + rev_mask_tdi_lines}, but '
+                logging.critical('Even assuming this is a "full" channel '
+                                 'image, this has the wrong number of lines. '
+                                 f'{mdr_cub_path} should have '
+                                 f'{h2i_l + rev_mask_tdi_lines}, but '
                                  f'has {mdr_l} lines. Exiting')
                 sys.exit()
             else:
@@ -116,12 +121,14 @@ def main():
 
         else:
             logging.critical(f'The number of samples in {h2i_path} ({h2i_s}) '
-                             f'and {mdr_cub_path} ({mdr_s}) are different. Exiting.')
+                             f'and {mdr_cub_path} ({mdr_s}) are different. '
+                             'Exiting.')
             sys.exit()
 
     if h2i_l != mdr_l:
         logging.critical(f'The number of lines in {h2i_path} ({h2i_l}) '
-                         f'and {mdr_cub_path} ({mdr_l}) are different. Exiting.')
+                         f'and {mdr_cub_path} ({mdr_l}) are different. '
+                         'Exiting.')
         sys.exit()
 
     # Convert the EDR to the right bit type for post-HiCal Pipeline:
@@ -132,7 +139,8 @@ def main():
 
     # If it is a channel 1 file, Alan mirrored it so that he could process
     # the two channels in an identical way (which we also took advantage
-    # of above if the buffer and dark pixels were included), so we need to mirror it back.
+    # of above if the buffer and dark pixels were included), so we need to
+    # mirror it back.
     cid = hirise.get_ChannelID_fromfile(h2i_16b_p)
     if cid.channel == '1':
         mirror_path = to_del.add(mdr_cub_path.with_suffix('.mirror.cub'))
@@ -140,7 +148,8 @@ def main():
         mdr_cub_path = mirror_path
 
     # Is the MDR in DN or I/F?
-    maximum_pxl = float(pvl.loads(isis.stats(mdr_cub_path).stdout)['Results']['Maximum'])
+    maximum_pxl = float(
+        pvl.loads(isis.stats(mdr_cub_path).stdout)['Results']['Maximum'])
     if maximum_pxl < 1.5:
         logging.info('MDR is already in I/F units.')
         mdr_16b_p = to_del.add(mdr_cub_path.with_suffix('.16bit.cub'))
@@ -150,21 +159,25 @@ def main():
     else:
         logging.info('MDR is in DN units and will be converted to I/F.')
 
-        fpa_t = statistics.mean([float(isis.getkey_k(h2i_16b_p, 'Instrument',
-                                                     'FpaPositiveYTemperature')),
-                                 float(isis.getkey_k(h2i_16b_p, 'Instrument',
-                                                     'FpaNegativeYTemperature'))])
+        fpa_t = statistics.mean(
+            [float(isis.getkey_k(h2i_16b_p, 'Instrument',
+                                 'FpaPositiveYTemperature')),
+             float(isis.getkey_k(h2i_16b_p, 'Instrument',
+                                 'FpaNegativeYTemperature'))])
         print(f'fpa_t {fpa_t}')
 
         conf = pvl.load(str(args.conf))
 
         tdg = t_dep_gain(get_one(conf['Hical'], 'Profile', cid.ccdname), fpa_t)
         suncorr = solar_correction()
-        sclk = isis.getkey_k(h2i_16b_p, 'Instrument', 'SpacecraftClockStartCount')
+        sclk = isis.getkey_k(h2i_16b_p, 'Instrument',
+                             'SpacecraftClockStartCount')
         target = isis.getkey_k(h2i_16b_p, 'Instrument', 'TargetName')
         suncorr = solar_correction(sunDistanceAU(sclk, target))
-        sed = float(isis.getkey_k(h2i_16b_p, 'Instrument', 'LineExposureDuration'))
-        zbin = get_one(conf['Hical'], 'Profile', 'GainUnitConversion')['GainUnitConversionBinFactor']
+        sed = float(isis.getkey_k(h2i_16b_p, 'Instrument',
+                                  'LineExposureDuration'))
+        zbin = get_one(conf['Hical'], 'Profile',
+                       'GainUnitConversion')['GainUnitConversionBinFactor']
 
         # The 'ziof' name is from the ISIS HiCal/GainUnitConversion.h, it is a
         # divisor in the calibration equation.
@@ -192,7 +205,7 @@ def solar_correction(au=1.498) -> float:
 
 
 def sunDistanceAU(time: str, target: str) -> float:
-    '''Returns distance in AU between Sun and observed body from MRO'''
+    """Returns distance in AU between Sun and observed body from MRO."""
 
     base_kernel_path = Path(isis.environ['ISIS3DATA']) / 'base' / 'kernels'
     lsk = sorted(Path(base_kernel_path / 'lsk').glob('naif*.tls'))[-1]
@@ -218,8 +231,8 @@ def sunDistanceAU(time: str, target: str) -> float:
 
 
 def t_dep_gain(profile: dict, t: float) -> float:
-    '''Given the profile, and the FPA temperature in C,
-       calculate the temperature dependent gain.'''
+    """Given the profile, and the FPA temperature in C,
+    calculate the temperature dependent gain."""
     # Equivalent to getTempDepGain() in ISIS HiCal/GainUnitConversion.h
     # These equations are really g * (1 + t - baseT) * Q * absgainTDI
     # where these variables are from the hical.pipelines.conf file.
@@ -244,7 +257,7 @@ def t_dep_gain(profile: dict, t: float) -> float:
 
 
 def get_one(conf, thing: str, name: str) -> dict:
-    '''Return the item for the named thing (of which there are multiple).'''
+    """Return the item for the named thing (of which there are multiple)."""
     for it in conf.getlist(thing):
         if it['Name'] == name:
             return it

@@ -22,7 +22,8 @@
 
 
 # This program is based on HiPrecision version 1.20 2017/07/19
-# and on the Perl HiPrecisionInit program: ($Revision: 1.27 $ $Date: 2017/08/30 # 21:29:23 $)
+# and on the Perl HiPrecisionInit program: ($Revision: 1.27 $
+#                                           $Date: 2017/08/30 # 21:29:23 $)
 # by Audrie Fennema and Sarah Mattson
 # which is Copyright(C) 2008 Arizona Board of Regents, under the GNU GPL.
 #
@@ -53,18 +54,40 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    # Ignore args.log to always print info when run from the command line.
+    util.set_logging('info')
 
-    conf = pvl.load(str(args.conf))
+    start(args.slither_text, args.conf)
 
+    return
+
+
+def start(slither_paths: list, conf_path: os.PathLike):
+    conf = pvl.load(str(conf_path))
+
+    yes_HiJACK = list()
     thresh = float(conf['HiPrecisionInit']['Mean_Jitter_Magnitude_Threshold'])
-    print(f'Mean_Jitter_Magnitude_Threshold: {thresh}')
-    print(f'Average\tProcess \tFile Name')
-    for s in args.slither_text:
-        (_, avediff, _) = sstats.Polyfit(s)
-
-        terminus = 'HiNoProj'
-        if avediff > thresh:
+    logging.info(f'Mean_Jitter_Magnitude_Threshold: {thresh}')
+    logging.info(f'Average\tProcess \tFile Name')
+    for s in slither_paths:
+        (need, avediff) = needs_HiJACK(s, thresh)
+        if need:
             terminus = 'HiJACK  '
+        else:
+            terminus = 'HiNoProj'
 
-        print('{:.2}\t{}\t{}'.format(avediff, terminus, s))
+        logging.info('{:.2}\t{}\t{}'.format(avediff, terminus, s))
+        yes_HiJACK.append(need)
+
+    return yes_HiJACK
+
+
+def needs_HiJACK(slither_path: os.PathLike, threshold: float):
+    (_, avediff, _) = sstats.Polyfit(slither_path)
+    need = None
+    if avediff > threshold:
+        need = True
+    else:
+        need = False
+
+    return need, avediff

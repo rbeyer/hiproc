@@ -29,6 +29,7 @@
 
 import argparse
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -43,8 +44,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()],
                                      conflict_handler='resolve')
-    parser.add_argument('-o_irb', '--output_irb', required=False, default='_IRB.cub')
-    parser.add_argument('-o_rgb', '--output_rgb', required=False, default='_RGB.cub')
+    parser.add_argument('-o_irb', '--output_irb', required=False,
+                        default='_IRB.cub')
+    parser.add_argument('-o_rgb', '--output_rgb', required=False,
+                        default='_RGB.cub')
     parser.add_argument('-c', '--conf',    required=False,
                         default=Path(__file__).resolve().parent.parent /
                         'data' / 'HiBeautify.conf')
@@ -52,28 +55,36 @@ def main():
     #                     help='Use the frost/ice color stretch, and disable '
     #                     'auto-detection of frost/ice.')
     # parser.add_argument('--nofrost', action='store_true',
-    #                     help='Do not use the frost/ice color stretch, and disable '
+    #        help='Do not use the frost/ice color stretch, and disable '
     #                     'auto-detection of frost/ice.')
     parser.add_argument('cubes',
-                        metavar="the COLOR4.HiColorNorm.cub and COLOR5.HiColorNorm.cub files",
+                        metavar=("the COLOR4.HiColorNorm.cub and "
+                                 "COLOR5.HiColorNorm.cub files"),
                         nargs=2)
 
     args = parser.parse_args()
 
     util.set_logging(args.log)
 
-    # GetConfigurationParameters()
-    conf = pvl.load(str(args.conf))
+    start(args.cubes, args.conf, args.output_irb, args.output_rgb,
+          keep=args.keep)
 
-    cubes = list(map(hcn.ColorCube, args.cubes))
+
+def start(cube_paths: list, conf_path: os.PathLike, out_irb='_IRB.cub',
+          out_rgb='_RGB.cub', keep=False):
+
+    # GetConfigurationParameters()
+    conf = pvl.load(str(conf_path))
+
+    cubes = list(map(hcn.ColorCube, cube_paths))
 
     cubes.sort()
 
-    outirb = hcn.set_outpath(args.output_irb, cubes)
-    outrgb = hcn.set_outpath(args.output_rgb, cubes)
+    outirb_path = hcn.set_outpath(out_irb, cubes)
+    outrgb_path = hcn.set_outpath(out_rgb, cubes)
 
     # HiBeautify(cubes, outcub_paths, conf, frost=args.frost, keep=args.keep)
-    HiBeautify(cubes, (outirb, outrgb), conf, keep=args.keep)
+    HiBeautify(cubes, (outirb_path, outrgb_path), conf, keep=keep)
 
 
 def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
@@ -97,7 +108,8 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
     try:
         util.log(isis.handmos(cubes[0].path, mosaic=irb_out_p, outline=1,
                               outsample=outsample, outband=1, create='Y',
-                              nlines=cubes[0].lines, nsamp=total_width, nbands=3).args)
+                              nlines=cubes[0].lines, nsamp=total_width,
+                              nbands=3).args)
     except subprocess.CalledProcessError as err:
         print(err.stdout)
         print(err.stderr)
@@ -107,7 +119,8 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
     else:
         logging.info('Using both halves')
         util.log(isis.handmos(cubes[1].path, mosaic=irb_out_p,
-                              outline=1, outsample=image_midpoint, outband=1).args)
+                              outline=1, outsample=image_midpoint,
+                              outband=1).args)
 
     # Nothing is actually done to the pixels here regarding the FrostStats, so
     # I'm just going to skip them here.
@@ -146,12 +159,17 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
     #     synthbcrp_p = rgbsynthb_p
     #     irbmrgcrp_p = irbmerged_p
     # else:
-    #     synthbcrp_p = to_del.add(out_p.with_suffix(f'.{temp_token}_Bx.cub'))
-    #     irbmrgcrp_p = to_del.add(out_p.with_suffix(f'.{temp_token}_IRBx.cub'))
+    #     synthbcrp_p = to_del.add(
+    #           out_p.with_suffix(f'.{temp_token}_Bx.cub'))
+    #     irbmrgcrp_p = to_del.add(
+    #           out_p.with_suffix(f'.{temp_token}_IRBx.cub'))
     #
-    #     for (f, t) in ((rgbsynthb_p, synthbcrp_p), (irbmerged_p, irbmrgcrp_p)):
-    #         logging.info(isis.crop(f, to=t, propspice=False, line=(1 + upper),
-    #                                nlines=(cubes[0].lines - lower + upper)).args)
+    #     for (f, t) in ((rgbsynthb_p, synthbcrp_p),
+    #                    (irbmerged_p, irbmrgcrp_p)):
+    #         logging.info(isis.crop(f, to=t, propspice=False,
+    #                                line=(1 + upper),
+    #                                nlines=(
+    #                                   cubes[0].lines - lower + upper)).args)
     #
     # stats = dict()
     # stats['B'] = Get_MinMax(synthbcrp_p,
@@ -164,8 +182,8 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
     #                              conf['Beautify']['Stretch_Reduction_Factor'],
     #                              temp_token, keep=keep)
 
-    # Create an RGB cube using the RED from the IRB mosaic, the BG from the IRB mosaic
-    # and the synthetic B that we just made.
+    # Create an RGB cube using the RED from the IRB mosaic,
+    # the BG from the IRB mosaic and the synthetic B that we just made.
     util.log(isis.cubeit_k([f'{irb_out_p}+2', f'{irb_out_p}+3', rgbsynthb_p],
                            to=rgb_out_p).args)
 
@@ -181,9 +199,9 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
 # def Get_MinMax(cube, scale=1,
 #                temp_token=datetime.now().strftime('%y%m%d%H%M%S'),
 #                keep=False) -> tuple:
-#     '''Reduces an Isis cub by a specified scaling factor.  Runs hist to return the
-#        pixel values from the histogram at the ordinal positions passed (or min & max
-#        if unspecified).
+#     '''Reduces an Isis cub by a specified scaling factor.  Runs hist to
+#        return the pixel values from the histogram at the ordinal
+#        positions passed (or min & max if unspecified).
 #
 #        Returns (min, max, avg).
 #     '''
@@ -194,13 +212,15 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
 #
 #     if scale > 1:
 #         reduce_p = to_del.add(in_p.with_suffix(f'{temp_token}.reduce.cub'))
-#         logging.info(isis.reduce(in_p, to=reduce_p, sscale=scale, lscale=scale,
-#                                  validper=1, vper_replace='nearest', mode='SCALE').args)
+#         logging.info(isis.reduce(in_p, to=reduce_p, sscale=scale,
+#                                  lscale=scale, validper=1,
+#                                  vper_replace='nearest', mode='SCALE').args)
 #
 #         in_p = reduce_p
 #
 #     elif scale < 1:
-#         raise ValueError(f'The value for scale must be >= 1, but was {scale}.')
+#         raise ValueError(
+#             f'The value for scale must be >= 1, but was {scale}.')
 #
 #     stats = isis.stats_k(in_p)
 #
@@ -210,4 +230,5 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
 #     if int(stats['NullPixels']) >= int(stats['TotalPixels']):
 #         return (-1, -1, 0)
 #
-#     return(int(stats['Minimum']), int(stats['Maximum']), int(stats['Average']))
+#     return(int(stats['Minimum']), int(stats['Maximum']),
+#            int(stats['Average']))

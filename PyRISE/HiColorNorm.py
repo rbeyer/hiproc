@@ -17,7 +17,8 @@
 
 
 # This program is based on HiColorNorm version 1.36 2014/07/15
-# and on the Perl HiColorNorm program: ($Revision: 1.26 $ $Date: 2014/07/15 # 19:39:15 $)
+# and on the Perl HiColorNorm program: ($Revision: 1.26 $
+#                                       $Date: 2014/07/15 # 19:39:15 $)
 # by Eric Eliason
 # which is Copyright(C) 2006 Arizona Board of Regents, under the GNU GPL.
 #
@@ -37,6 +38,7 @@ import re
 import shutil
 import statistics
 from datetime import datetime
+from itertools import repeat
 from pathlib import Path
 
 import pvl
@@ -50,9 +52,9 @@ import PyRISE.HiColorInit as hicolor
 class ColorCube(hirise.ObservationID):
     """A class for HiRISE multiband COLOR cubes."""
 
-    def __init__(self, pathlike):
+    def __init__(self, pathlike, dbs=None):
         self.path = Path(pathlike)
-        match = re.search(r'COLOR(\d)', pathlike)
+        match = re.search(r'COLOR(\d)', str(pathlike))
         if match:
             self.ccdnumber = match.group(1)
         else:
@@ -75,8 +77,8 @@ class ColorCube(hirise.ObservationID):
 
         self.pids = isis.getkey_k(self.path, 'Mosaic',
                                   'SourceProductId').split(', ')
-        self.ir_bin = self.get_binning('IR')
-        self.red_bin = self.get_binning('RED')
+        self.ir_bin = self.get_binning('IR', dbs)
+        self.red_bin = self.get_binning('RED', dbs)
         # self.bg_bin = get_binning('BG')
 
         self.mask_path = {'IR': None, 'BG': None}
@@ -113,7 +115,8 @@ class ColorCube(hirise.ObservationID):
         return f'COLOR{self.ccdnumber}'
 
     def get_obsid(self) -> hirise.ObservationID:
-        return hirise.ObservationID(self.phase, self.orbit_number, self.latesque)
+        return hirise.ObservationID(self.phase, self.orbit_number,
+                                    self.latesque)
 
     def set_crop_lines(self, conf):
         sline = conf['HiColorNorm']['HiColorNorm_Crop_Top'] + 1
@@ -128,23 +131,49 @@ class ColorCube(hirise.ObservationID):
         self.crop_lines = nline
         return(sline, nline)
 
-    def get_binning(self, color_code, pids=None, db_paths=None):
-        # Get the binning values for the component red, ir, and bg
-        # observations.
+    def get_binning_from(self, color_code, pids=None, db_paths=None):
+        dbs = list()
+        if pids is None:
+            pids = self.pids
+
+        parent = self.path.parent
         if db_paths is None:
             db_paths = list()
-            parent = self.path.parent
-            if pids is None:
-                pids = self.pids
             for pid in pids:
-                if color_code in pid:
-                    for p in parent.glob(f'{pid}*.json'):
-                        db_paths.append(p)
+                db_paths.extend(list(parent.glob(f'{pid}*.json')))
+
+        for pid in pids:
+            if color_code in pid:
+                if len(db_paths) > 0:
+                    for p in db_paths:
+                        with open(p) as f:
+                            dbs.append(json.load(p))
+                else:
+                    for p in parent.glob(f'{pid}*.cub'):
+                        temp_d = dict()
+                        temp_d['PRODUCT_ID'] = isis.getkey_k(p, 'Archive',
+                                                             'ProductId')
+                        temp_d['BINNING'] = int(isis.getkey_k(p, 'Instrument',
+                                                              'Summing'))
+                        dbs.append(temp_d)
+        return dbs
+
+    def get_binning(self, color_code, dbs=None, pids=None, db_paths=None):
+        # Get the binning values for the component red, ir, and bg
+        # observations.
+        if pids is None:
+            pids = self.pids
+
+        if dbs is None:
+            dbs = self.get_binning_from(color_code, pids, db_paths)
 
         bins = collections.Counter()
-        for p in db_paths:
-            with open(p) as f:
-                bins[json.load(f)['BINNING']] += 1
+        for db in dbs:
+            if('PRODUCT_ID' in db
+               and db['PRODUCT_ID'] in pids
+               and color_code in db['PRODUCT_ID']):
+                    bins[db['BINNING']] += 1
+
         if len(bins) != 1:
             raise Exception('Gathered {} different '.format(len(bins)) +
                             f'binning values for the {color_code} channel, '
@@ -179,31 +208,37 @@ def main():
 
     util.set_logging(args.log)
 
-    # GetConfigurationParameters()
-    conf = pvl.load(str(args.conf))
-    conf_check(conf)
-
-    cubes = list(map(ColorCube, args.cubes))
-
-    cubes.sort()
-
-    outcub_path = set_outpath(args.output, cubes)
-
-    (ir_ratio, bg_ratio) = HiColorNorm(cubes, outcub_path, conf,
-                                       FurrowCheck(cubes),
-                                       unfiltered=args.Make_Unfiltered,
-                                       keep=args.keep)
+    (ir_ratio, bg_ratio) = start(args.cubes, args.output, args.conf,
+                                 make_unfiltered=args.Make_Unfiltered,
+                                 keep=args.keep)
 
     # Original Perl connects to HiCat to query the binning for CCDs
     #   and also whether there were furrows in the IR or BG components
     #   Finally, there's an insert into the Color_Processing_Statistics
-    #       table that puts in the HICOLORNORM_RATIO_CORRECTION_STANDARD_DEVIATION
-    #       for each FILTER
+    #       table that puts in the
+    #       HICOLORNORM_RATIO_CORRECTION_STANDARD_DEVIATION for each FILTER
     # At the moment, we're not doing that here.
 
 
+def start(cube_paths, out_path, conf_path, make_unfiltered=True,
+          db_list=None, keep=False):
+
+    # GetConfigurationParameters()
+    conf = pvl.load(str(conf_path))
+    conf_check(conf)
+
+    cubes = list(map(ColorCube, cube_paths, repeat(db_list)))
+
+    cubes.sort()
+
+    outcub_path = set_outpath(out_path, cubes)
+
+    return HiColorNorm(cubes, outcub_path, conf, FurrowCheck(cubes),
+                       unfiltered=make_unfiltered, keep=keep)
+
+
 def conf_check(conf: dict) -> None:
-    '''Various checks on parameters in the configuration.'''
+    """Various checks on parameters in the configuration."""
 
     t = 'HiColorNorm_NoiseFilter_IR10'
     util.conf_check_bool(t, conf['HiColorNorm'][t])
@@ -227,8 +262,8 @@ def conf_check(conf: dict) -> None:
 def set_outpath(out: os.PathLike, cubes) -> Path:
     # Check that they all have the same Obs ID:
     if len(set(c.get_obsid() for c in cubes)) != 1:
-        raise ValueError("These cube files don't all have the same Observation "
-                         f"ID: {cubes}")
+        raise ValueError("These cube files don't all have the same "
+                         f"Observation ID: {cubes}")
 
     if str(out).startswith('_'):
         return (cubes[0].path.parent / Path(str(cubes[0].get_obsid()) + out))
@@ -251,7 +286,8 @@ def HiColorNorm(cubes, outcub_path, conf, furrow_flag,
         # Protect the processing from erroneous/spurious pixels
         mask_list = list()
         for b in (1, 2, 3):
-            tmp_p = to_del.add(c.path.with_suffix(f'.{temp_token}.temp{b}.cub'))
+            tmp_p = to_del.add(c.path.with_suffix(
+                f'.{temp_token}.temp{b}.cub'))
             util.log(isis.mask(f'{c.path}+{b}', mask=f'{c.path}+{b}',
                                to=tmp_p, minimum=0.0, maximum=2.0,
                                preserve='INSIDE').args)
@@ -272,7 +308,8 @@ def HiColorNorm(cubes, outcub_path, conf, furrow_flag,
 
     if conf['HiColorNorm']['HiColorNorm_Make_Stitch']:
         # listpath = to_del.add(c.path.with_suffix(f'.{temp_token}.list.txt'))
-        # listpath.write_text('\n'.join(str(c.final_path) for c in cubes) + '\n')
+        # listpath.write_text(
+        #   '\n'.join(str(c.final_path) for c in cubes) + '\n')
 
         with isis.fromlist.temp([str(c.final_path) for c in cubes]) as f:
             util.log(isis.hiccdstitch(fromlist=f, to=out_p).args)
@@ -344,7 +381,8 @@ def per_color(cube, temp_token, color_code, keep=False):
     return(mask_p, crop_p)
 
 
-def make_LR_mosaic(left_path, right_path, left_samps, mosaic_path, lines, samps):
+def make_LR_mosaic(left_path, right_path, left_samps, mosaic_path, lines,
+                   samps):
     util.log(isis.handmos(left_path, mosaic=mosaic_path,
                           create='YES', nlines=lines, nsamp=samps,
                           nbands=1, outsamp=1,
@@ -386,7 +424,8 @@ def make_unfiltered(in_path, nrm_path, temp_token, color_code, color_band,
     unfiltered_p = in_p.with_name(in_p.name.replace('COLOR',
                                                     'UNFILTERED_COLOR'))
     shutil.copyfile(in_p, unfiltered_p)
-    # run ISIS algebra program to create unfiltered (normalized-IR/RED)*RED files
+    # run ISIS algebra program to create unfiltered
+    # (normalized-IR/RED)*RED files
     alg_unfiltered_path = in_p.with_suffix(f'.{tt}.algebra.cub')
     util.log(isis.algebra(nrm_path,
                           from2='{}+2'.format(in_p),
@@ -428,7 +467,8 @@ def lpfz_filtering(from_path: os.PathLike, to_path: os.PathLike,
                           LIS=True, LRS=True).args)
 
 
-def per_band(cubes, out_p, temp_token, color_code, furrow_flag, unfiltered, keep=False) -> float:
+def per_band(cubes, out_p, temp_token, color_code, furrow_flag, unfiltered,
+             keep=False) -> float:
     to_del = isis.PathSet()
 
     # Generate the handmos of both the ratio and the croped ratio files
@@ -437,14 +477,16 @@ def per_band(cubes, out_p, temp_token, color_code, furrow_flag, unfiltered, keep
         maxsamps = sum(c.samps for c in cubes)
 
         # Generate the mosaic of the ratio image
-        mos_p = to_del.add(out_p.with_suffix(f'.{temp_token}.{color_code}.mos.cub'))
+        mos_p = to_del.add(
+            out_p.with_suffix(f'.{temp_token}.{color_code}.mos.cub'))
         make_LR_mosaic(cubes[0].mask_path[color_code],
                        cubes[1].mask_path[color_code],
                        cubes[0].samps, mos_p, maxlines, maxsamps)
 
         # Generate the mosaic of the crop ratio image
         maxlines = max(c.crop_lines for c in cubes)
-        crpmos_p = to_del.add(out_p.with_suffix(f'.{temp_token}.{color_code}.moscrop.cub'))
+        crpmos_p = to_del.add(
+            out_p.with_suffix(f'.{temp_token}.{color_code}.moscrop.cub'))
         make_LR_mosaic(cubes[0].crop_path[color_code],
                        cubes[1].crop_path[color_code],
                        cubes[0].samps, crpmos_p, maxlines, maxsamps)
@@ -452,14 +494,16 @@ def per_band(cubes, out_p, temp_token, color_code, furrow_flag, unfiltered, keep
         mos_p = cubes[0].mask_path[color_code]
         crpmos_p = cubes[0].crop_path[color_code]
 
-    mosnrm_p = to_del.add(out_p.with_suffix(f'.{temp_token}.{color_code}.mosnorm.cub'))
+    mosnrm_p = to_del.add(
+        out_p.with_suffix(f'.{temp_token}.{color_code}.mosnorm.cub'))
     ratio_stddev = cubenorm_stats(crpmos_p, mos_p, mosnrm_p, keep=keep)
 
     # from the handmos cubes, pull out the individual CCDs with crop
     if len(cubes) == 2:
         samp = 1
         for i, c in enumerate(cubes):
-            cubes[i].nrm_path[color_code] = c.path.with_suffix(f'.{temp_token}.{color_code}.norm.cub')
+            cubes[i].nrm_path[color_code] = c.path.with_suffix(
+                f'.{temp_token}.{color_code}.norm.cub')
             util.log(isis.crop(mosnrm_p, to=cubes[i].nrm_path[color_code],
                                sample=samp, nsamples=c.samps).args)
             samp += c.samps
@@ -497,27 +541,31 @@ def per_band(cubes, out_p, temp_token, color_code, furrow_flag, unfiltered, keep
             lowpass_args['lines'] = 1
             lowpass_args['samples'] = 1
 
-        lpf_path = to_del.add(c.path.with_suffix(f'.{temp_token}.{color_code}.lpf.cub'))
+        lpf_path = to_del.add(
+            c.path.with_suffix(f'.{temp_token}.{color_code}.lpf.cub'))
         util.log(isis.lowpass(c.nrm_path[color_code], to=lpf_path,
                               **lowpass_args).args)
 
         # Perform lpfz filters to interpolate null pixels due to furrows or
         #   bad pixels
         if furrow_flag:
-            lpfz_path = c.path.with_suffix(f'.{temp_token}.{color_code}.lpfz.cub')
+            lpfz_path = c.path.with_suffix(
+                f'.{temp_token}.{color_code}.lpfz.cub')
             lpfz_triplefilter(lpf_path, lpfz_path, temp_token, keep=keep)
         else:
             lpfz_path = lpf_path
 
         # run ISIS algebra program to created (normalized-IR/RED)*RED files
-        alg_path = to_del.add(c.path.with_suffix(f'.{temp_token}.{color_code}.algebra.cub'))
+        alg_path = to_del.add(c.path.with_suffix(
+            f'.{temp_token}.{color_code}.algebra.cub'))
         util.log(isis.algebra(lpfz_path, from2=f'{c.path}+2',
                               to=alg_path, operator='MULTIPLY').args)
 
         # Update the output file with the normalized IR and BG bands
         util.log(isis.handmos(alg_path, mosaic=c.final_path,
                               outsample=1, outline=1,
-                              outband=c.band[color_code], matchbandbin=False).args)
+                              outband=c.band[color_code],
+                              matchbandbin=False).args)
 
     if not keep:
         to_del.unlink()

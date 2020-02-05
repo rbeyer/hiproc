@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 """Deal with stuck bits in HiRISE pixels.
 
-    If there is some process which is flipping one of the HiRISE
-    bits in a 14-bit pixel the wrong way, it will inadvertently add
-    or subtract a certain DN value to a pixel.  Naturally, it goes
-    from 2^13 (8192) all the way down to 2.
+If there is some process which is flipping one of the HiRISE
+bits in a 14-bit pixel the wrong way, it will inadvertently add
+or subtract a certain DN value to a pixel.  Naturally, it goes
+from 2^13 (8192) all the way down to 2.
 
-    In practice, these 'bitflipped' pixels show up as spikes in the
-    image histogram at DN values approximately centered on the image
-    Median plus or minus the bitflip value (8192, 4096, etc.).
+In practice, these 'bitflipped' pixels show up as spikes in the
+image histogram at DN values approximately centered on the image
+Median plus or minus the bitflip value (8192, 4096, etc.).
 
-    These are not narrow spikes and have variable width, so care
-    must be taken when dealing with them.  This program will do one
-    of two things, it will either attempt to un-flip the bits on
-    the bit-flipped pixels or it will attempt to mask them out.
+These are not narrow spikes and have variable width, so care
+must be taken when dealing with them.  This program will do one
+of two things, it will either attempt to un-flip the bits on
+the bit-flipped pixels or it will attempt to mask them out.
 """
 
 # Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
@@ -93,11 +93,11 @@ def main():
 
 
 def get_range(start, stop, step=None):
-    '''Returns a range object given floating point start and
-       stop values (the optional step must be an int).  If
-       step is none, it will be set to 1 or -1 depending on the
-       relative values of start and stop.
-    '''
+    """Returns a range object given floating point start and
+    stop values (the optional step must be an int).  If
+    step is none, it will be set to 1 or -1 depending on the
+    relative values of start and stop.
+    """
     if start < stop:
         start = math.floor(start)
         stop = math.ceil(stop)
@@ -113,20 +113,20 @@ def get_range(start, stop, step=None):
 
 
 def find_gap(hist: list, start, stop, step=None, findfirst=False) -> int:
-    '''Given the range specified by start, stop and step, the DNs are
-       extracted from the list of namedtuples (from kalasiris.Histogram)
-       the 'gaps' between continuous ranges of DN are found (DNs where
-       the histogram has no pixels).  The largest gap is found, and
-       then the DN value closest to start from that largest gap is
-       returned.
+    """Given the range specified by start, stop and step, the DNs are
+    extracted from the list of namedtuples (from kalasiris.Histogram)
+    the 'gaps' between continuous ranges of DN are found (DNs where
+    the histogram has no pixels).  The largest gap is found, and
+    then the DN value closest to start from that largest gap is
+    returned.
 
-       If step is not specified or None, it will be set to 1 or -1
-       depending on the relative values of start and stop.
+    If step is not specified or None, it will be set to 1 or -1
+    depending on the relative values of start and stop.
 
-       If findfirst is True, then rather than finding the 'biggest'
-       gap, it will return the DN from the gap that is closest to
-       start.
-    '''
+    If findfirst is True, then rather than finding the 'biggest'
+    gap, it will return the DN from the gap that is closest to
+    start.
+    """
     dn_window = get_range(start, stop, step)
 
     hist_set = set(filter(lambda d: d in dn_window,
@@ -156,10 +156,10 @@ def find_gap(hist: list, start, stop, step=None, findfirst=False) -> int:
 
 
 def find_min_dn(hist: list, start, stop, step=None):
-    '''Given how the min() mechanics work, this should return the first
-       DN value of the entry with the lowest pixel count, in range order
-       (if there is more than one).
-    '''
+    """Given how the min() mechanics work, this should return the first
+    DN value of the entry with the lowest pixel count, in range order
+    (if there is more than one).
+    """
     r = get_range(start, stop, step)
     hist_list = sorted(filter(lambda x: int(x.DN) in r, hist),
                        key=lambda x: int(x.DN),
@@ -171,11 +171,11 @@ def find_min_dn(hist: list, start, stop, step=None):
 
 def subtract_over_thresh(in_path: os.PathLike, out_path: os.PathLike,
                          thresh: int, delta: int, keep=False):
-    '''For all pixels in the in_path ISIS cube, if delta is positive, then
-       pixels with a value greater than thresh will have delta subtracted from
-       them.  If delta is negative, then all pixels less than thresh
-       will have delta added to them.
-    '''
+    """For all pixels in the in_path ISIS cube, if delta is positive, then
+    pixels with a value greater than thresh will have delta subtracted from
+    them.  If delta is negative, then all pixels less than thresh
+    will have delta added to them.
+    """
 
     # Originally, I wanted to just do this simply with fx:
     # eqn = "\(f1 + ((f1{glt}={thresh}) * {(-1 * delta)}))"
@@ -214,14 +214,14 @@ def subtract_over_thresh(in_path: os.PathLike, out_path: os.PathLike,
 
 
 def histogram(in_path: Path, hist_path: Path):
-    '''This is just a convenience function to facilitate logging.'''
+    """This is just a convenience function to facilitate logging."""
     util.log(isis.hist(in_path, to=hist_path).args)
     return isis.Histogram(hist_path)
 
 
 def mask(in_path: Path, out_path: Path, keep=False):
-    '''Attempt to mask out pixels beyond the central DNs of the median
-       based on minima in the histogram.'''
+    """Attempt to mask out pixels beyond the central DNs of the median
+    based on minima in the histogram."""
 
     import matplotlib.pyplot as plt
 
@@ -267,8 +267,8 @@ def mask(in_path: Path, out_path: Path, keep=False):
 
 
 def mask_gap(in_path: Path, out_path: Path, keep=False):
-    '''Attempt to mask out pixels beyond the central DNs of the median
-       based on gaps in the histogram.'''
+    """Attempt to mask out pixels beyond the central DNs of the median
+    based on gaps in the histogram."""
 
     # This approach worked well based on 'ideal' reverse-clocked data
     # or 'dark' images, but in 'real' HiRISE images of Mars, the reality
@@ -322,9 +322,9 @@ def get_unflip_thresh(hist, far, near, lowlimit):
 
 
 def unflip(in_p: Path, out_p: Path, keep=False):
-    '''Attempt to indentify DNs whose bits have been flipped, and
-       unflip them.
-    '''
+    """Attempt to indentify DNs whose bits have been flipped, and
+    unflip them.
+    """
     to_del = isis.PathSet()
 
     # This full suite of deltas works well for the reverse-clock area

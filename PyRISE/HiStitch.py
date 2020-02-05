@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""Stitch together two HiRISE channel files to create a single CCD image file."""
+"""Stitch together two HiRISE channel files to create a single CCD image
+file."""
 
 # Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
 #
@@ -17,7 +18,8 @@
 
 
 # This program is based on HiStitch version 1.32 2016/08/04
-# and on the Perl HiStitch program: ($Revision: 1.24 $ $Date: 2016/08/05 18:05:28 $)
+# and on the Perl HiStitch program: ($Revision: 1.24 $
+#                                    $Date: 2016/08/05 18:05:28 $)
 # by Eric Eliason
 # which is Copyright(C) 2016 Arizona Board of Regents, under the GNU GPL.
 #
@@ -49,19 +51,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()],
                                      conflict_handler='resolve')
-    parser.add_argument('--db',         required=False, default='.HiCat.json',
-                        help="The .json file to use.  Optionally, if it starts "
-                        "with a '.' it is considered an extension and will be "
-                        "swapped with the input file's extension to find the "
-                        ".json file to use.")
-    parser.add_argument('--db2',         required=False, default='.HiCat.json',
-                        help="The second .json file to use.  Optionally, if it starts "
-                        "with a '.' it is considered an extension and will be "
-                        "swapped with the second input file's extension to find the "
-                        ".json file to use.")
-    parser.add_argument('--dbout',        required=False, default='.HiCat.json')
-    parser.add_argument('-o', '--output', required=False, default='.HiStitch.cub')
-    parser.add_argument('-c', '--conf',    required=False,
+    parser.add_argument('--db', required=False, default='.HiCat.json',
+                        help="The .json file to use.  Optionally, if it "
+                        "starts with a '.' it is considered an extension and "
+                        "will be swapped with the input file's extension to "
+                        "find the .json file to use.")
+    parser.add_argument('--db2', required=False, default='.HiCat.json',
+                        help="The second .json file to use.  Optionally, if "
+                        "it starts with a '.' it is considered an extension "
+                        "and will be swapped with the second input file's "
+                        "extension to find the .json file to use.")
+    parser.add_argument('--dbout', required=False, default='.HiCat.json')
+    parser.add_argument('-o', '--output', required=False,
+                        default='.HiStitch.cub')
+    parser.add_argument('-c', '--conf', required=False,
                         default=Path(__file__).resolve().parent.parent /
                         'data' / 'HiStitch.conf')
     parser.add_argument('cube0', metavar="cube0.cub-file")
@@ -77,35 +80,52 @@ def main():
 
     util.set_logging(args.log)
 
+    (db, outcub_path) = start(args.cube0, args.cube1,
+                              get_db(util.pid_path_w_suffix(args.db,
+                                                            args.cube0)),
+                              get_db(util.pid_path_w_suffix(args.db2,
+                                                            args.cube1)),
+                              args.output, args.conf, keep=args.keep)
+
+    db_path = set_outpath(args.dbout,
+                          hirise.get_CCDID_fromfile(outcub_path),
+                          outcub_path.parent)
+
+    with open(db_path, 'w') as f:
+        json.dump(db, f, indent=0, sort_keys=True)
+
+
+def start(cube0: os.PathLike, cube1: os.PathLike, db0: dict, db1: dict,
+          output: os.PathLike, conf_path: os.PathLike, keep=False) -> dict:
+
     # GetConfigurationParameters()
-    conf = pvl.load(str(args.conf))
+    conf = pvl.load(str(conf_path))
     conf_check(conf)
 
     # GetProductFiles()
-    if not args.cube1:
-        cubes = Path(args.cube0),
+    if not cube1:
+        cubes = Path(cube0),
     else:
-        cubes = sort_input_cubes(Path(args.cube0), Path(args.cube1))
+        cubes = sort_input_cubes(Path(cube0), Path(cube1))
 
     chids = get_chids(cubes)
 
-    outcub_path = set_outpath(args.output, hirise.CCDID(chids[0]), cubes[0].parent)
+    outcub_path = set_outpath(output, hirise.CCDID(chids[0]), cubes[0].parent)
 
     # PrepareDBStatements()
     #   select from HiCat.EDR_Products
-    db = list()
     db_paths = list()
-    db_paths.append(util.pid_path_w_suffix(args.db, cubes[0]))
+    db_paths.append(db0)
     if len(cubes) == 2:
-        db_paths.append(util.pid_path_w_suffix(args.db2, cubes[1]))
+        db_paths.append(db1)
 
-    dbs = sort_databases(db_paths, chids)
+    dbs = sort_databases([db0, db1], chids)
 
     (truthchannel, balanceratio) = HiStitch(cubes,
                                             outcub_path,
                                             conf['HiStitch'], dbs,
                                             int(chids[0].ccdnumber),
-                                            keep=args.keep)
+                                            keep=keep)
 
     # insert ObsID, pid0.ccdname+pid0.ccdnumber, truthchannel, balanceratio
     # into HiCat.CCD_Processing_Statistics
@@ -115,10 +135,17 @@ def main():
     db['CONTROL_CHANNEL'] = truthchannel
     db['CHANNEL_MATCHING_CORRECTION'] = balanceratio
 
-    db_path = set_outpath(args.dbout, hirise.CCDID(chids[0]), outcub_path.parent)
+    return (db, outcub_path)
 
-    with open(db_path, 'w') as f:
-        json.dump(db, f, indent=0, sort_keys=True)
+
+def get_db(db_path: os.PathLike) -> dict:
+    if db_path is None:
+        return None
+
+    with open(db_path) as f:
+        db = json.load(f)
+
+    return db
 
 
 def get_chids(cubes: list) -> tuple:
@@ -137,7 +164,8 @@ def get_chids(cubes: list) -> tuple:
         return (cid_a, )
 
 
-def set_outpath(output: os.PathLike, cid: hirise.CCDID, directory: Path) -> Path:
+def set_outpath(output: os.PathLike, cid: hirise.CCDID,
+                directory: Path) -> Path:
     if str(output).startswith('.'):
         return (directory / Path(str(cid) + output))
     else:
@@ -145,7 +173,7 @@ def set_outpath(output: os.PathLike, cid: hirise.CCDID, directory: Path) -> Path
 
 
 def sort_input_cubes(a_cub: os.PathLike, b_cub: os.PathLike) -> tuple:
-    '''Figures out which one is Channel 0 and which is Channel 1.'''
+    """Figures out which one is Channel 0 and which is Channel 1."""
 
     channel_of = dict()
     channel_of[a_cub] = isis.getkey_k(a_cub, 'Instrument', 'ChannelNumber')
@@ -157,23 +185,19 @@ def sort_input_cubes(a_cub: os.PathLike, b_cub: os.PathLike) -> tuple:
 
     for (cub, chan) in channel_of.items():
         if int(chan) != 0 and int(chan) != 1:
-            raise RuntimeError(f'{cub} has a channel other than 0 or 1: {chan}')
+            raise RuntimeError(
+                f'{cub} has a channel other than 0 or 1: {chan}')
 
     sorted_cubchan = sorted(channel_of.items(), key=lambda x: x[1])
     return (sorted_cubchan[0][0], sorted_cubchan[1][0])
 
 
-def sort_databases(db_paths: list, chids: tuple) -> tuple:
-    '''Ensures that the databases match the cubes.'''
+def sort_databases(dbs: list, chids: tuple) -> tuple:
+    """Ensures that the databases match the cubes."""
 
-    if len(db_paths) != len(chids):
-        raise IndexError(f'The number of database paths {db_paths} does not '
-                         'match the number of Product IDs {pids}')
-
-    dbs = list()
-    for p in db_paths:
-        with open(p) as f:
-            dbs.append(json.load(f))
+    if len(dbs) != len(chids):
+        raise IndexError(f'The number of databases {len(dbs)}  does not '
+                         'match the number of Product IDs {chids}')
 
     chid_db_map = dict()
     for p in chids:
@@ -202,7 +226,8 @@ def HiStitch(cubes: list, out_cube: os.PathLike, conf: dict, dbs: list,
 
     # ProcessingStep() - mostly sets up stuff
     max_mean = max(map(lambda x: float(x['IMAGE_MEAN']), dbs))
-    flags = set_flags(conf, dbs, ccd_number, b.index(int(dbs[0]['BINNING'])), max_mean)
+    flags = set_flags(conf, dbs, ccd_number, b.index(int(dbs[0]['BINNING'])),
+                      max_mean)
 
     # HiStitchStep() - runs HiStitch, and originally inserted to db, now we
     # just return at the bottom of this function.
@@ -226,15 +251,17 @@ def HiStitch(cubes: list, out_cube: os.PathLike, conf: dict, dbs: list,
         return(None, None)
 
 
-def set_flags(conf, dbs, ccdnum: int, bindex: int, max_mean: float) -> collections.namedtuple:
-    '''Set various processing flags based on various configuration
-    parameters.'''
+def set_flags(conf, dbs, ccdnum: int, bindex: int,
+              max_mean: float) -> collections.namedtuple:
+    """Set various processing flags based on various configuration
+    parameters."""
     HiStitchFlags = collections.namedtuple('HiStitchFlags',
                                            ['furrow', 'balance', 'equalize'])
 
     max_lis = max(map(lambda x: int(x['LOW_SATURATED_PIXELS']), dbs))
     max_std = max(map(lambda x: float(x['CAL_MASK_STANDARD_DEVIATION']), dbs))
-    max_dstd = max(map(lambda x: float(x['IMAGE_DARK_STANDARD_DEVIATION']), dbs))
+    max_dstd = max(map(lambda x: float(x['IMAGE_DARK_STANDARD_DEVIATION']),
+                       dbs))
     max_gper = max(map(lambda x: float(x['GAP_PIXELS_PERCENT']), dbs))
 
     binning = int(dbs[0]['BINNING'])
@@ -255,11 +282,13 @@ def set_flags(conf, dbs, ccdnum: int, bindex: int, max_mean: float) -> collectio
 
     if(conf['HiStitch_Balance'] or conf['HiStitch_Equalize']):
         if (int(conf['HiStitch_Balance_Processing'][ccdnum]) == 0 or
-            (max_lis < int(conf['HiStitch_LIS_Pixels']) and
+            (max_lis < int(conf['HiStitch_LIS_Pixels'])
              # The original Perl had these two following conditions written
              # this way, but I think the lists need to be indexed by bindex:
-             max_std < float(conf['HiStitch_Balance_Bin_Mask_STD'][binning]) and
-             max_dstd < float(conf['HiStitch_Balance_Bin_DarkPixel_STD'][binning]))):
+             and max_std < float(
+                 conf['HiStitch_Balance_Bin_Mask_STD'][binning])
+             and max_dstd < float(
+                 conf['HiStitch_Balance_Bin_DarkPixel_STD'][binning]))):
             logging.warning('Original Perl issue: conf file arrays are being '
                             'indexed incorrectly, may affect setting of '
                             'equalize and balance flags.')
@@ -295,10 +324,10 @@ def HiStitchStep(in_cubes, out_cub, binning, ccdnum, conf, balance, equalize):
 
 def HiFurrow_Fix(in_cube: os.PathLike, out_cube: os.PathLike,
                  max_mean: float, keep=False):
-    '''Perform a normalization of the furrow region of bin 2 or 4
-       HiRISE images. The input to this script is a HiRISE stitch
-       product containing both channels of a CCD.'''
-
+    """Perform a normalization of the furrow region of bin 2 or 4
+    HiRISE images. The input to this script is a HiRISE stitch
+    product containing both channels of a CCD.
+    """
     in_cub = Path(in_cube)
 
     binning = int(isis.getkey_k(in_cub, 'Instrument', 'Summing'))
@@ -358,8 +387,9 @@ def HiFurrow_Fix(in_cube: os.PathLike, out_cube: os.PathLike,
 
     # Lowpass filter to fill in the null pixel area
     lpf_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.lpf.cub'))
-    util.log(isis.lowpass(mask1_cub, to=lpf_cub, sample=lpf_samp, line=lpf_line,
-                          null=True, hrs=False, his=False, lis=False).args)
+    util.log(isis.lowpass(mask1_cub, to=lpf_cub, sample=lpf_samp,
+                          line=lpf_line, null=True, hrs=False, his=False,
+                          lis=False).args)
 
     # Create a file where non-furrow columns are set to null
     mask2_cub = to_del.add(in_cub.with_suffix(f'.{temp_token}.mask2.cub'))
@@ -391,7 +421,7 @@ def HiFurrow_Fix(in_cube: os.PathLike, out_cube: os.PathLike,
 
 
 def conf_check(conf: dict) -> None:
-    '''Various checks on parameters in the configuration.'''
+    """Various checks on parameters in the configuration."""
 
     util.conf_check_strings('HiStitch_Clean_Files', ('DELETE', 'KEEP'),
                             conf['HiStitch']['HiStitch_Clean_Files'])
@@ -402,7 +432,8 @@ def conf_check(conf: dict) -> None:
     util.conf_check_bool('HiStitch_Equalize',
                          conf['HiStitch']['HiStitch_Equalize'])
 
-    util.conf_check_strings('HiStitch_Equalize_Correction', ('MULTIPLY', 'ADD'),
+    util.conf_check_strings('HiStitch_Equalize_Correction',
+                            ('MULTIPLY', 'ADD'),
                             conf['HiStitch']['HiStitch_Equalize_Correction'])
 
     util.conf_check_count('HiStitch_Balance_Processing', 14, 'CCD',
@@ -412,15 +443,18 @@ def conf_check(conf: dict) -> None:
                           conf['HiStitch']['HiStitch_Control_Channel'])
 
     util.conf_check_count('HiStitch_Balance_Bin_DarkPixel_STD', 5, 'bin mode',
-                          conf['HiStitch']['HiStitch_Balance_Bin_DarkPixel_STD'])
+                          conf['HiStitch'][
+                              'HiStitch_Balance_Bin_DarkPixel_STD'])
 
     util.conf_check_count('HiStitch_Balance_Bin_Mask_STD', 5, 'bin mode',
                           conf['HiStitch']['HiStitch_Balance_Bin_Mask_STD'])
 
-    util.conf_check_bounds('HiStitch_Normalization_Minimum', (-16384.0, 16364.0),
+    util.conf_check_bounds('HiStitch_Normalization_Minimum',
+                           (-16384.0, 16364.0),
                            conf['HiStitch']['HiStitch_Normalization_Minimum'])
 
-    util.conf_check_bounds('HiStitch_Normalization_Maximum', (-16384.0, 16364.0),
+    util.conf_check_bounds('HiStitch_Normalization_Maximum',
+                           (-16384.0, 16364.0),
                            conf['HiStitch']['HiStitch_Normalization_Maximum'])
 
     util.conf_check_bounds('HiStitch_Minimum_Percent', (0, 2),

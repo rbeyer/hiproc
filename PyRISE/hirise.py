@@ -39,12 +39,15 @@ phase_re = re.compile("|".join(phase_names))
 orbit_re = re.compile(r"\d{1,6}")
 lat_re = re.compile(r"[0-3]?\d?\d?[05]")
 
-obsid_core_re = re.compile(fr"(?P<phase>{phase_re.pattern})?_?(?P<orbit>{orbit_re.pattern})_(?P<latesque>{lat_re.pattern})")
+obsid_core_re = re.compile(fr"(?P<phase>{phase_re.pattern})?_?"
+                           fr"(?P<orbit>{orbit_re.pattern})_"
+                           fr"(?P<latesque>{lat_re.pattern})")
 obsid_re = re.compile(fr"(?<!\w){obsid_core_re.pattern}(?!\d)")
 
 ccd_name_re = re.compile(r"RED|IR|BG")
 ccd_re = re.compile(r"RED\d|IR1[0-1]|BG1[2-3]")
-ccdid_core_re = re.compile(fr"{obsid_core_re.pattern}_(?P<ccd>{ccd_re.pattern})")
+ccdid_core_re = re.compile(
+    fr"{obsid_core_re.pattern}_(?P<ccd>{ccd_re.pattern})")
 ccdid_re = re.compile(fr"(?<!\w){ccdid_core_re.pattern}(?!\d)")
 
 chan_re = re.compile(r"(?P<channel>[01])")
@@ -52,18 +55,20 @@ ccdchan_re = re.compile(fr"(?P<ccd>{ccd_re.pattern})_(?P<channel>[0-1])")
 chanid_core_re = re.compile(fr"{ccdid_core_re.pattern}_(?P<channel>[0-1])")
 chanid_re = re.compile(fr"(?<!\w){chanid_core_re.pattern}(?!\d)")
 
-prodid_re = re.compile(fr"(?<!\w){obsid_core_re.pattern}_?(?P<ccd>{ccd_re.pattern})?_?(?P<channel>[0-1])?(?!\d)")
+prodid_re = re.compile(fr"(?<!\w){obsid_core_re.pattern}_?"
+                       fr"(?P<ccd>{ccd_re.pattern})?_?"
+                       fr"(?P<channel>[0-1])?(?!\d)")
 
 
 class ObservationID:
     """A class for HiRISE Observation IDs.
 
-       :ivar phase: The three-letter string indicating the mission phase
-       of this Observation ID.
-       :ivar orbit_number: The six-digit orbit number (with leading zeros) as a
-       string.
-       :ivar latesque: The four digit code (with leading zeroes) as a string,
-       which indicates where in the circle of an orbit the observation lies.
+    :ivar phase: The three-letter string indicating the mission phase
+    of this Observation ID.
+    :ivar orbit_number: The six-digit orbit number (with leading zeros)
+    as a string.
+    :ivar latesque: The four digit code (with leading zeroes) as a string,
+    which indicates where in the circle of an orbit the observation lies.
     """
 
     def __init__(self, *args):
@@ -80,7 +85,8 @@ class ObservationID:
                     orbit = parsed['orbit']
                     lat = parsed['latesque']
                 else:
-                    raise ValueError('{} did not match regex: {}'.format(args[0], obsid_re.pattern))
+                    raise ValueError(f'{args[0]} did not match regex: '
+                                     f'{obsid_re.pattern}')
         elif len(args) == 2:
             (phase, orbit, lat) = None, *args
         elif len(args) == 3:
@@ -99,7 +105,8 @@ class ObservationID:
                     raise ValueError('The orbit, {}, is outside the allowed '
                                      'range ({}, {}) in HiRISE mission phase '
                                      '{}'.format(self.orbit_number,
-                                                 phase_max_orbit[prev_phase(phase)],
+                                                 phase_max_orbit[
+                                                     prev_phase(phase)],
                                                  phase_max_orbit[phase],
                                                  phase))
             else:
@@ -155,8 +162,8 @@ class ObservationID:
 class CCDID(ObservationID):
     """A class for HiRISE CCD IDs.
 
-       :ivar ccdname: The CCD name: 'RED', 'IR', or 'BG'.
-       :ivar ccdnumber: The CCD number as a string: 0 through 13.
+    :ivar ccdname: The CCD name: 'RED', 'IR', or 'BG'.
+    :ivar ccdnumber: The CCD number as a string: 0 through 13.
     """
 
     def __init__(self, *args):
@@ -171,16 +178,19 @@ class CCDID(ObservationID):
                 match = ccdid_re.search(str(items[0]))
                 if match:
                     parsed = match.groupdict()
-                    items = (parsed['phase'], parsed['orbit'], parsed['latesque'])
+                    items = (parsed['phase'], parsed['orbit'],
+                             parsed['latesque'])
                     (ccdname, ccdnumber) = get_ccdnamenumber(parsed['ccd'])
                 else:
-                    raise ValueError('Could not construct a CCDID. {} did not match regex: '
-                                     '{}'.format(args[0], ccdid_re.pattern))
+                    raise ValueError('Could not construct a CCDID. '
+                                     f'{args[0]} did not match regex: '
+                                     f'{ccdid_re.pattern}')
         elif len(items) == 3:
             try:
                 (ccdname, ccdnumber) = get_ccdnamenumber(items.pop())
             except ValueError as err:
-                raise ValueError('Could not construct a CCDID. ' + str(err)) from err
+                raise ValueError(
+                    'Could not construct a CCDID. ' + str(err)) from err
         elif len(items) == 4:
             if items[0] in phase_names:
                 (ccdname, ccdnumber) = get_ccdnamenumber(items.pop())
@@ -233,7 +243,7 @@ class CCDID(ObservationID):
 class ChannelID(CCDID):
     """A class for HiRISE Channel IDs.
 
-       :ivar channel: The Channel number (0 or 1) as a string.
+    :ivar channel: The Channel number (0 or 1) as a string.
     """
 
     def __init__(self, *args):
@@ -264,7 +274,8 @@ class ChannelID(CCDID):
                              items[0].ccdname,
                              items[0].ccdnumber]
                 else:
-                    raise ValueError('{} was not a CCDID object'.format(items[0]))
+                    raise ValueError(
+                        '{} was not a CCDID object'.format(items[0]))
 
             elif len(items) == 2:
                 (ccdname, ccdnumber) = get_ccdnamenumber(items.pop())
@@ -275,7 +286,8 @@ class ChannelID(CCDID):
                              ccdname,
                              ccdnumber]
                 else:
-                    raise ValueError('{} was not a ObservationID object'.format(items[0]))
+                    raise ValueError(
+                        '{} was not a ObservationID object'.format(items[0]))
 
         else:
             raise IndexError('accepts 1 to 6 arguments')
@@ -353,19 +365,20 @@ def _match_num(s: str):
 
 
 def parseObsID(s: str) -> tuple:
-    '''Parses a string to find the first occurence of a valid ObsID.
+    """Parses a string to find the first occurence of a valid ObsID.
 
-       Returns a tuple of strings that were matched.
-    '''
+    Returns a tuple of strings that were matched.
+    """
     match = obsid_re.search(str(s))
     if(match):
         return match.groups()
     else:
-        raise ValueError('{} did not match regex: {}'.format(s, obsid_re.pattern))
+        raise ValueError(
+            '{} did not match regex: {}'.format(s, obsid_re.pattern))
 
 
 def prev_phase(s: str) -> str:
-    '''Returns the name of the previous HiRISE mission phase.'''
+    """Returns the name of the previous HiRISE mission phase."""
     prev_index = phase_names.index(s) - 1
     if prev_index < 0:
         raise IndexError(f'HiRISE mission phase, {s}, is the first one, '
@@ -375,8 +388,8 @@ def prev_phase(s: str) -> str:
 
 
 def is_orbit_in_phase(orbit, phase: str):
-    '''Determines whether the given orbit is within the given HiRISE
-    mission phase.'''
+    """Determines whether the given orbit is within the given HiRISE
+    mission phase."""
     previous = prev_phase(phase)
     if int(orbit) <= phase_max_orbit[previous]:
         if(phase_max_orbit[phase] is not None and
@@ -384,23 +397,24 @@ def is_orbit_in_phase(orbit, phase: str):
            phase_max_orbit[phase] == int(orbit)):
             return True
         return False
-    if phase_max_orbit[phase] is not None and int(orbit) > phase_max_orbit[phase]:
+    if(phase_max_orbit[phase] is not None
+       and int(orbit) > phase_max_orbit[phase]):
         return False
     return True
 
 
 def ObsIDstr(s: str) -> str:
-    '''Extracts a HiRISE Observation ID string from the given string'''
+    """Extracts a HiRISE Observation ID string from the given string."""
     return str(ObservationID(s))
 
 
 def get_phase(orbit) -> str:
-    '''Returns the name of the HiRISE mission phase based on the MRO orbit
-       number.
+    """Returns the name of the HiRISE mission phase based on the MRO orbit
+    number.
 
-       The given orbit must be an int or something that can be converted
-       to an int via int().
-    '''
+    The given orbit must be an int or something that can be converted
+    to an int via int().
+    """
     last_phase = None
     for (k, v) in reversed(list(phase_max_orbit.items())):
         if v is not None and int(orbit) > v:
@@ -416,8 +430,8 @@ def get_phase(orbit) -> str:
 
 
 def get_ccd(s: str) -> str:
-    '''Extracts a HiRISE CCD from the string (would get
-    'RED5' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').'''
+    """Extracts a HiRISE CCD from the string (would get
+    'RED5' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub')."""
     match = ccd_re.search(s)
     if match:
         return match.group()
@@ -434,9 +448,10 @@ def _getccdname_fromint(ccdnum: int) -> str:
 
 
 def get_ccdname(item) -> str:
-    '''Extracts the name of a HiRISE CCD from the string (would get
+    """Extracts the name of a HiRISE CCD from the string (would get
     'RED' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').  If an integer
-    is given instead of a string, it will provide the corresponding name.'''
+    is given instead of a string, it will provide the corresponding name.
+    """
     try:
         match = ccd_name_re.search(item)
         if match:
@@ -445,7 +460,8 @@ def get_ccdname(item) -> str:
             try:
                 return _getccdname_fromint(int(item))
             except:
-                raise ValueError(f'{item} did not match regex: {ccd_name_re.pattern}')
+                raise ValueError(
+                    f'{item} did not match regex: {ccd_name_re.pattern}')
     except TypeError:
         try:
             if isinstance(item, int):
@@ -457,8 +473,8 @@ def get_ccdname(item) -> str:
 
 
 def get_ccdnumber(s: str) -> str:
-    '''Extracts the number of a HiRISE CCD from the string (would get
-    '5' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').'''
+    """Extracts the number of a HiRISE CCD from the string (would get
+    '5' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub')."""
     match = ccd_re.search(s)
     if match:
         return re.search(r"\d{1,2}", match.group()).group()
@@ -467,8 +483,8 @@ def get_ccdnumber(s: str) -> str:
 
 
 def get_ccdnamenumber(item) -> tuple:
-    '''Extracts the name and number of a HiRISE CCD from the input (would get
-    '('RED', '5')' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').'''
+    """Extracts the name and number of a HiRISE CCD from the input (would get
+    '('RED', '5')' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub')."""
     try:
         nn = get_ccd(item)
         return(get_ccdname(nn), get_ccdnumber(nn))
@@ -482,8 +498,8 @@ def get_ccdnamenumber(item) -> tuple:
 
 
 def get_ccdchannel(s: str) -> tuple:
-    '''Extracts a HiRISE CCD and channel number from the string (would get
-    ('RED5', '1') from 'PSP_010502_2090_RED5_0.EDR_Stats.cub').'''
+    """Extracts a HiRISE CCD and channel number from the string (would get
+    ('RED5', '1') from 'PSP_010502_2090_RED5_0.EDR_Stats.cub')."""
     match = ccdchan_re.search(s)
     if match:
         return match.groups()
@@ -516,8 +532,8 @@ def _get_fromfile(path: os.PathLike, IDclass, name, archivekey):
 
 
 def get_ObsID_fromfile(path: os.PathLike) -> ObservationID:
-    '''Reads the file to get the ObservationID, if an ISIS cube,
-       otherwise parses the filepath.'''
+    """Reads the file to get the ObservationID, if an ISIS cube,
+       otherwise parses the filepath."""
 
     return _get_fromfile(path, ObservationID,
                          'HiRISE Observation ID',
@@ -525,8 +541,8 @@ def get_ObsID_fromfile(path: os.PathLike) -> ObservationID:
 
 
 def get_CCDID_fromfile(path: os.PathLike) -> CCDID:
-    '''Reads the file to get the CCDID, if an ISIS cube,
-       otherwise parses the filepath.'''
+    """Reads the file to get the CCDID, if an ISIS cube,
+       otherwise parses the filepath."""
 
     return _get_fromfile(path, CCDID,
                          'HiRISE CCD ID',
@@ -534,8 +550,8 @@ def get_CCDID_fromfile(path: os.PathLike) -> CCDID:
 
 
 def get_ChannelID_fromfile(path: os.PathLike) -> ChannelID:
-    '''Reads the file to get the ChannelID, if an ISIS cube,
-       otherwise parses the filepath.'''
+    """Reads the file to get the ChannelID, if an ISIS cube,
+       otherwise parses the filepath."""
 
     return _get_fromfile(path, ChannelID,
                          'HiRISE Channel ID',

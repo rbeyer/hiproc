@@ -91,13 +91,13 @@ class TestMock(unittest.TestCase):
             with patch('PyRISE.HiStitch.json.load', side_effect=dbs):
                 self.assertRaises(IndexError, hs.sort_databases, (_, _, _),
                                   chids)
-            with patch('PyRISE.HiStitch.json.load', side_effect=dbs):
-                self.assertRaises(LookupError, hs.sort_databases,
-                                  (_, _), (chids[0], chids[0]))
-            with patch('PyRISE.HiStitch.json.load', side_effect=dbs):
-                self.assertEqual(dbs, hs.sort_databases((_, _), chids))
-            with patch('PyRISE.HiStitch.json.load', side_effect=reversed(dbs)):
-                self.assertEqual(dbs, hs.sort_databases((_, _), chids))
+            # with patch('PyRISE.HiStitch.json.load', side_effect=dbs):
+            self.assertRaises(LookupError, hs.sort_databases,
+                              dbs, (chids[0], chids[0]))
+            # with patch('PyRISE.HiStitch.json.load', side_effect=dbs):
+            self.assertEqual(dbs, hs.sort_databases(dbs, chids))
+            # with patch('PyRISE.HiStitch.json.load', side_effect=reversed(dbs)):
+            self.assertEqual(dbs, hs.sort_databases(list(reversed(dbs)), chids))
 
     @patch('PyRISE.HiStitch.isis.fx')
     @patch('PyRISE.HiStitch.isis.mask')

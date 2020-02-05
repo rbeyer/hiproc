@@ -18,7 +18,8 @@ mosaicks them into a single cube."""
 
 
 # This program is based on HiPrecision version 1.20 2017/07/19
-# and on the Perl HiNoProj program: ($Revision: 1.9 $ $Date: 2017/08/30 21:26:39 $)
+# and on the Perl HiNoProj program: ($Revision: 1.9 $
+#                                    $Date: 2017/08/30 21:26:39 $)
 # by Audrie Fennema
 # which is Copyright(C) 2008 Arizona Board of Regents, under the GNU GPL.
 #
@@ -34,6 +35,7 @@ import logging
 import os
 import re
 import shutil
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -59,7 +61,8 @@ class Cube(hci.HiColorCube):
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()])
-    parser.add_argument('-o', '--output', required=False, default='_RED.NOPROJ.cub')
+    parser.add_argument('-o', '--output', required=False,
+                        default='_RED.NOPROJ.cub')
     parser.add_argument('-c', '--conf',   required=False,
                         default=Path(__file__).resolve().parent.parent /
                         'data' / 'HiNoProj.conf')
@@ -70,40 +73,11 @@ def main():
 
     util.set_logging(args.log)
 
-    cubes = list(map(Cube, args.cubes))
-    cubes.sort()
-
-    if not all(c.ccdname == 'RED' for c in cubes):
-        logging.critical('Not all of the input files are RED CCD files.')
-        sys.exit()
-
-    sequences = list()
-    for k, g in itertools.groupby((int(c.ccdnumber) for c in cubes),
-                                  lambda x, c=itertools.count(): next(c) - x):
-        sequences.append(list(g))
-
-    if len(sequences) != 1:
-        logging.critical('The given cubes are not a single run of sequential '
-                         'HiRISE CCDs, instead there are '
-                         '{} groups with these CCD numbers: {}.'.format(len(sequences),
-                                                                        sequences))
-        sys.exit()
-
-    base_ccd = list(filter(lambda x: x.ccdnumber == str(args.base_ccd_number),
-                           cubes))
-    if len(base_ccd) != 1:
-        logging.critical(f'The base ccd, number {args.base_ccd_number}, is not '
-                         'one of the given cubes.')
-        sys.exit()
-
-    conf = pvl.load(str(args.conf))
-    conf_check(conf['HiNoProj'])
-
-    outcub_path = hcn.set_outpath(args.output, cubes)
-
-    import subprocess
     try:
-        HiNoProj(cubes, base_ccd[0], outcub_path, conf['HiNoProj'], keep=args.keep)
+        start(args.cubes, args.conf, args.output, args.base_ccd_number,
+              keep=args.keep)
+    except ValueError as err:
+        print(err)
     except subprocess.CalledProcessError as err:
         print('Had an ISIS error:')
         print(err.cmd)
@@ -113,8 +87,42 @@ def main():
     return
 
 
+def start(cube_paths: os.PathLike, conf_path: os.PathLike,
+          output='_RED.NOPROJ.cub', base_ccd_number=5, keep=False):
+
+    cubes = list(map(Cube, cube_paths))
+    cubes.sort()
+
+    if not all(c.ccdname == 'RED' for c in cubes):
+        raise ValueError('Not all of the input files are RED CCD files.')
+
+    sequences = list()
+    for k, g in itertools.groupby((int(c.ccdnumber) for c in cubes),
+                                  lambda x, c=itertools.count(): next(c) - x):
+        sequences.append(list(g))
+
+    if len(sequences) != 1:
+        raise ValueError('The given cubes are not a single run of sequential '
+                         'HiRISE CCDs, instead there are '
+                         f'{len(sequences)} groups with these '
+                         f'CCD numbers: {sequences}.')
+
+    base_ccd = list(filter(lambda x: x.ccdnumber == str(base_ccd_number),
+                           cubes))
+    if len(base_ccd) != 1:
+        raise ValueError(f'The base ccd, number {args.base_ccd_number}, '
+                         'is not one of the given cubes.')
+
+    conf = pvl.load(str(conf_path))
+    conf_check(conf['HiNoProj'])
+
+    outcub_path = hcn.set_outpath(output, cubes)
+
+    HiNoProj(cubes, base_ccd[0], outcub_path, conf['HiNoProj'], keep=keep)
+
+
 def conf_check(conf: dict) -> None:
-    '''Various checks on parameters in the configuration.'''
+    """Various checks on parameters in the configuration."""
 
     t = 'Shape'
     util.conf_check_strings(t, ('ELLIPSOID', 'SYSTEM', 'USER'), conf[t])
@@ -136,8 +144,10 @@ def is_polar(cubes, pole_tolerance: float, temp_token: str) -> bool:
 
         cpvl = pvl.loads(cam_cp.stdout)
 
-        abs_lats.append(abs(float(cpvl['UniversalGroundRange']['MinimumLatitude'])))
-        abs_lats.append(abs(float(cpvl['UniversalGroundRange']['MaximumLatitude'])))
+        abs_lats.append(abs(
+            float(cpvl['UniversalGroundRange']['MinimumLatitude'])))
+        abs_lats.append(abs(
+            float(cpvl['UniversalGroundRange']['MaximumLatitude'])))
 
         temp_p.unlink()
 
@@ -148,8 +158,8 @@ def is_polar(cubes, pole_tolerance: float, temp_token: str) -> bool:
 
 
 def handmos_side(cubes, base_cube, out_p: os.PathLike, left=True):
-    '''Runs handmos to add cubes which are to one side or the other
-       of the *base_cube*.'''
+    """Runs handmos to add cubes which are to one side or the other
+       of the *base_cube*."""
     # handmos left side
     side = 1
     priority = 'beneath'
@@ -185,7 +195,8 @@ def copy_and_spice(inpath: os.PathLike, outpath: os.PathLike,
     return
 
 
-def get_offsets(cube: os.PathLike, match: os.PathLike, flat: os.PathLike) -> tuple:
+def get_offsets(cube: os.PathLike, match: os.PathLike,
+                flat: os.PathLike) -> tuple:
     util.log(isis.hijitreg(cube, match=match, flat=flat).args)
 
     with open(flat, 'r') as f:
@@ -200,16 +211,18 @@ def get_offsets(cube: os.PathLike, match: os.PathLike, flat: os.PathLike) -> tup
     return (avg_line_offset, avg_samp_offset)
 
 
-def add_offsets(cubes: list, base_ccdnumber: int, temp_token: str, keep=False) -> tuple:
+def add_offsets(cubes: list, base_ccdnumber: int, temp_token: str,
+                keep=False) -> tuple:
     flats = isis.PathSet()
     for i, c in enumerate(cubes[:-1]):
         pair = '{}-{}'.format(cubes[i + 1].get_ccd(), cubes[i].get_ccd())
 
-        flat_p = flats.add(c.path.with_suffix(f'.{temp_token}.{pair}.flat.tab'))
+        flat_p = flats.add(
+            c.path.with_suffix(f'.{temp_token}.{pair}.flat.tab'))
 
-        (avg_line_offset, avg_samp_offset) = get_offsets(cubes[i].next_path,
-                                                         cubes[i + 1].next_path,
-                                                         flat_p)
+        (avg_line_offset,
+         avg_samp_offset) = get_offsets(cubes[i].next_path,
+                                        cubes[i + 1].next_path, flat_p)
 
         j = i
         if int(c.ccdnumber) >= base_ccdnumber:
@@ -225,7 +238,8 @@ def add_offsets(cubes: list, base_ccdnumber: int, temp_token: str, keep=False) -
         return (cubes, flats)
 
 
-def fix_labels(cubes: list, path: os.PathLike, matched_cube: str, prodid: str) -> None:
+def fix_labels(cubes: list, path: os.PathLike, matched_cube: str,
+               prodid: str) -> None:
     util.log(isis.editlab(path, option='modkey', grpname='Archive',
                           keyword='ProductId',
                           value=prodid).args)
@@ -241,7 +255,8 @@ def fix_labels(cubes: list, path: os.PathLike, matched_cube: str, prodid: str) -
                  'in the balance cube.')
     source_ids = list()
     for c in cubes:
-        source_ids.append(isis.getkey_k(c.path, 'Instrument', 'StitchedProductIds'))
+        source_ids.append(isis.getkey_k(c.path, 'Instrument',
+                                        'StitchedProductIds'))
 
     util.log(isis.editlab(path, option='ADDKEY', grpname='Archive',
                           keyword='SourceProductId',
@@ -249,7 +264,8 @@ def fix_labels(cubes: list, path: os.PathLike, matched_cube: str, prodid: str) -
     return
 
 
-def HiNoProj(cubes: list, base_cube, outcub_path: os.PathLike, conf: dict, keep=False):
+def HiNoProj(cubes: list, base_cube, outcub_path: os.PathLike, conf: dict,
+             keep=False):
 
     temp_token = datetime.now().strftime('HiNoProj-%y%m%d%H%M%S')
     to_del = isis.PathSet()
@@ -266,7 +282,8 @@ def HiNoProj(cubes: list, base_cube, outcub_path: os.PathLike, conf: dict, keep=
 
         util.log(isis.spicefit(temp_p).args)
 
-        c.next_path = to_del.add(c.path.with_suffix(f'.{temp_token}.noproj.cub'))
+        c.next_path = to_del.add(
+            c.path.with_suffix(f'.{temp_token}.noproj.cub'))
         c.path = temp_p
 
     for c in cubes:
@@ -274,7 +291,8 @@ def HiNoProj(cubes: list, base_cube, outcub_path: os.PathLike, conf: dict, keep=
                              source='frommatch').args)
 
     # Run hijitreg on adjacent noproj'ed ccds to get average line/sample offset
-    (cubes, _) = add_offsets(cubes, int(base_cube.ccdnumber), temp_token, keep=keep)
+    (cubes, _) = add_offsets(cubes, int(base_cube.ccdnumber), temp_token,
+                             keep=keep)
 
     # Mosaic noproj'ed ccds using average line/sample offset
     shutil.copyfile(base_cube.next_path, out_p)

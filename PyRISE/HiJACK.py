@@ -58,15 +58,21 @@ import PyRISE.HiColorNorm as hcn
 import PyRISE.HiJitReg as hjr
 import PyRISE.HiNoProj as hnp
 
+resolve_jitter_path = (
+    '/Users/rbeyer/software/HiPrecision/fromOleg/HiPrecision/resolveJitter')
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()])
-    parser.add_argument('-o', '--outdir', required=False, default='./HiJACK')
+    parser.add_argument('-o', '--out_dir', required=False, default='./HiJACK')
     parser.add_argument('-c', '--conf_dir',   required=False,
                         default=Path(__file__).resolve().parent.parent /
                         'data', help='Directory where ResolveJitter.conf '
                         'and HiJACK.conf can be found.')
+    parser.add_argument('-n', '--noplot', action='store_false',
+                        help='Will stop the display of before and after '
+                        'jitter plots.')
     parser.add_argument('-b', '--base_ccd_number', required=False, default=5)
     parser.add_argument('cubes', metavar="balance.cub-files", nargs='+')
 
@@ -74,55 +80,57 @@ def main():
 
     util.set_logging(args.log)
 
-    cubes = list(map(hnp.Cube, args.cubes))
-    cubes.sort()
-
-    sequences = list()
-    for k, g in itertools.groupby((int(c.ccdnumber) for c in filter(lambda x:
-                                                                    x.ccdname == 'RED',
-                                                                    cubes)),
-                                  lambda x, c=itertools.count(): next(c) - x):
-        sequences.append(list(g))
-
-    if len(sequences) != 1:
-        logging.critical('The given RED cubes are not a single run of sequential '
-                         'HiRISE CCDs, instead there are '
-                         '{} groups with these CCD numbers: {}.'.format(len(sequences),
-                                                                        sequences))
-        sys.exit()
-
-    base_ccd = list(filter(lambda x: x.ccdnumber == str(args.base_ccd_number),
-                           cubes))
-    if len(base_ccd) != 1:
-        logging.critical(f'The base ccd, number {args.base_ccd_number}, is not '
-                         'one of the given cubes.')
-        sys.exit()
-
-    # Need both red4 and red5
-    red45 = list(filter(lambda x: x == 4 or x == 5,
-                        (int(c.ccdnumber) for c in cubes)))
-    if len(red45) != 2:
-        logging.critical('The RED3 and RED5 cubes are not in the given'
-                         'list of files: {}'.format(*cubes))
-        sys.exit()
-
-    import subprocess
     try:
-        HiJACK(cubes, base_ccd[0], args.outdir, args.conf_dir, keep=args.keep)
-
+        start(args.cubes, args.conf_dir, args.out_dir, args.base_ccd_number,
+              plot=args.plot, keep=args.keep)
+    except ValueError as err:
+        print(err)
     except subprocess.CalledProcessError as err:
         print('Had an ISIS error:')
-        print(' '.join(err.cmd))
+        print(err.cmd)
         print(err.stdout)
         print(err.stderr)
         raise err
     return
 
 
+def start(cube_paths: list, confdir: os.PathLike, outdir='./HiJACK',
+          base_ccd_number=5, plot=True, keep=False):
+
+    cubes = list(map(hnp.Cube, cube_paths))
+    cubes.sort()
+
+    sequences = list()
+    for k, g in itertools.groupby((int(c.ccdnumber) for c in filter(lambda x: x.ccdname == 'RED', cubes)), lambda x, c=itertools.count(): next(c) - x):
+        sequences.append(list(g))
+
+    if len(sequences) != 1:
+        raise ValueError('The given RED cubes are not a single run of '
+                         'sequential HiRISE CCDs, instead there are '
+                         f'{len(sequences)} groups with these CCD '
+                         f'numbers: {sequences}.')
+
+    base_ccd = list(filter(lambda x: x.ccdnumber == str(base_ccd_number),
+                           cubes))
+    if len(base_ccd) != 1:
+        raise ValueError(f'The base ccd, number {base_ccd_number}, is not '
+                         'one of the given cubes.')
+
+    # Need both red4 and red5
+    red45 = list(filter(lambda x: x == 4 or x == 5,
+                        (int(c.ccdnumber) for c in cubes)))
+    if len(red45) != 2:
+        raise ValueError('The RED3 and RED5 cubes are not in the given'
+                         'list of files: {}'.format(*cubes))
+
+    HiJACK(cubes, base_ccd[0], outdir, confdir, plot=plot, keep=keep)
+    return
+
+
 def match_red(cubes: list, base_cube, flat_path, elargement_ratio=1.0006):
-    '''Prepare cubs for hijitreg by matching size and binning to center red
-       ccds.
-    '''
+    """Prepare cubs for hijitreg by matching size and binning to center red
+    ccds.
+    """
     # Where does the 1.0006 value for OPTICAL_ENLARGEMENT_RATIO come from?
     # Not sure.
 
@@ -135,8 +143,8 @@ def match_red(cubes: list, base_cube, flat_path, elargement_ratio=1.0006):
     for c in cubes:
         bin_ratio = c.bin / base_cube.bin
 
-        # Differences in field of view between color and red are corrected for by
-        # multiplying bin ratio by pre-determined constant for BG and
+        # Differences in field of view between color and red are corrected
+        # for by multiplying bin ratio by pre-determined constant for BG and
         # dividing bin ratio by that constant for IR
 
         mag = bin_ratio
@@ -242,13 +250,18 @@ def make_flats(cubes, common_cube, conf, temp_token, keep=False):
 
             params['GROUP'] = 'ResolveJitter'
             params['COLS'] = confauto['ControlNet']['Control_Cols_' + redcolor]
-            params['PATTERN_SAMPLES'] = confauto['PatternChip' + redcolor]['Samples']
-            params['PATTERN_LINES'] = confauto['PatternChip' + redcolor]['Lines']
-            params['SEARCH_SAMPLES'] = confauto['SearchChip' + redcolor]['Samples']
-            params['SEARCH_LINES'] = confauto['SearchChip' + redcolor]['Lines']
+            params['PATTERN_SAMPLES'] = confauto['PatternChip' +
+                                                 redcolor]['Samples']
+            params['PATTERN_LINES'] = confauto['PatternChip' +
+                                               redcolor]['Lines']
+            params['SEARCH_SAMPLES'] = confauto['SearchChip' +
+                                                redcolor]['Samples']
+            params['SEARCH_LINES'] = confauto['SearchChip' +
+                                              redcolor]['Lines']
 
             if c.ccdname != 'RED':
-                channels = isis.getkey_k(c.path, 'Instrument', 'StitchedProductIds')
+                channels = isis.getkey_k(c.path, 'Instrument',
+                                         'StitchedProductIds')
                 if len(channels) < 2:
                     logging.info(f'Increasing columns because {c.path} is '
                                  'missing a channel.')
@@ -263,7 +276,8 @@ def make_flats(cubes, common_cube, conf, temp_token, keep=False):
                 hjr.run_HiJitReg(common_cube.next_path, c, params,
                                  temp_token, keep=keep)
 
-                ret = hjr.Analyze_Flat(c, 0, (min_fraction_good * 2), hijitreg=False)
+                ret = hjr.Analyze_Flat(c, 0, (min_fraction_good * 2),
+                                       hijitreg=False)
 
                 if ret == 1:
                     successful_flats.append(c.flattab_path)
@@ -273,9 +287,11 @@ def make_flats(cubes, common_cube, conf, temp_token, keep=False):
                     c.regdef_path.unlink()
                     c.flattab_path.unlink()
                     c.cnet_path.unlink()
-                    params['TOLERANCE'] -= (confauto['Algorithm']['Increment'] * step)
+                    params['TOLERANCE'] -= (
+                        confauto['Algorithm']['Increment'] * step)
             else:
-                raise RuntimeError(f'Flat file for {c} is not within tolerances.')
+                raise RuntimeError(f'Flat file for {c} is not within '
+                                   'tolerances.')
 
     else:
         successful_flats = list(x.flattab_path for x in jitter_cubes)
@@ -300,7 +316,7 @@ def ResolveJitter(cubes: list, conf: dict, jitter_path: os.PathLike,
     # Not sure that this is required, so skipping.
 
     # run resolveJitter3HiJACK.m or resolveJitter4HiJACK.cc
-    rj_args = ['/Users/rbeyer/software/HiPrecision/fromOleg/HiPrecision/resolveJitter',
+    rj_args = [resolve_jitter_path,
                str(jitter_path.parent),
                str(common_cube.get_obsid()),
                str(conf['AutoRegistration']['ControlNet']['Control_Lines'])]
@@ -386,7 +402,7 @@ def plot_flats(pre_flat, dejit_flat):
 
 
 def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
-           conf_dir: os.PathLike, keep=False):
+           conf_dir: os.PathLike, plot=True, keep=False):
 
     temp_token = datetime.now().strftime('HiJACK-%y%m%d%H%M%S')
     outdir_p = Path(outdir)
@@ -396,11 +412,12 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
 
     # Pre-HiJACK
     for c in cubes:
-        c.next_path = to_del.add((outdir_p / c.path.name).with_suffix(f'.{temp_token}.prehijack.cub'))
+        c.next_path = to_del.add(
+            (outdir_p / c.path.name).with_suffix(
+                f'.{temp_token}.prehijack.cub'))
 
     flat_path = (outdir_p /
-                 '{}.{}.{}'.format(cubes[0].get_obsid(),
-                                   temp_token,
+                 '{}.{}.{}'.format(cubes[0].get_obsid(), temp_token,
                                    'RED5-RED4_prehijack.flat.tab'))
     match_red(cubes, base_cube, flat_path)
 
@@ -421,27 +438,28 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
         polar = hnp.is_polar(cubes, hijack_conf['Pole_Tolerance'], temp_token)
 
     for c in cubes:
-        hnp.copy_and_spice(c.next_path,
-                           to_del.add(c.path.with_suffix(f'.{temp_token}.spiced.cub')),
-                           hijack_conf['HiJACK'], polar)
+        hnp.copy_and_spice(c.next_path, to_del.add(c.path.with_suffix(
+            f'.{temp_token}.spiced.cub')), hijack_conf['HiJACK'], polar)
     # Run hijitter
     inlist = list()
     outlist = list()
     for c in cubes:
-        c.next_path = (outdir_p / c.path.name).with_suffix('').with_suffix('.dejittered.cub')
+        c.next_path = (outdir_p / c.path.name).with_suffix('').with_suffix(
+            '.dejittered.cub')
         inlist.append(c.path)
         outlist.append(c.next_path)
 
     jitterck_p = outdir_p / (str(cubes[0].get_obsid()) + '.jittery.bc')
 
-    hijitregdef_p = Path(os.environ['ISIS3DATA']) / 'mro/calibration/hijitreg.p1745.s3070.def'
+    hijitregdef_p = Path(
+        os.environ['ISIS3DATA']) / 'mro/calibration/hijitreg.p1745.s3070.def'
 
     # inlist_p = to_del.add(isis.fromlist.make(inlist,
     #                                          (outdir_p /
     #                                           (str(cubes[0].get_obsid()) +
     #                                            '_hijitter.inlst'))))
     # outlist_p = to_del.add(isis.fromlist.make(outlist,
-    #                                           inlist_p.with_suffix('.outlst')))
+    #    inlist_p.with_suffix('.outlst')))
     with isis.fromlist.temp(inlist) as inlist_f:
         with isis.fromlist.temp(outlist) as outlist_f:
             util.log(isis.hijitter(fromlist=inlist_f,
@@ -450,8 +468,8 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
                                    tolist=outlist_f,
                                    jitterck=jitterck_p).args)
     # Mosaic dejittered cubs
-    # Remember hijitter makes all the individual cubes the size of the entire image.
-    #  with the image data in the appropriate space for the ccd.
+    # Remember hijitter makes all the individual cubes the size of the
+    #  entire image. With the image data in the appropriate space for the ccd.
 
     out_root = outdir_p / str(cubes[0].get_obsid())
 
@@ -474,8 +492,8 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
 
     # Center RED for color
     center_red_p = out_root.with_name(out_root.name + '_RED4-5.NOPROJ.cub')
-    center_red_cubes = list(filter(lambda x: x.ccdnumber == '4' or x.ccdnumber == '5',
-                                   red_cubes))
+    center_red_cubes = list(filter(
+        lambda x: x.ccdnumber == '4' or x.ccdnumber == '5', red_cubes))
     shutil.copyfile(center_red_cubes[1].next_path, center_red_p)
     mosaic_dejittered(center_red_cubes, center_red_p,
                       '{}_RED4-5'.format(str(center_red_cubes[0].get_obsid())))
@@ -502,9 +520,11 @@ def HiJACK(cubes: list, base_cube, outdir: os.PathLike,
     with isis.fromlist.temp([ir_p, center_red_p, bg_p]) as f:
         util.log(isis.cubeit(fromlist=f, to=irb_p, proplab=center_red_p).args)
 
-    # Make plot of before and after flat.tab results
-    dejit_flat = list(filter(lambda x: x.match('*RED5-RED4*'), red_flat_files))[0]
-    plot_flats(flat_path, dejit_flat)
+    if plot:
+        # Make plot of before and after flat.tab results
+        dejit_flat = list(filter(lambda x: x.match('*RED5-RED4*'),
+                                 red_flat_files))[0]
+        plot_flats(flat_path, dejit_flat)
 
     if not keep:
         flat_path.unlink()

@@ -25,14 +25,14 @@ import PyRISE.hirise as hirise
 
 
 def parent_parser() -> argparse.ArgumentParser:
-    '''Returns a parent parser with common arguments for PyRISE programs.'''
+    """Returns a parent parser with common arguments for PyRISE programs."""
     parent = argparse.ArgumentParser(add_help=False)
     parent.add_argument('-l', '--log',  required=False, default='WARNING',
-                        help="The log level to show for this program, can be a "
-                        "named log level or a numerical level.")
+                        help="The log level to show for this program, can "
+                        "be a named log level or a numerical level.")
     parent.add_argument('--logfile',  required=False,
-                        help="The log file to write log messages to instead of "
-                        "the terminal.")
+                        help="The log file to write log messages to instead "
+                        "of the terminal.")
     parent.add_argument('-k', '--keep', required=False, default=False,
                         action='store_true',
                         help="Normally, the program will clean up any "
@@ -42,8 +42,7 @@ def parent_parser() -> argparse.ArgumentParser:
 
 
 def set_logging(i, filename=None) -> None:
-    '''Sets the log level and basic configuration.'''
-
+    """Sets the log level and basic configuration."""
     log_level = 0
     if isinstance(i, int):
         log_level = i
@@ -51,9 +50,11 @@ def set_logging(i, filename=None) -> None:
         log_level = getattr(logging, i.upper(), logging.WARNING)
 
     if filename is None:
-        logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+        logging.basicConfig(format='%(levelname)s: %(message)s',
+                            level=log_level)
     else:
-        logging.basicConfig(filename=filename, format='%(levelname)s: %(message)s',
+        logging.basicConfig(filename=filename,
+                            format='%(levelname)s: %(message)s',
                             level=log_level)
     return
 
@@ -61,14 +62,14 @@ def set_logging(i, filename=None) -> None:
 def log(items: list) -> None:
     """A convenience function to wrap ISIS calls.
 
-       Allows you to write::
+    Allows you to write::
 
-           util.log(isis.hi2isis(img, to=out_cube).args)
+        util.log(isis.hi2isis(img, to=out_cube).args)
 
-       And have the string in the log message not be the default
-       list pretty-print, but instead with the arguments just separated
-       by spaces, which is easier for reading the ISIS commands, and
-       potentially copying and pasting to the command line.
+    And have the string in the log message not be the default
+    list pretty-print, but instead with the arguments just separated
+    by spaces, which is easier for reading the ISIS commands, and
+    potentially copying and pasting to the command line.
     """
     logging.info(' '.join(items))
     return
@@ -76,7 +77,7 @@ def log(items: list) -> None:
 
 def path_w_suffix(in_path: str, template_path: os.PathLike) -> Path:
     """If the input starts with a '.' assume it is a suffix and return the
-       template with the suffix replaced, otherwise return the input."""
+    template with the suffix replaced, otherwise return the input."""
     if in_path.startswith('.'):
         return Path(template_path).with_suffix(in_path)
     else:
@@ -106,7 +107,8 @@ def pid_path_w_suffix(in_path: str, template_path: os.PathLike) -> Path:
 
 
 def get_path(in_path: os.PathLike, search=None) -> Path:
-    '''Returns a path that can resovled in the search path (or list of paths).'''
+    """Returns a path that can resovled in the search path
+    (or list of paths)."""
     inPath = Path(in_path)
     if inPath.exists():
         return inPath
@@ -136,7 +138,8 @@ def get_path(in_path: os.PathLike, search=None) -> Path:
         raise FileNotFoundError(f'Could not find {inPath} in {search_paths}.')
 
 
-def conf_check_strings(conf_name: str, choices: tuple, conf_value: str) -> None:
+def conf_check_strings(conf_name: str, choices: tuple,
+                       conf_value: str) -> None:
     assert conf_value in choices, ('The {} parameter can be {}, '
                                    'but was {}'.format(conf_name,
                                                        str(choices),
@@ -151,7 +154,8 @@ def conf_check_bool(conf_name: str, conf_value: bool) -> None:
                                                       conf_value))
 
 
-def conf_check_count(conf_name: str, count: int, what: str, conf_value: list) -> None:
+def conf_check_count(conf_name: str, count: int, what: str,
+                     conf_value: list) -> None:
     assert len(conf_value) == count, ('The {} parameter must have {} '
                                       'entries, one for each {}, but '
                                       'it was {}'.format(conf_name,

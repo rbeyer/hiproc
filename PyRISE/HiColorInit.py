@@ -17,18 +17,20 @@
 
 
 # This program is based on HiColor version 1.99 2017/10/10
-# and on the Perl HiColorInit program: ($Revision: 1.37 $ $Date: 2011/01/31 20:10:26 $)
+# and on the Perl HiColorInit program: ($Revision: 1.37 $
+#                                       $Date: 2011/01/31 20:10:26 $)
 # by Guy McArthur
 # which is Copyright(C) 2007 Arizona Board of Regents, under the GNU GPL.
 #
 # Since that suite of software is under the GPL, none of it can be directly
 # incorporated in this program, since I wish to distribute this software
-# under the Apache 2 license.  Elements of this software (written in an entirely
-# different language) are based on that software but rewritten from scratch to
-# emulate functionality.
+# under the Apache 2 license.  Elements of this software (written in an
+# entirely different language) are based on that software but rewritten
+# from scratch to emulate functionality.
 
 import argparse
 import logging
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -63,7 +65,8 @@ class HiColorCube(hirise.CCDID):
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()])
-    parser.add_argument('-o', '--output_suffix', required=False, default='.precolor.cub')
+    parser.add_argument('-o', '--output_suffix', required=False,
+                        default='.precolor.cub')
     parser.add_argument('cubes', metavar="balance.cub-files", nargs='+')
 
     args = parser.parse_args()
@@ -75,28 +78,42 @@ def main():
                          f'does not: {args.output_suffix}')
         sys.exit()
 
-    cubes = list(map(HiColorCube, args.cubes))
+    try:
+        start(args.cubes, args.output_suffix, keep=args.keep)
+    except ValueError as err:
+        logging.critical(err)
+        sys.exit()
+    except subprocess.CalledProcessError as err:
+            print('Had an ISIS error:')
+            print(' '.join(err.cmd))
+            print(err.stdout)
+            print(err.stderr)
+            raise err
+    return
+
+
+def start(cube_paths: list, output_suffix: str, keep=False):
+
+    cubes = list(map(HiColorCube, cube_paths))
     (red4, red5, ir10, ir11, bg12, bg13) = separate_ccds(cubes)
 
     if red4 is None and red5 is None:
-        logging.critical('Neither RED4 nor RED5 were provided.')
-        sys.exit()
+        raise ValueError('Neither RED4 nor RED5 were provided.')
 
     if red4 is not None and red5 is not None:
         if(red4.lines != red5.lines or
            red4.samps != red5.samps):
-            logging.critical('RED4 dimensions not equal to RED5 dimensions!')
-            sys.exit()
+            raise ValueError('RED4 dimensions not equal to RED5 dimensions!')
 
     if red4 is not None:
-        HiColorInit(red4, ir10, bg12, args.output_suffix, keep=args.keep)
+        HiColorInit(red4, ir10, bg12, output_suffix, keep=keep)
     if red5 is not None:
-        HiColorInit(red5, ir11, bg13, args.output_suffix)
+        HiColorInit(red5, ir11, bg13, output_suffix, keep=keep)
     return
 
 
 def separate_ccds(cubes: list) -> tuple:
-    '''Return a tuple of six values, either HiColorCubes, or None.'''
+    """Return a tuple of six values, either HiColorCubes, or None."""
     red4 = red5 = ir10 = ir11 = bg12 = bg13 = None
     for c in cubes:
         if c.ccdnumber == '4':
@@ -112,19 +129,20 @@ def separate_ccds(cubes: list) -> tuple:
         elif c.ccdnumber == '13':
             bg13 = c
         else:
-            # Not one of the six that we care about, so we'll silently ignore it.
+            # Not one of the six that we care about,
+            # so we'll silently ignore it.
             pass
     return (red4, red5, ir10, ir11, bg12, bg13)
 
 
 def HiColorInit(red: HiColorCube, ir: HiColorCube, bg: HiColorCube,
                 outsuffix: str, keep=False):
-    '''Do all of the scaling and cropping for a RED/IR/BG set.'''
+    """Do all of the scaling and cropping for a RED/IR/BG set."""
 
     if len(set(map(lambda c: c.get_obsid(), filter(lambda x: x is not None,
                                                    [red, ir, bg])))) != 1:
-        raise ValueError("These cube files don't all have the same Observation "
-                         f"ID: {cubes}")
+        raise ValueError("These cube files don't all have the same "
+                         f"Observation ID: {cubes}")
 
     temp_token = datetime.now().strftime('HiColorInit-%y%m%d%H%M%S')
 
@@ -143,8 +161,9 @@ def HiColorInit(red: HiColorCube, ir: HiColorCube, bg: HiColorCube,
         bin_ratio = c.bin / red.bin
         tdi_ratio = c.tdi / red.tdi
         mag_ratio = bin_ratio / 1.0006
-        # ratio of color to red for enlargement, correction of optical distortion
-        # from OPTICAL_ENLARGEMENT_RATIO constant in original HiColor.pm
+        # ratio of color to red for enlargement, correction of optical
+        # distortion from OPTICAL_ENLARGEMENT_RATIO constant in original
+        # HiColor.pm
 
         # Rescale the color by the bin ratio and mag ratio, to match the red.
         # These will be the BG and IR "pre-color" cubes.
