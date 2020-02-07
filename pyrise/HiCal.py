@@ -106,7 +106,9 @@ def main():
                         "starts with a '.' it is considered an extension "
                         "and will be swapped with the input file's "
                         "extension to find the .json file to use.")
-    parser.add_argument('-n', '--newalg', required=False, action='store_true')
+    parser.add_argument('-n', '--newalg', required=False, type=int,
+                        default=0,
+                        help="The number of medstd widths.")
     # parser.add_argument('--hgfconf', required=False, default='HiGainFx.conf')
     parser.add_argument('--nfconf', required=False, default='NoiseFilter.conf')
     parser.add_argument('--bin2', required=False, action='store_true',
@@ -146,7 +148,7 @@ def main():
 
         out_cube = util.path_w_suffix(args.output, c)
         try:
-            db = start(c, out_cube, db, conf, args.conf,
+            db = start(c, out_cube, db, conf, args.conf, args.newalg,
                        args.bin2, args.bin4, keep=args.keep)
         except UserWarning as err:
             logging.warning(err)
@@ -187,7 +189,7 @@ def conf_setup(conf_path: os.PathLike, nfconf_path: os.PathLike) -> dict:
 
 
 def start(cube: os.PathLike, out_cube: Path, db: dict,
-          conf: dict, conf_path: os.PathLike,
+          conf: dict, conf_path: os.PathLike, newalg,
           bin2: bool, bin4: bool, keep=False) -> dict:
 
     in_cube = Path(cube)
@@ -232,6 +234,7 @@ def start(cube: os.PathLike, out_cube: Path, db: dict,
                                             ccdchan, conf,
                                             conf_path, db,
                                             destripe=destripe_filter,
+                                            newalg=newalg,
                                             keep=keep)
 
     db['HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION'] = std
@@ -670,7 +673,7 @@ def furrow_nulling(cube: os.PathLike, out_cube: os.PathLike, binning: int,
 
 
 def mask(in_cube: os.PathLike, out_cube: os.PathLike, noisefilter_min: float,
-         noisefilter_max: float, binning: int, newalg=False,
+         noisefilter_max: float, binning: int, newalg=10,
          keep=False) -> None:
     """mask out unwanted pixels"""
     logging.info(mask.__doc__)

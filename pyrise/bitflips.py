@@ -61,6 +61,9 @@ def main():
                         help=('If set, the program will mask the '
                               'bit-flipped pixels, otherwise will '
                               'try to collapse them.'))
+    parser.add_argument('--line', required=False, action='store_true',
+                        help='In conjunction with -m applies cubenorm in '
+                        'the line direction instead of column.')
     parser.add_argument('cube', metavar="some.cub-file", nargs='+',
                         help='More than one can be listed here.')
 
@@ -80,7 +83,7 @@ def main():
 
         try:
             if args.mask:
-                mask(Path(i), out_p, keep=args.keep)
+                mask(Path(i), out_p, line=args.line, keep=args.keep)
             else:
                 unflip(Path(i), out_p, keep=args.keep)
         except subprocess.CalledProcessError as err:
@@ -219,7 +222,7 @@ def histogram(in_path: Path, hist_path: Path):
     return isis.Histogram(hist_path)
 
 
-def mask(in_path: Path, out_path: Path, keep=False):
+def mask(in_path: Path, out_path: Path, line=False, keep=False):
     """Attempt to mask out pixels beyond the central DNs of the median
     based on minima in the histogram."""
     from PyRISE.HiCal import analyze_cubenorm_stats2
@@ -232,7 +235,11 @@ def mask(in_path: Path, out_path: Path, keep=False):
     median = math.trunc(float(hist['Median']))
 
     cubenorm_stats_file = to_del.add(in_path.with_suffix('.cn.stats'))
-    util.log(isis.cubenorm(in_path, stats=cubenorm_stats_file).args)
+    if line:
+        util.log(isis.cubenorm(in_path, stats=cubenorm_stats_file,
+                               direction='line').args)
+    else:
+        util.log(isis.cubenorm(in_path, stats=cubenorm_stats_file).args)
     (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, median,
                                              hist, width=5, plot=True)
 
@@ -325,6 +332,7 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
 
     min_i = find_minima_index(central_i, mindn_i, minima_i, pixel_counts)
     max_i = find_minima_index(central_i, maxdn_i, minima_i, pixel_counts)
+    logging.info(f'DN window: {dn[min_i]}, {dn[max_i]}')
 
     if plot:
         import matplotlib.pyplot as plt
