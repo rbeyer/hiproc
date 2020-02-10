@@ -222,7 +222,7 @@ def histogram(in_path: Path, hist_path: Path):
     return isis.Histogram(hist_path)
 
 
-def mask(in_path: Path, out_path: Path, line=False, keep=False):
+def mask(in_path: Path, out_path: Path, line=False, plot=True, keep=False):
     """Attempt to mask out pixels beyond the central DNs of the median
     based on minima in the histogram."""
     from PyRISE.HiCal import analyze_cubenorm_stats2
@@ -241,7 +241,7 @@ def mask(in_path: Path, out_path: Path, line=False, keep=False):
     else:
         util.log(isis.cubenorm(in_path, stats=cubenorm_stats_file).args)
     (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, median,
-                                             hist, width=5, plot=True)
+                                             hist, width=5, plot=plot)
 
     # To bypass the 'medstd' calculations in analyze_cubenorm_stats2(),
     # this mechanism can be used to set the limits directly.
@@ -255,7 +255,7 @@ def mask(in_path: Path, out_path: Path, line=False, keep=False):
 
     if not keep:
         hist_p.unlink()
-    return
+    return (mindn, maxdn)
 
 
 def find_minima_index(central_idx: int, limit_idx: int,
@@ -337,19 +337,33 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
     if plot:
         import matplotlib.pyplot as plt
 
+        plt.ioff()
+        fig, (ax0, ax1) = plt.subplots(2, 1)
+
         indices = np.arange(0, len(pixel_counts))
         dn_window = np.fromiter(map((lambda i: i >= mindn_i and i <= maxdn_i),
                                     (x for x in range(len(pixel_counts)))),
                                 dtype=bool)
-        plt.yscale('log')
-        plt.fill_between(indices, pixel_counts, where=dn_window,
+        ax0.set_ylabel('Pixel Count')
+        ax0.set_xlabel('DN Index')
+        ax0.set_yscale('log')
+        ax0.fill_between(indices, pixel_counts, where=dn_window,
                          color='lightgray')
-        plt.axvline(x=central_i, c='gray')
-        plt.axvline(x=np.argmax(pixel_counts), c='lime', ls='--')
-        plt.plot(pixel_counts)
-        plt.plot(minima_i, pixel_counts[minima_i], "x")
-        plt.plot(min_i, pixel_counts[min_i], "o", c='red')
-        plt.plot(max_i, pixel_counts[max_i], "o", c='red')
+        ax0.axvline(x=central_i, c='gray')
+        ax0.axvline(x=np.argmax(pixel_counts), c='lime', ls='--')
+        ax0.plot(pixel_counts)
+        ax0.plot(minima_i, pixel_counts[minima_i], "x")
+        ax0.plot(min_i, pixel_counts[min_i], "o", c='red')
+        ax0.plot(max_i, pixel_counts[max_i], "o", c='red')
+
+        ax1.set_ylabel('Pixel Count')
+        ax1.set_xlabel('DN')
+        ax1.set_yscale('log')
+        ax1.set_ybound(lower=0.5)
+        ax1.scatter(dn, pixel_counts, marker='.', s=1)
+        ax1.axvline(x=dn[min_i], c='red')
+        ax1.axvline(x=dn[max_i], c='red')
+
         plt.show()
 
     return (dn[min_i], dn[max_i])
