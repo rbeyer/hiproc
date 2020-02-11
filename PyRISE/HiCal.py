@@ -1,32 +1,66 @@
 #!/usr/bin/env python
-"""Generate radiometrically corrected HiRISE Channel products."""
+"""Generate radiometrically corrected HiRISE Channel products.
 
-# Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+These are the functionalities that the EDR_Stats pipeline does that are
+reproduced here:
 
+* Perform a radiometric calibration correction and conversion to "I/F" units
+  using the ISIS ``hical`` program.
+* As part of the radiometric calibration, the current pipeline implementation
+  applies a separate gain line-drift correction, referred to as HiGainFx.
+  This original line-drift correction is used in lieu of the correction found
+  in the current ISIS "hical" program, but it has been de-activated here,
+  because it was running 'in addition to' and not 'instead of' the correction
+  in ``hical``.  Also, the current ``hical`` does a more rigorous correction
+  than the early HiGainFx.
+* Perform furrow correction. The image columns at the channel join
+  are checked for furrows. Pixels in the furrow region (at the channel
+  join) whose DN values have gone above a threshold are set to the
+  null pixel value as these pixels can not be calibrated. If a
+  RED-filter image experiences furrowing, a rare event usually caused
+  by an improperly commanded observation, then the furrowed pixels
+  will be permanently set to null pixels for all of the HiRISE standard
+  and extras products. For BG and IR-filter images that make up the
+  color products, the furrowed pixels will be interpolated in the
+  HiColorNorm pipeline step.
+* If an observation is determined to have furrows then an entry is
+  made in HiCat's Tags table (here in the .json files) to indicate
+  the level of furrowing that has occurred. The comment field in the
+  Tag table entry contains a number indicating the percent of the
+  first furrow column that had pixel values above the threshold furrow
+  value.
+* Due to HiRISE instrument instability problems, the HiCal pipeline
+  performs a noise reduction procedure to reduce the number of bad
+  pixels in an image observation. The noise correction is applied
+  when the standard deviation of the dark pixel or mask regions exceed
+  a threshold, or if the number of LIS pixels exceeds a threshold.
+* A high-pass filter "cubenorm" step is applied to the calibrated
+  image. Due to camera instabilities, residual vertical striping
+  often exists in the imaging that is corrected by this empirical
+  method. The average standard deviation of this change is calculated
+  and stored in the .json file.
+* The ISIS program "hidestripe" is applied to suppress horizontal
+  stripping seen whenever an observation is acquired using mixed-binning
+  commanding. The standard deviation of this change is calculated and
+  stored in the .json file.
 
+"""
+
+# Copyright 2019-2020, Ross A. Beyer (rbeyer@seti.org)
+#
+# Reuse is permitted under the terms of the license.
+# The LICENSE file is at the top level of this library.
+#
 # This program is based on HiCal version 1.61 (2016/12/05),
 # and on the Perl HiCal program: ($Revision: 1.52 $
 #                                 $Date: 2016/12/05 19:14:24 $)
 # by Eric Eliason and Richard Leis
 # which is Copyright(C) 2004 Arizona Board of Regents, under the GNU GPL.
 #
-# Since that suite of software is under the GPL, none of it can be directly
-# incorporated in this program, since I wish to distribute this software
-# under the Apache 2 license.  Elements of this software (written in an
-# entirely different language) are based on that software but rewritten
-# from scratch to emulate functionality.
+# Since that suite of software is under the GPL, none of it can be
+# directly incorporated in this program.  Elements of this software
+# (written in an entirely different language) are based on that
+# software but rewritten from scratch to emulate functionality.
 
 import argparse
 import collections
