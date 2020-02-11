@@ -19,7 +19,7 @@
 import unittest
 from unittest.mock import patch
 
-import PyRISE.HiColorInit as hci
+import pyrise.HiColorInit as hci
 
 
 def getkey(cube, group, key):
@@ -33,7 +33,7 @@ def getkey(cube, group, key):
 
 class TestHiColorCube(unittest.TestCase):
 
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_init(self, mock_getkey):
         c = hci.HiColorCube('dummy/PSP_010502_2090_RED5_0')
         self.assertTrue(c.tdi, 64)
@@ -41,7 +41,7 @@ class TestHiColorCube(unittest.TestCase):
 
 class TestMock(unittest.TestCase):
 
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_separate_ccds(self, mock_getkey):
         c04 = hci.HiColorCube('dummy/PSP_010502_2090_RED4')
         c05 = hci.HiColorCube('dummy/PSP_010502_2090_RED5')
@@ -60,12 +60,12 @@ class TestMock(unittest.TestCase):
         self.assertEqual(c12, bg12)
         self.assertEqual(c13, bg13)
 
-    @patch('PyRISE.HiColorInit.isis.reduce')
-    @patch('PyRISE.HiColorInit.isis.enlarge')
-    @patch('PyRISE.HiColorInit.isis.handmos')
-    @patch('PyRISE.HiColorInit.isis.editlab')
-    @patch('PyRISE.HiColorInit.Path.unlink')
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.reduce')
+    @patch('pyrise.HiColorInit.isis.enlarge')
+    @patch('pyrise.HiColorInit.isis.handmos')
+    @patch('pyrise.HiColorInit.isis.editlab')
+    @patch('pyrise.HiColorInit.Path.unlink')
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_HiColorInit_enlarge(self, m_getkey, m_unlink, m_editlab, m_handmos,
                                  m_enlarge, m_reduce):
         red = hci.HiColorCube('dummy/PSP_010502_2090_RED4')
@@ -83,12 +83,12 @@ class TestMock(unittest.TestCase):
         self.assertAlmostEqual(200, m_handmos.call_args[1]['outline'])
         m_unlink.assert_not_called()
 
-    @patch('PyRISE.HiColorInit.isis.reduce')
-    @patch('PyRISE.HiColorInit.isis.enlarge')
-    @patch('PyRISE.HiColorInit.isis.handmos')
-    @patch('PyRISE.HiColorInit.isis.editlab')
-    @patch('PyRISE.HiColorInit.Path.unlink')
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.reduce')
+    @patch('pyrise.HiColorInit.isis.enlarge')
+    @patch('pyrise.HiColorInit.isis.handmos')
+    @patch('pyrise.HiColorInit.isis.editlab')
+    @patch('pyrise.HiColorInit.Path.unlink')
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_HiColorInit_reduce(self, m_getkey, m_unlink, m_editlab, m_handmos,
                                 m_enlarge, m_reduce):
         red = hci.HiColorCube('dummy/PSP_010502_2090_RED4')

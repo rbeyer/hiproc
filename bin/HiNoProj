@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import PyRISE.HiNoProj as hnp
+import pyrise.HiNoProj as hnp
 
 hnp.main()

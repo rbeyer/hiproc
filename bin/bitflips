@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import PyRISE.bitflips as bf
+import pyrise.bitflips as bf
 
 bf.main()

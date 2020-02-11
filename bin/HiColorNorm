@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import PyRISE.HiColorNorm as hcn
+import pyrise.HiColorNorm as hcn
 
 hcn.main()

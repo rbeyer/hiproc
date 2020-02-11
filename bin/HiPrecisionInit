@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import PyRISE.HiPrecisionInit as hpi
+import pyrise.HiPrecisionInit as hpi
 
 hpi.main()

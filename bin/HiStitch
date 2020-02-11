@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import PyRISE.HiStitch as hs
+import pyrise.HiStitch as hs
 
 hs.main()

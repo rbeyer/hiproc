@@ -4,10 +4,7 @@
 define BROWSER_PYSCRIPT
 import os, webbrowser, sys
 
-try:
-	from urllib import pathname2url
-except:
-	from urllib.request import pathname2url
+from urllib.request import pathname2url
 
 webbrowser.open("file://" + pathname2url(os.path.abspath(sys.argv[1])))
 endef
@@ -31,10 +28,8 @@ urllib.request.urlretrieve(sys.argv[1],sys.argv[2])
 endef
 export DOWNLOAD_PYSCRIPT
 
-
 BROWSER := python -c "$$BROWSER_PYSCRIPT"
 DOWNLOAD := python -c "$$DOWNLOAD_PYSCRIPT"
-
 
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
@@ -62,10 +57,10 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr test-resources
 
 lint: ## check style with flake8
-	flake8 kalasiris tests
+	flake8 pyrise tests
 
 test: test-resources ## run tests quickly with the default Python
-	python setup.py test
+	pytest
 
 test-resources: ## Download what we need for testing
 	mkdir test-resources
@@ -84,9 +79,35 @@ test-resources: ## Download what we need for testing
 	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_BG13_0.IMG test-resources/PSP_010502_2090_BG13_0.img
 	$(DOWNLOAD) https://hirise-pds.lpl.arizona.edu/PDS/EDR/PSP/ORB_010500_010599/PSP_010502_2090/PSP_010502_2090_BG13_1.IMG test-resources/PSP_010502_2090_BG13_1.img
 
+
+
+test-all: ## run tests on every Python version with tox
+	tox
+
 coverage: ## check code coverage quickly with the default Python
-	coverage run --source PyRISE setup.py test
+	coverage run --source pyrise -m pytest
 	coverage report -m
-# coverage run --source PyRISE setup.py test
-# coverage html
-# $(BROWSER) htmlcov/index.html
+	coverage html
+	$(BROWSER) htmlcov/index.html
+
+docs: ## generate Sphinx HTML documentation, including API docs
+	rm -f docs/pyrise.rst
+	rm -f docs/modules.rst
+	sphinx-apidoc -o docs/ pyrise
+	$(MAKE) -C docs clean
+	$(MAKE) -C docs html
+	$(BROWSER) docs/_build/html/index.html
+
+servedocs: docs ## compile the docs watching for changes
+	watchmedo shell-command -p '*.rst' -c '$(MAKE) -C docs html' -R -D .
+
+release: dist ## package and upload a release
+	twine upload dist/*
+
+dist: clean ## builds source and wheel package
+	python setup.py sdist
+	python setup.py bdist_wheel
+	ls -l dist
+
+install: clean ## install the package to the active Python's site-packages
+	python setup.py install

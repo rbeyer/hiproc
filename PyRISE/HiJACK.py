@@ -51,12 +51,12 @@ import numpy as np
 import pvl
 
 import kalasiris as isis
-import PyRISE.hirise as hirise
-import PyRISE.util as util
-import PyRISE.HiColorInit as hci
-import PyRISE.HiColorNorm as hcn
-import PyRISE.HiJitReg as hjr
-import PyRISE.HiNoProj as hnp
+import pyrise.hirise as hirise
+import pyrise.util as util
+import pyrise.HiColorInit as hci
+import pyrise.HiColorNorm as hcn
+import pyrise.HiJitReg as hjr
+import pyrise.HiNoProj as hnp
 
 resolve_jitter_path = (
     '/Users/rbeyer/software/HiPrecision/fromOleg/HiPrecision/resolveJitter')

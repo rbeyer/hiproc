@@ -36,9 +36,9 @@ from datetime import datetime
 from pathlib import Path
 
 import kalasiris as isis
-import PyRISE.util as util
-import PyRISE.HiColorInit as hicolor
-import PyRISE.HiJitReg as hjr
+import pyrise.util as util
+import pyrise.HiColorInit as hicolor
+import pyrise.HiJitReg as hjr
 
 
 def main():

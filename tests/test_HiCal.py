@@ -24,9 +24,9 @@ from unittest.mock import patch
 import pvl
 
 import kalasiris as isis
-import PyRISE.hirise as hirise
-import PyRISE.EDR_Stats as edr
-import PyRISE.HiCal as hc
+import pyrise.hirise as hirise
+import pyrise.EDR_Stats as edr
+import pyrise.HiCal as hc
 
 from .utils import resource_check as rc
 
@@ -178,7 +178,7 @@ class TestMock(unittest.TestCase):
         for p in imgs:
             cub = p.with_suffix('.PathOnly.cub')
             cubes.append(cub)
-        with patch('PyRISE.HiCal.isis.getkey_k', return_value='2'):
+        with patch('pyrise.HiCal.isis.getkey_k', return_value='2'):
             with patch('pathlib.Path.glob', return_value=cubes):
                 d = hc.get_bins_fromfiles(cubes[0])
                 self.assertEqual(len(cubes) / 2, len(d))
@@ -190,8 +190,8 @@ class TestMock(unittest.TestCase):
         self.assertEqual(False, hc.check_destripe('dummy', 0, True, True))
         self.assertEqual(True, hc.check_destripe('dummy', 2, True, True))
         self.assertEqual(False, hc.check_destripe('dummy', 0, False, False))
-        with patch('PyRISE.HiCal.get_bins_fromfiles', return_value=bins):
-            with patch('PyRISE.HiCal.isis.getkey_k', return_value=powered):
+        with patch('pyrise.HiCal.get_bins_fromfiles', return_value=bins):
+            with patch('pyrise.HiCal.isis.getkey_k', return_value=powered):
                 self.assertEqual(False, hc.check_destripe('dummy', 2,
                                                           None, None))
 
@@ -228,7 +228,7 @@ class TestNeedCubenormStatsFile(unittest.TestCase):
         conf = dict(NoiseFilter_Zap_Fraction=0.4,
                     NoiseFilter_Nonvalid_Fraction=0.90)
 
-        with patch('PyRISE.HiCal.csv.DictWriter'):
+        with patch('pyrise.HiCal.csv.DictWriter'):
             hc.NoiseFilter_cubenorm_edit(self.statsfile, self.output,
                                          0, 2, conf, True)
 
@@ -245,7 +245,7 @@ class TestNeedCubenormStatsFile(unittest.TestCase):
                                                       True, vpnts, True)[-1])
 
     def test_Cubenorm_Filter(self):
-        with patch('PyRISE.HiCal.csv.DictWriter'):
+        with patch('pyrise.HiCal.csv.DictWriter'):
             t = hc.Cubenorm_Filter(self.statsfile, self.output,
                                    False, 5, False, 0)
             self.assertAlmostEqual(34.309424, t[0], 6)

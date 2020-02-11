@@ -33,8 +33,8 @@ from osgeo import gdal
 import pvl
 import spiceypy
 
-import PyRISE.hirise as hirise
-import PyRISE.util as util
+import pyrise.hirise as hirise
+import pyrise.util as util
 import kalasiris as isis
 
 

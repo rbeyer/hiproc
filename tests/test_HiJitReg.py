@@ -22,8 +22,8 @@ from pathlib import Path
 
 import pvl
 
-import PyRISE.HiColorInit as hci
-import PyRISE.HiJitReg as hjr
+import pyrise.HiColorInit as hci
+import pyrise.HiJitReg as hjr
 
 
 reg_def = {'AutoRegistration': {'PatternChip': {'Samples': 100, 'Lines': 60},
@@ -140,53 +140,53 @@ def getkey(cube, group, key):
 
 class TestJitterCube(unittest.TestCase):
 
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_init(self, mock_getkey):
         c = hci.HiColorCube('dummy/PSP_010502_2090_IR10_0')
         j = hjr.JitterCube(c)
         self.assertEqual(j.cnet_path,
                          Path('dummy/PSP_010502_2090_RED4-IR10.control.pvl'))
 
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_badinit(self, mock_getkey):
         c = hci.HiColorCube('dummy/PSP_010502_2090_RED4_0')
         self.assertRaises(KeyError, hjr.JitterCube, c)
 
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_dict(self, mock_getkey):
         c = hjr.JitterCube('dummy/PSP_010502_2090_IR10_0')
         self.assertEqual(c['bin'], c.bin)
         self.assertEqual(c['ExcludeLimit'], 2)
 
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_parseRegDefs(self, mock_getkey):
         c = hjr.JitterCube('dummy/PSP_010502_2090_IR10_0')
-        with patch('PyRISE.HiJitReg.pvl.load', return_value=reg_def):
+        with patch('pyrise.HiJitReg.pvl.load', return_value=reg_def):
             c.parseRegDefs()
             self.assertEqual(c['PatternSamples'], 100)
 
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_parseFlatTab(self, mock_getkey):
         c = hjr.JitterCube('dummy/PSP_010502_2090_IR10_0')
-        with patch('PyRISE.HiJitReg.pvl.load', return_value=reg_def):
+        with patch('pyrise.HiJitReg.pvl.load', return_value=reg_def):
             c.parseRegDefs()
-        with patch('PyRISE.HiJitReg.open', mock_open(read_data=flat_tab_text)):
+        with patch('pyrise.HiJitReg.open', mock_open(read_data=flat_tab_text)):
             c.parseFlatTab()
         self.assertEqual(c['MatchedLineCount'], 5)
         self.assertEqual(c['AvgSampleOffset'], 0.4470)
 
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_get_control_measures(self, m_getkey):
         self.assertEqual(len(hjr.JitterCube._get_control_measures(cnet_pvl)), 1)
 
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_parseCNetPVL(self, mock_getkey):
         c = hjr.JitterCube('dummy/PSP_010502_2090_IR10_0')
-        with patch('PyRISE.HiJitReg.pvl.load', return_value=reg_def):
+        with patch('pyrise.HiJitReg.pvl.load', return_value=reg_def):
             c.parseRegDefs()
-        with patch('PyRISE.HiJitReg.open', mock_open(read_data=flat_tab_text)):
+        with patch('pyrise.HiJitReg.open', mock_open(read_data=flat_tab_text)):
             c.parseFlatTab()
-        with patch('PyRISE.HiJitReg.pvl.load', return_value=cnet_pvl):
+        with patch('pyrise.HiJitReg.pvl.load', return_value=cnet_pvl):
             c.parseCNetPVL()
             self.assertFalse(c['CanSlither'])
             self.assertEqual(c['MatchedLineCount'], 1)
@@ -198,16 +198,16 @@ class TestJitterCube(unittest.TestCase):
         c.parseFlatTab()
         c.parseCNetPVL('tmp/test.pvl')
 
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_filterCNetPVL(self, mock_getkey):
         c = hjr.JitterCube('dummy/PSP_010502_2090_IR10_0')
-        with patch('PyRISE.HiJitReg.pvl.load', return_value=reg_def):
+        with patch('pyrise.HiJitReg.pvl.load', return_value=reg_def):
             c.parseRegDefs()
-        with patch('PyRISE.HiJitReg.open', mock_open(read_data=flat_tab_text)):
+        with patch('pyrise.HiJitReg.open', mock_open(read_data=flat_tab_text)):
             c.parseFlatTab()
         c.IgnoredPoints.add('Row 2 Column 0')
-        with patch('PyRISE.HiJitReg.pvl.load', return_value=cnet_pvl):
-            with patch('PyRISE.HiJitReg.open', mock_open()) as m:
+        with patch('pyrise.HiJitReg.pvl.load', return_value=cnet_pvl):
+            with patch('pyrise.HiJitReg.open', mock_open()) as m:
                 c.filterCNetPVL()
                 ignorecall = call().write(b'Ignore')
                 self.assertEqual(len(tuple(filter(lambda x: x == ignorecall,
@@ -217,7 +217,7 @@ class TestJitterCube(unittest.TestCase):
 
 class TestHiJitReg(unittest.TestCase):
 
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def setUp(self, mock_getkey):
         self.r = hci.HiColorCube('dummy/PSP_010502_2090_RED4_0')
         self.c = hci.HiColorCube('dummy/PSP_010502_2090_IR10_0')
@@ -238,49 +238,49 @@ class TestHiJitReg(unittest.TestCase):
                                    'Boxcar_Length': 10}}
 
     def test_Analyze_Flat(self):
-        with patch('PyRISE.HiJitReg.open',
+        with patch('pyrise.HiJitReg.open',
                    mock_open(read_data=flat_tab_text)):
-            with patch('PyRISE.HiJitReg.pvl.load',
+            with patch('pyrise.HiJitReg.pvl.load',
                        side_effect=[reg_def, cnet_pvl, cnet_pvl]):
                 self.assertEqual(hjr.Analyze_Flat(self.j, 1, 1), 0)
 
-            with patch('PyRISE.HiJitReg.pvl.load',
+            with patch('pyrise.HiJitReg.pvl.load',
                        side_effect=[reg_def, cnet_pvl, cnet_pvl]):
                 self.j['CanSlither'] = True
                 self.assertEqual(hjr.Analyze_Flat(self.j, 1, 1), 1)
 
-    @patch('PyRISE.HiJitReg.Path')
+    @patch('pyrise.HiJitReg.Path')
     def test_write_regdef(self, m_Path):
         hjr.write_regdef('dummy/out.pvl', jitter_params)
         self.assertEqual(len(m_Path.mock_calls), 2)
 
-    @patch('PyRISE.HiJitReg.isis.cnetbin2pvl')
-    @patch('PyRISE.HiJitReg.isis.hijitreg')
-    @patch('PyRISE.HiJitReg.Path')
+    @patch('pyrise.HiJitReg.isis.cnetbin2pvl')
+    @patch('pyrise.HiJitReg.isis.hijitreg')
+    @patch('pyrise.HiJitReg.Path')
     def test_run_HiJitReg(self, m_Path, m_hijitreg, m_cnetbin2pvl):
         hjr.run_HiJitReg(self.r.path, self.j, jitter_params, 'foo', keep=True)
         m_hijitreg.assert_called_once()
         m_cnetbin2pvl.assert_called_once()
 
-    @patch('PyRISE.HiJitReg.isis.cnetbin2pvl')
-    @patch('PyRISE.HiJitReg.isis.hijitreg')
-    @patch('PyRISE.HiJitReg.Path.write_text')
-    @patch('PyRISE.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiJitReg.isis.cnetbin2pvl')
+    @patch('pyrise.HiJitReg.isis.hijitreg')
+    @patch('pyrise.HiJitReg.Path.write_text')
+    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
     def test_jitter_iter(self, m_getkey, m_Path, m_hijitreg, m_cnetbin2pvl):
-        with patch('PyRISE.HiJitReg.open',
+        with patch('pyrise.HiJitReg.open',
                    mock_open(read_data=flat_tab_text)):
-            with patch('PyRISE.HiJitReg.pvl.load',
+            with patch('pyrise.HiJitReg.pvl.load',
                        side_effect=[reg_def, cnet_pvl, reg_def, cnet_pvl]):
                 self.assertFalse(hjr.jitter_iter(self.r, self.c, self.conf,
                                                  keep=True))
 
-            with patch('PyRISE.HiJitReg.pvl.load',
+            with patch('pyrise.HiJitReg.pvl.load',
                        side_effect=[reg_def, cnet_pvl, reg_def, cnet_pvl]):
-                with patch('PyRISE.HiJitReg.Analyze_Flat', return_value=1):
+                with patch('pyrise.HiJitReg.Analyze_Flat', return_value=1):
                     self.assertTrue(hjr.jitter_iter(self.r, self.c, self.conf,
                                                     keep=True))
 
-    @patch('PyRISE.HiJitReg.jitter_iter', return_value=True)
+    @patch('pyrise.HiJitReg.jitter_iter', return_value=True)
     def test_HiJitReg(self, m_jit_it):
         c04 = c05 = c10 = c11 = c12 = c13 = None
         conf = dict(dummy='yes')

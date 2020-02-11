@@ -43,10 +43,10 @@ from pathlib import Path
 import pvl
 
 import kalasiris as isis
-import PyRISE.hirise as hirise
-import PyRISE.util as util
-import PyRISE.HiColorInit as hci
-import PyRISE.HiColorNorm as hcn
+import pyrise.hirise as hirise
+import pyrise.util as util
+import pyrise.HiColorInit as hci
+import pyrise.HiColorNorm as hcn
 
 
 class Cube(hci.HiColorCube):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import PyRISE.HiCal as hical
+import pyrise.HiCal as hical
 
 hical.main()

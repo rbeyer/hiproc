@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import PyRISE.SlitherStats as sstats
+import pyrise.SlitherStats as sstats
 
 sstats.main()

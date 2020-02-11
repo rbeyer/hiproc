@@ -19,8 +19,8 @@ import unittest
 from unittest.mock import call, patch
 from pathlib import Path
 
-import PyRISE.HiColorNorm as hcn
-import PyRISE.HiBeautify as hbeaut
+import pyrise.HiColorNorm as hcn
+import pyrise.HiBeautify as hbeaut
 
 
 def getkey(cube, group, key):
@@ -38,16 +38,16 @@ def getkey(cube, group, key):
 
 class TestHiBeautify(unittest.TestCase):
 
-    @patch('PyRISE.HiColorNorm.ColorCube.get_binning', return_value=2)
-    @patch('PyRISE.HiColorNorm.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorNorm.ColorCube.get_binning', return_value=2)
+    @patch('pyrise.HiColorNorm.isis.getkey_k', side_effect=getkey)
     def setUp(self, m_getkey, m_get_binning):
         c4 = hcn.ColorCube('dummy/PSP_010502_2090_COLOR4.HiColorNorm')
         c5 = hcn.ColorCube('dummy/PSP_010502_2090_COLOR5.HiColorNorm')
         self.cubes = [c4, c5]
 
-    @patch('PyRISE.HiBeautify.isis.cubeit_k')
-    @patch('PyRISE.HiBeautify.isis.algebra')
-    @patch('PyRISE.HiBeautify.isis.handmos')
+    @patch('pyrise.HiBeautify.isis.cubeit_k')
+    @patch('pyrise.HiBeautify.isis.algebra')
+    @patch('pyrise.HiBeautify.isis.handmos')
     def test_HiBeautify(self, m_handmos, m_algebra, m_cubeit_k):
         conf = {'Beautify': {'Synthetic_A_Coefficient': 2,
                              'Synthetic_B_Coefficient': 0.3}}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import PyRISE.HiccdStitch as hcs
+import pyrise.HiccdStitch as hcs
 
 hcs.main()

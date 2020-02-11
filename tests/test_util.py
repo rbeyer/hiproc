@@ -22,7 +22,7 @@ import logging
 import unittest
 from pathlib import Path
 
-import PyRISE.util as util
+import pyrise.util as util
 
 from .utils import resource_check as rc
 
@@ -69,13 +69,13 @@ class TestUtil(unittest.TestCase):
         self.assertRaises(TypeError, util.get_path, 'dummy', 42)
         self.assertRaises(NotADirectoryError, util.get_path, 'dummy',
                           'not_a_dir')
-        self.assertRaises(FileNotFoundError, util.get_path, 'dummy', 'PyRISE')
+        self.assertRaises(FileNotFoundError, util.get_path, 'dummy', 'pyrise')
         self.assertRaises(FileNotFoundError, util.get_path, 'dummy',
-                          Path('PyRISE'))
+                          Path('pyrise'))
         self.assertRaises(FileNotFoundError, util.get_path, 'dummy',
-                          ['PyRISE', 'tests'])
-        self.assertEqual(Path('PyRISE/util.py'), util.get_path('util.py',
-                                                               'PyRISE'))
+                          ['pyrise', 'tests'])
+        self.assertEqual(Path('pyrise/util.py'), util.get_path('util.py',
+                                                               'pyrise'))
 
     def test_conf_check_strings(self):
         self.assertIsNone(util.conf_check_strings('foo', ('YES', 'NO'), 'YES'))

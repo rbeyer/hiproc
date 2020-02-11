@@ -36,8 +36,8 @@ from pathlib import Path
 import pvl
 
 import kalasiris as isis
-import PyRISE.util as util
-import PyRISE.HiColorNorm as hcn
+import pyrise.util as util
+import pyrise.HiColorNorm as hcn
 
 
 def main():

@@ -43,8 +43,8 @@ from pathlib import Path
 import pvl
 
 import kalasiris as isis
-import PyRISE.hirise as hirise
-import PyRISE.util as util
+import pyrise.hirise as hirise
+import pyrise.util as util
 
 
 def main():

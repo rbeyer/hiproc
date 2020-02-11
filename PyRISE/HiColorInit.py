@@ -36,8 +36,8 @@ from datetime import datetime
 from pathlib import Path
 
 import kalasiris as isis
-import PyRISE.hirise as hirise
-import PyRISE.util as util
+import pyrise.hirise as hirise
+import pyrise.util as util
 
 
 CCD_Corresponence = {'IR10': 'RED4',

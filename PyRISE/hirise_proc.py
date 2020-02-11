@@ -48,20 +48,20 @@ from pathlib import Path
 import pvl
 import kalasiris as isis
 
-import PyRISE.hirise as hirise
-import PyRISE.util as util
-import PyRISE.EDR_Stats as EDR_Stats
-import PyRISE.HiCal as HiCal
-import PyRISE.HiStitch as HiStitch
-import PyRISE.HiccdStitch as HiccdStitch
-import PyRISE.HiColorInit as HiColorInit
-import PyRISE.HiJitReg as HiJitReg
-import PyRISE.HiSlither as HiSlither
-import PyRISE.HiColorNorm as HiColorNorm
-import PyRISE.HiBeautify as HiBeautify
-import PyRISE.HiPrecisionInit as HiPrecisionInit
-import PyRISE.HiNoProj as HiNoProj
-import PyRISE.HiJACK as HiJACK
+import pyrise.hirise as hirise
+import pyrise.util as util
+import pyrise.EDR_Stats as EDR_Stats
+import pyrise.HiCal as HiCal
+import pyrise.HiStitch as HiStitch
+import pyrise.HiccdStitch as HiccdStitch
+import pyrise.HiColorInit as HiColorInit
+import pyrise.HiJitReg as HiJitReg
+import pyrise.HiSlither as HiSlither
+import pyrise.HiColorNorm as HiColorNorm
+import pyrise.HiBeautify as HiBeautify
+import pyrise.HiPrecisionInit as HiPrecisionInit
+import pyrise.HiNoProj as HiNoProj
+import pyrise.HiJACK as HiJACK
 
 
 class ChannelCube(hirise.ChannelID):

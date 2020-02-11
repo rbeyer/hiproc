@@ -22,10 +22,10 @@ from unittest.mock import call
 from unittest.mock import patch
 from unittest.mock import Mock
 
-# import PyRISE.hirise as hirise
-import PyRISE.HiJitReg as hjr
-import PyRISE.HiNoProj as hnp
-import PyRISE.HiJACK as hjk
+# import pyrise.hirise as hirise
+import pyrise.HiJitReg as hjr
+import pyrise.HiNoProj as hnp
+import pyrise.HiJACK as hjk
 
 hijackconf_path = Path('data') / 'HiJACK.conf'
 resjitconf_path = Path('data') / 'ResolveJitter.conf'
@@ -47,7 +47,7 @@ def getkey(cube, group, key):
 
 class TestHiJACK(unittest.TestCase):
 
-    @patch('PyRISE.HiNoProj.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiNoProj.isis.getkey_k', side_effect=getkey)
     def setUp(self, getkey_k):
         self.r4 = hnp.Cube('dummy/PSP_010502_2090_RED4.HiStitch.balance.cub')
         self.r3 = hnp.Cube('dummy/PSP_010502_2090_RED3.HiStitch.balance.cub')
@@ -59,12 +59,12 @@ class TestHiJACK(unittest.TestCase):
                          Alt_2_CCDs="RED3,RED4,RED5,IR10",
                          Alt_3_CCDs="IR10,RED4,RED5,BG12")
 
-    @patch('PyRISE.HiJACK.shutil.move')
-    @patch('PyRISE.HiJACK.isis.handmos')
-    @patch('PyRISE.HiJACK.isis.hijitreg')
-    @patch('PyRISE.HiJACK.shutil.copy')
-    @patch('PyRISE.HiJACK.isis.reduce')
-    @patch('PyRISE.HiJACK.isis.enlarge')
+    @patch('pyrise.HiJACK.shutil.move')
+    @patch('pyrise.HiJACK.isis.handmos')
+    @patch('pyrise.HiJACK.isis.hijitreg')
+    @patch('pyrise.HiJACK.shutil.copy')
+    @patch('pyrise.HiJACK.isis.reduce')
+    @patch('pyrise.HiJACK.isis.enlarge')
     def test_match_red(self, m_enlarge, m_reduce, m_copy,
                        m_hjr, m_hand, m_move):
 
@@ -112,8 +112,8 @@ class TestHiJACK(unittest.TestCase):
         rcubes.sort()
         self.assertEqual(cubes, rcubes)
 
-    @patch('PyRISE.HiJitReg.run_HiJitReg')
-    @patch('PyRISE.HiNoProj.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiJitReg.run_HiJitReg')
+    @patch('pyrise.HiNoProj.isis.getkey_k', side_effect=getkey)
     def test_make_flats(self, m_get, m_rhjr):
         cubes = [self.r4, self.r3, self.r5, self.i1]
         for c in cubes:
@@ -141,13 +141,13 @@ class TestHiJACK(unittest.TestCase):
                               'Badness_Limit': 1,
                               'Boxcar_Length': 10}}
 
-        with patch('PyRISE.HiJitReg.JitterCube') as m_jit:
+        with patch('pyrise.HiJitReg.JitterCube') as m_jit:
             m_path = Mock(spec_set=Path)
             m_jit().flattab_path = m_path
             s = hjk.make_flats(cubes, self.r5, conf, 'tt', keep=True)
             self.assertEqual(s, [m_path] * (len(cubes) - 1))
 
-        with patch('PyRISE.HiJitReg.Analyze_Flat', return_value=1):
+        with patch('pyrise.HiJitReg.Analyze_Flat', return_value=1):
             s = hjk.make_flats(cubes, self.r5, conf, 'tt', keep=True)
             flat_list = list()
             for x in (self.r3, self.r4, self.i1):
@@ -155,7 +155,7 @@ class TestHiJACK(unittest.TestCase):
                 flat_list.append(self.r5.path.parent / (p + '.flat.tab'))
             self.assertEqual(flat_list, s)
 
-    @patch('PyRISE.HiJACK.subprocess.run')
+    @patch('pyrise.HiJACK.subprocess.run')
     def test_ResolveJitter(self, m_run):
         cubes = [self.r4, self.r3, self.r5, self.i1]
         for c in cubes:
@@ -167,9 +167,9 @@ class TestHiJACK(unittest.TestCase):
             p = hjr.JitterCube.get_pair_name(x, self.r5.get_ccd())
             flat_list.append(self.r5.path.parent / (p + '.flat.tab'))
 
-        with patch('PyRISE.HiJACK.determine_resjit_set',
+        with patch('pyrise.HiJACK.determine_resjit_set',
                    return_value=(cubes, self.r5)):
-            with patch('PyRISE.HiJACK.make_flats',
+            with patch('pyrise.HiJACK.make_flats',
                        return_value=flat_list):
                 m_path = Mock(spec_set=Path)
                 m_path.parent = self.r5.path.parent
@@ -188,8 +188,8 @@ class TestHiJACK(unittest.TestCase):
                                         flat_list[2].relative_to(m_path.parent), '-1'],
                                        check=True)])
 
-    @patch('PyRISE.HiNoProj.handmos_side')
-    @patch('PyRISE.HiNoProj.fix_labels')
+    @patch('pyrise.HiNoProj.handmos_side')
+    @patch('pyrise.HiNoProj.fix_labels')
     def test_mosaic_dejittered(self, m_fix, m_hand):
         out_p = 'output_path'
         prodid = 'product_id'
@@ -203,28 +203,28 @@ class TestHiJACK(unittest.TestCase):
                          [call([self.r4, self.r5], out_p,
                                str(self.r5), prodid)])
 
-    @patch('PyRISE.HiJACK.Path.mkdir')
-    @patch('PyRISE.HiJACK.ResolveJitter')
-    @patch('PyRISE.HiNoProj.fix_labels')
-    @patch('PyRISE.HiJACK.isis.PathSet')
-    @patch('PyRISE.HiJACK.plot_flats')
-    @patch('PyRISE.HiJACK.isis.fromlist.temp')
-    @patch('PyRISE.HiJACK.isis.cubeit')
-    @patch('PyRISE.HiJACK.isis.handmos')
-    @patch('PyRISE.HiJACK.mosaic_dejittered')
-    @patch('PyRISE.HiJACK.shutil.copyfile')
-    @patch('PyRISE.HiJACK.isis.hijitter')
-    @patch('PyRISE.HiNoProj.copy_and_spice')
-    @patch('PyRISE.HiNoProj.conf_check')
-    @patch('PyRISE.HiJACK.pvl.load')
-    @patch('PyRISE.HiJACK.match_red')
+    @patch('pyrise.HiJACK.Path.mkdir')
+    @patch('pyrise.HiJACK.ResolveJitter')
+    @patch('pyrise.HiNoProj.fix_labels')
+    @patch('pyrise.HiJACK.isis.PathSet')
+    @patch('pyrise.HiJACK.plot_flats')
+    @patch('pyrise.HiJACK.isis.fromlist.temp')
+    @patch('pyrise.HiJACK.isis.cubeit')
+    @patch('pyrise.HiJACK.isis.handmos')
+    @patch('pyrise.HiJACK.mosaic_dejittered')
+    @patch('pyrise.HiJACK.shutil.copyfile')
+    @patch('pyrise.HiJACK.isis.hijitter')
+    @patch('pyrise.HiNoProj.copy_and_spice')
+    @patch('pyrise.HiNoProj.conf_check')
+    @patch('pyrise.HiJACK.pvl.load')
+    @patch('pyrise.HiJACK.match_red')
     def test_HiJACK(self, m_match, m_pvl, m_ccheck, m_cns, m_hijit,
                     m_copy, m_mosdejit, m_handmos, m_cubeit,
                     m_fromlist, m_plot, m_PathSet, m_fixlab,
                     m_ResJit, m_mkdir):
         confd = 'confdir'
         outd = 'outdir'
-        with patch('PyRISE.HiNoProj.add_offsets',
+        with patch('pyrise.HiNoProj.add_offsets',
                    side_effect=[([self.r4, self.r5], [Path('RED5-RED4flat1'),
                                                       Path('RED3-RED4flat2')]),
                                 ([self.i1, self.r3], ['irflat1', 'irflat2']),

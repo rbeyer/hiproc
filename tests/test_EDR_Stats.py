@@ -20,7 +20,7 @@ import unittest
 from pathlib import Path
 
 import kalasiris as isis
-import PyRISE.EDR_Stats as edr
+import pyrise.EDR_Stats as edr
 
 from .utils import resource_check as rc
 

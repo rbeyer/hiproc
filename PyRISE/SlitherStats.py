@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.polynomial.polynomial as P
 
-import PyRISE.util as util
+import pyrise.util as util
 
 
 def main():

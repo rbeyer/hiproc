@@ -24,8 +24,8 @@ from unittest.mock import patch
 
 import pvl
 
-import PyRISE.hirise as hirise
-import PyRISE.HiStitch as hs
+import pyrise.hirise as hirise
+import pyrise.HiStitch as hs
 
 conf_path = Path('data') / 'HiStitch.conf'
 
@@ -68,18 +68,18 @@ class TestMock(unittest.TestCase):
     def test_sort_input_cubes(self):
         cub0 = 'PSP_010502_2090_RED4_0'
         cub1 = 'PSP_010502_2090_RED4_1'
-        with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=[cub0[-1],
+        with patch('pyrise.HiStitch.isis.getkey_k', side_effect=[cub0[-1],
                                                                  cub1[-1]]):
             self.assertEqual((cub0, cub1), hs.sort_input_cubes(cub0, cub1))
 
-        with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=[cub1[-1],
+        with patch('pyrise.HiStitch.isis.getkey_k', side_effect=[cub1[-1],
                                                                  cub0[-1]]):
             self.assertEqual((cub0, cub1), hs.sort_input_cubes(cub1, cub0))
 
-        with patch('PyRISE.HiStitch.isis.getkey_k', return_value=0):
+        with patch('pyrise.HiStitch.isis.getkey_k', return_value=0):
             self.assertRaises(RuntimeError, hs.sort_input_cubes, cub0, cub0)
 
-        with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=[0, 2]):
+        with patch('pyrise.HiStitch.isis.getkey_k', side_effect=[0, 2]):
             self.assertRaises(RuntimeError, hs.sort_input_cubes, cub0, cub1)
 
     def test_sort_databases(self):
@@ -87,34 +87,34 @@ class TestMock(unittest.TestCase):
                  hirise.ChannelID('PSP_010502_2090_RED4_1'))
         dbs = ({'PRODUCT_ID': str(chids[0])}, {'PRODUCT_ID': str(chids[1])})
         _ = 'dummy_path'
-        with patch('PyRISE.HiStitch.open', mock_open(read_data='dummy')):
-            with patch('PyRISE.HiStitch.json.load', side_effect=dbs):
+        with patch('pyrise.HiStitch.open', mock_open(read_data='dummy')):
+            with patch('pyrise.HiStitch.json.load', side_effect=dbs):
                 self.assertRaises(IndexError, hs.sort_databases, (_, _, _),
                                   chids)
-            # with patch('PyRISE.HiStitch.json.load', side_effect=dbs):
+            # with patch('pyrise.HiStitch.json.load', side_effect=dbs):
             self.assertRaises(LookupError, hs.sort_databases,
                               dbs, (chids[0], chids[0]))
-            # with patch('PyRISE.HiStitch.json.load', side_effect=dbs):
+            # with patch('pyrise.HiStitch.json.load', side_effect=dbs):
             self.assertEqual(dbs, hs.sort_databases(dbs, chids))
-            # with patch('PyRISE.HiStitch.json.load', side_effect=reversed(dbs)):
+            # with patch('pyrise.HiStitch.json.load', side_effect=reversed(dbs)):
             self.assertEqual(dbs, hs.sort_databases(list(reversed(dbs)), chids))
 
-    @patch('PyRISE.HiStitch.isis.fx')
-    @patch('PyRISE.HiStitch.isis.mask')
-    @patch('PyRISE.HiStitch.isis.lowpass')
-    @patch('PyRISE.HiStitch.isis.highpass')
-    @patch('PyRISE.HiStitch.isis.algebra')
-    @patch('PyRISE.HiStitch.isis.handmos')
+    @patch('pyrise.HiStitch.isis.fx')
+    @patch('pyrise.HiStitch.isis.mask')
+    @patch('pyrise.HiStitch.isis.lowpass')
+    @patch('pyrise.HiStitch.isis.highpass')
+    @patch('pyrise.HiStitch.isis.algebra')
+    @patch('pyrise.HiStitch.isis.handmos')
     @patch('shutil.copyfile')
     def test_HiFurrow_Fix(self, mock_copyfile, mock_handmos, mock_algebra,
                           mock_highpass, mock_lowpass, mock_mask, mock_fx):
-        with patch('PyRISE.HiStitch.isis.getkey_k', return_value=1):
+        with patch('pyrise.HiStitch.isis.getkey_k', return_value=1):
             self.assertRaises(ValueError, hs.HiFurrow_Fix,
                               'dum_in', 'dum_out', 0)
-        with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=[2, 1, 1]):
+        with patch('pyrise.HiStitch.isis.getkey_k', side_effect=[2, 1, 1]):
             self.assertRaises(ValueError, hs.HiFurrow_Fix,
                               'dum_in', 'dum_out', 0)
-        with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=['2',
+        with patch('pyrise.HiStitch.isis.getkey_k', side_effect=['2',
                                                                  '1024',
                                                                  '1024']):
             in_cube = 'dummy_in.cub'
@@ -223,7 +223,7 @@ class TestHiStitch(unittest.TestCase):
         cubes = ('dummy1.in', 'dummy2.in')
         out_c = 'dummy.out'
 
-        with patch('PyRISE.HiStitch.isis.histitch') as mock:
+        with patch('pyrise.HiStitch.isis.histitch') as mock:
             hs.HiStitchStep(cubes, out_c, 2, 5, self.my_c, False, False)
             mock.assert_called_with(from1=cubes[0], from2=cubes[1],
                                     to=out_c, balance=False)
@@ -243,14 +243,14 @@ class TestHiStitch(unittest.TestCase):
                                     channel=1, seamsize=5, skip=7,
                                     operator='MULTIPLY', width=1501)
 
-    @patch('PyRISE.HiStitch.Path.rename')
-    @patch('PyRISE.HiStitch.isis.fx')
-    @patch('PyRISE.HiStitch.isis.mask')
-    @patch('PyRISE.HiStitch.isis.lowpass')
-    @patch('PyRISE.HiStitch.isis.highpass')
-    @patch('PyRISE.HiStitch.isis.algebra')
-    @patch('PyRISE.HiStitch.isis.handmos')
-    @patch('PyRISE.HiStitch.isis.histitch')
+    @patch('pyrise.HiStitch.Path.rename')
+    @patch('pyrise.HiStitch.isis.fx')
+    @patch('pyrise.HiStitch.isis.mask')
+    @patch('pyrise.HiStitch.isis.lowpass')
+    @patch('pyrise.HiStitch.isis.highpass')
+    @patch('pyrise.HiStitch.isis.algebra')
+    @patch('pyrise.HiStitch.isis.handmos')
+    @patch('pyrise.HiStitch.isis.histitch')
     @patch('shutil.copyfile')
     def test_HiStitch(self, mock_histitch, mock_copyfile, mock_handmos,
                       mock_algebra, mock_highpass, mock_lowpass,
@@ -266,12 +266,12 @@ class TestHiStitch(unittest.TestCase):
                       'Samples': 1024}
             return values[key]
 
-        with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=getkey):
+        with patch('pyrise.HiStitch.isis.getkey_k', side_effect=getkey):
             self.assertEqual((0, 3), hs.HiStitch(cubes, out_c,
                                                  self.my_c, self.my_dbs,
                                                  5, keep=True))
 
-        with patch('PyRISE.HiStitch.isis.getkey_k', side_effect=getkey):
+        with patch('pyrise.HiStitch.isis.getkey_k', side_effect=getkey):
             self.assertEqual((None, None), hs.HiStitch([cubes, ], out_c,
                                                        self.my_c, self.my_dbs,
                                                        5, keep=True))

@@ -40,8 +40,8 @@ from pathlib import Path
 
 import pvl
 
-import PyRISE.SlitherStats as sstats
-import PyRISE.util as util
+import pyrise.SlitherStats as sstats
+import pyrise.util as util
 
 
 def main():

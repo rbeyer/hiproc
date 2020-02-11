@@ -38,10 +38,10 @@ import os
 from pathlib import Path
 
 import pvl
-
-import PyRISE.hirise as hirise
-import PyRISE.util as util
 import kalasiris as isis
+
+import pyrise.hirise as hirise
+import pyrise.util as util
 
 
 def main():

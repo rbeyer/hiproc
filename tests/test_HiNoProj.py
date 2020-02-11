@@ -24,8 +24,8 @@ from unittest.mock import patch
 
 import pvl
 
-# import PyRISE.hirise as hirise
-import PyRISE.HiNoProj as hnp
+# import pyrise.hirise as hirise
+import pyrise.HiNoProj as hnp
 
 conf_path = Path('data') / 'HiNoProj.conf'
 
@@ -46,7 +46,7 @@ def getkey(cube, group, key):
 
 class TestHiNoProjCube(unittest.TestCase):
 
-    @patch('PyRISE.HiNoProj.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiNoProj.isis.getkey_k', side_effect=getkey)
     def test_init(self, mock_getkey):
         c = hnp.Cube('dummy/PSP_010502_2090_RED5_0')
         self.assertIsNone(c.next_path)
@@ -61,14 +61,14 @@ class TestConf(unittest.TestCase):
 
 class TestHiNoProj(unittest.TestCase):
 
-    @patch('PyRISE.HiNoProj.Path.with_suffix')
-    @patch('PyRISE.HiNoProj.pvl.loads',
+    @patch('pyrise.HiNoProj.Path.with_suffix')
+    @patch('pyrise.HiNoProj.pvl.loads',
            return_value={'UniversalGroundRange': {'MinimumLatitude': -66,
                                                   'MaximumLatitude': 67}})
-    @patch('PyRISE.HiNoProj.isis.camrange')
-    @patch('PyRISE.HiNoProj.isis.spiceinit')
-    @patch('PyRISE.HiNoProj.shutil.copyfile')
-    @patch('PyRISE.HiNoProj.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiNoProj.isis.camrange')
+    @patch('pyrise.HiNoProj.isis.spiceinit')
+    @patch('pyrise.HiNoProj.shutil.copyfile')
+    @patch('pyrise.HiNoProj.isis.getkey_k', side_effect=getkey)
     def test_is_polar(self, mock_getkey, m_copy, m_spice, m_cam, m_pvl, m_path):
         c1 = hnp.Cube('dummy/PSP_010502_2090_RED4.HiStitch.balance.cub')
         c2 = hnp.Cube('dummy/PSP_010502_2090_RED3.HiStitch.balance.cub')
@@ -76,8 +76,8 @@ class TestHiNoProj(unittest.TestCase):
         self.assertFalse(hnp.is_polar([c1, c2], 87, 'tt'))
         self.assertTrue(hnp.is_polar([c1, c2], 60, 'tt'))
 
-    @patch('PyRISE.HiNoProj.isis.handmos')
-    @patch('PyRISE.HiNoProj.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiNoProj.isis.handmos')
+    @patch('pyrise.HiNoProj.isis.getkey_k', side_effect=getkey)
     def test_handmos_side(self, mock_getkey, m_hand):
         c2 = hnp.Cube('dummy/PSP_010502_2090_RED2.HiStitch.balance.cub')
         c3 = hnp.Cube('dummy/PSP_010502_2090_RED3.HiStitch.balance.cub')
@@ -108,22 +108,22 @@ class TestHiNoProj(unittest.TestCase):
                                outband=1, outline=-19, outsample=-19,
                                priority='beneath')])
 
-    # @patch('PyRISE.HiNoProj.isis.getkey_k', side_effect=getkey)
+    # @patch('pyrise.HiNoProj.isis.getkey_k', side_effect=getkey)
     # def test_fix_kernel(self, mock_getkey):
     #     c5 = hnp.Cube('dummy/PSP_010502_2090_RED5.HiStitch.balance.cub')
     #     hnp.fix_kernel(c5)
 
-    @patch('PyRISE.HiNoProj.isis.editlab')
-    @patch('PyRISE.HiNoProj.handmos_side')
-    @patch('PyRISE.HiNoProj.shutil.copyfile')
-    @patch('PyRISE.HiNoProj.open', mock_open(read_data='''
+    @patch('pyrise.HiNoProj.isis.editlab')
+    @patch('pyrise.HiNoProj.handmos_side')
+    @patch('pyrise.HiNoProj.shutil.copyfile')
+    @patch('pyrise.HiNoProj.open', mock_open(read_data='''
 # Average Line Offset: 5
 # Average Sample Offset: 5'''))
-    @patch('PyRISE.HiNoProj.isis.hijitreg')
-    @patch('PyRISE.HiNoProj.isis.noproj')
-    @patch('PyRISE.HiNoProj.isis.spicefit')
-    @patch('PyRISE.HiNoProj.isis.spiceinit')
-    @patch('PyRISE.HiNoProj.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiNoProj.isis.hijitreg')
+    @patch('pyrise.HiNoProj.isis.noproj')
+    @patch('pyrise.HiNoProj.isis.spicefit')
+    @patch('pyrise.HiNoProj.isis.spiceinit')
+    @patch('pyrise.HiNoProj.isis.getkey_k', side_effect=getkey)
     def test_HiNoProj(self, mock_getkey, m_spice, m_sfit, m_noproj, m_hijitreg,
                       m_copy, m_handside, m_edit):
         c2 = hnp.Cube('dummy/PSP_010502_2090_RED2.HiStitch.balance.cub')

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import PyRISE.HiSlither as slither
+import pyrise.HiSlither as slither
 
 slither.main()

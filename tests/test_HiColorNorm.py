@@ -21,8 +21,8 @@ from pathlib import Path
 
 import pvl
 
-import PyRISE.hirise as hirise
-import PyRISE.HiColorNorm as hcn
+import pyrise.hirise as hirise
+import pyrise.HiColorNorm as hcn
 
 
 def getkey(cube, group, key):
@@ -40,8 +40,8 @@ def getkey(cube, group, key):
 
 class TestColorCube(unittest.TestCase):
 
-    @patch('PyRISE.HiColorNorm.ColorCube.get_binning', return_value=2)
-    @patch('PyRISE.HiColorNorm.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorNorm.ColorCube.get_binning', return_value=2)
+    @patch('pyrise.HiColorNorm.isis.getkey_k', side_effect=getkey)
     def setUp(self, m_getkey, m_get_binning):
         self.c = hcn.ColorCube('dummy/PSP_010502_2090_COLOR5')
 
@@ -64,8 +64,8 @@ class TestColorCube(unittest.TestCase):
 
 class TestHiColorNorm(unittest.TestCase):
 
-    @patch('PyRISE.HiColorNorm.ColorCube.get_binning', return_value=2)
-    @patch('PyRISE.HiColorNorm.isis.getkey_k', side_effect=getkey)
+    @patch('pyrise.HiColorNorm.ColorCube.get_binning', return_value=2)
+    @patch('pyrise.HiColorNorm.isis.getkey_k', side_effect=getkey)
     def setUp(self, m_getkey, m_get_binning):
         c4 = hcn.ColorCube('dummy/PSP_010502_2090_COLOR4')
         c5 = hcn.ColorCube('dummy/PSP_010502_2090_COLOR5')
@@ -83,31 +83,31 @@ class TestHiColorNorm(unittest.TestCase):
         self.assertEqual(Path('dummy/PSP_010502_2090_COLOR.cub'),
                          hcn.set_outpath('_COLOR.cub', self.cubes))
         t_getkey = getkey
-        with patch('PyRISE.HiColorNorm.ColorCube.get_binning', return_value=2):
-            with patch('PyRISE.HiColorNorm.isis.getkey_k', side_effect=t_getkey):
-                with patch('PyRISE.hirise.get_ObsID_fromfile',
+        with patch('pyrise.HiColorNorm.ColorCube.get_binning', return_value=2):
+            with patch('pyrise.HiColorNorm.isis.getkey_k', side_effect=t_getkey):
+                with patch('pyrise.hirise.get_ObsID_fromfile',
                            return_value=hirise.ObservationID('ESP_060680_3180')):
                     oddball = hcn.ColorCube('dummy/ESP_060680_3180_COLOR4')
                     newlist = self.cubes + [oddball]
                     self.assertRaises(ValueError, hcn.set_outpath,
                                       'unchanged', newlist)
 
-    @patch('PyRISE.HiColorNorm.open', new_callable=mock_open)
+    @patch('pyrise.HiColorNorm.open', new_callable=mock_open)
     def test_FurrowCheck(self, m_open):
         self.assertFalse(hcn.FurrowCheck(self.cubes, None))
 
-        with patch('PyRISE.HiColorNorm.json.load',
+        with patch('pyrise.HiColorNorm.json.load',
                    return_value={'zapped': True}):
             self.assertTrue(hcn.FurrowCheck(self.cubes,
                                             ['dummy_db_path1',
                                              'dummy_db_path2']))
-        with patch('PyRISE.HiColorNorm.json.load',
+        with patch('pyrise.HiColorNorm.json.load',
                    return_value={'zapped': False}):
             self.assertFalse(hcn.FurrowCheck(self.cubes,
                                              ['dummy_db_path1',
                                               'dummy_db_path2']))
 
-    @patch('PyRISE.HiColorNorm.isis.handmos')
+    @patch('pyrise.HiColorNorm.isis.handmos')
     def test_make_LR_mosaic(self, m_handmos):
         hcn.make_LR_mosaic('left.cub', 'right.cub', 10, 'mosaic.cub', 100, 20)
         expected = [call('left.cub', create='YES', mosaic='mosaic.cub',
@@ -117,10 +117,10 @@ class TestHiColorNorm(unittest.TestCase):
                          outline=1, outsamp=11)]
         self.assertListEqual(m_handmos.call_args_list, expected)
 
-    @patch('PyRISE.HiColorNorm.csv.DictReader', return_value=[{'Average': 4},
+    @patch('pyrise.HiColorNorm.csv.DictReader', return_value=[{'Average': 4},
                                                               {'Average': 5}])
-    @patch('PyRISE.HiColorNorm.open', new_callable=mock_open)
-    @patch('PyRISE.HiColorNorm.isis.cubenorm')
+    @patch('pyrise.HiColorNorm.open', new_callable=mock_open)
+    @patch('pyrise.HiColorNorm.isis.cubenorm')
     def test_cubenorm_stats(self, m_cubenorm, m_open, m_reader):
         self.assertAlmostEqual(0.70710678,
                                hcn.cubenorm_stats('crpmos.cub', 'mos.cub',
@@ -132,9 +132,9 @@ class TestHiColorNorm(unittest.TestCase):
                          preserve=True, statsource='table', to='mosnrm.cub')]
         self.assertListEqual(m_cubenorm.call_args_list, expected)
 
-    @patch('PyRISE.HiColorNorm.isis.handmos')
-    @patch('PyRISE.HiColorNorm.isis.algebra')
-    @patch('PyRISE.HiColorNorm.shutil.copyfile')
+    @patch('pyrise.HiColorNorm.isis.handmos')
+    @patch('pyrise.HiColorNorm.isis.algebra')
+    @patch('pyrise.HiColorNorm.shutil.copyfile')
     def test_make_unfiltered(self, m_copy, m_alg, m_hand):
         self.assertEqual(Path('in_UNFILTERED_COLOR4.cub'),
                          hcn.make_unfiltered('in_COLOR4.cub',
@@ -150,7 +150,7 @@ class TestHiColorNorm(unittest.TestCase):
                                mosaic=Path('in_UNFILTERED_COLOR4.cub'),
                                outband=2, outline=1, outsample=1)])
 
-    @patch('PyRISE.HiColorNorm.isis.lowpass')
+    @patch('pyrise.HiColorNorm.isis.lowpass')
     def test_lpfz_filtering(self, m_low):
         hcn.lpfz_filtering('from.cub', 'to.cub', 3, 5)
         self.assertListEqual(m_low.call_args_list,
@@ -159,7 +159,7 @@ class TestHiColorNorm(unittest.TestCase):
                                    low=0.0, minimum=25, minopt='PERCENTAGE',
                                    null=True, samples=5, to='to.cub')])
 
-    @patch('PyRISE.HiColorNorm.isis.lowpass')
+    @patch('pyrise.HiColorNorm.isis.lowpass')
     def test_lpfz_triplefilter(self, m_low):
         hcn.lpfz_triplefilter('from.cub', 'to.cub', keep=True)
         self.assertListEqual(m_low.call_args_list,
@@ -176,9 +176,9 @@ class TestHiColorNorm(unittest.TestCase):
                                    low=0.0, minimum=25, minopt='PERCENTAGE',
                                    null=True, samples=11, to='to.cub')])
 
-    @patch('PyRISE.HiColorNorm.isis.crop')
-    @patch('PyRISE.HiColorNorm.isis.mask')
-    @patch('PyRISE.HiColorNorm.isis.ratio')
+    @patch('pyrise.HiColorNorm.isis.crop')
+    @patch('pyrise.HiColorNorm.isis.mask')
+    @patch('pyrise.HiColorNorm.isis.ratio')
     def test_per_color(self, m_rat, m_mask, m_crop):
         mask_p = Path('dummy/PSP_010502_2090_COLOR4.ttoken_IR.mask.cub')
         ratc_p = Path('dummy/PSP_010502_2090_COLOR4.ttoken_IR.ratcrop.cub')
@@ -196,14 +196,14 @@ class TestHiColorNorm(unittest.TestCase):
         self.assertEqual(m_crop.call_args_list,
                          [call(mask_p, line=None, nlines=None, to=ratc_p)])
 
-    @patch('PyRISE.HiColorNorm.isis.handmos')
-    @patch('PyRISE.HiColorNorm.isis.algebra')
-    @patch('PyRISE.HiColorNorm.lpfz_triplefilter')
-    @patch('PyRISE.HiColorNorm.isis.lowpass')
-    @patch('PyRISE.HiColorNorm.make_unfiltered')
-    @patch('PyRISE.HiColorNorm.isis.crop')
-    @patch('PyRISE.HiColorNorm.cubenorm_stats', return_value=3)
-    @patch('PyRISE.HiColorNorm.make_LR_mosaic')
+    @patch('pyrise.HiColorNorm.isis.handmos')
+    @patch('pyrise.HiColorNorm.isis.algebra')
+    @patch('pyrise.HiColorNorm.lpfz_triplefilter')
+    @patch('pyrise.HiColorNorm.isis.lowpass')
+    @patch('pyrise.HiColorNorm.make_unfiltered')
+    @patch('pyrise.HiColorNorm.isis.crop')
+    @patch('pyrise.HiColorNorm.cubenorm_stats', return_value=3)
+    @patch('pyrise.HiColorNorm.make_LR_mosaic')
     def test_per_band(self, m_LR, m_cn, m_crop, m_unfilt, m_low, m_3filt,
                       m_algebra, m_handmos):
         conf = {'HiColorNorm': {'HiColorNorm_Crop_Top': 1000,
@@ -222,13 +222,13 @@ class TestHiColorNorm(unittest.TestCase):
         self.assertEqual(num_cubes, m_algebra.call_count)
         self.assertEqual(num_cubes, m_handmos.call_count)
 
-    @patch('PyRISE.HiColorNorm.isis.hiccdstitch')
-    @patch('PyRISE.HiColorNorm.per_band', return_value=3)
-    @patch('PyRISE.HiColorNorm.per_color', return_value=('CCmask.cub',
+    @patch('pyrise.HiColorNorm.isis.hiccdstitch')
+    @patch('pyrise.HiColorNorm.per_band', return_value=3)
+    @patch('pyrise.HiColorNorm.per_color', return_value=('CCmask.cub',
                                                          'CCcrop.cub'))
-    @patch('PyRISE.HiColorNorm.isis.cubeit')
-    @patch('PyRISE.HiColorNorm.Path.write_text')
-    @patch('PyRISE.HiColorNorm.isis.mask')
+    @patch('pyrise.HiColorNorm.isis.cubeit')
+    @patch('pyrise.HiColorNorm.Path.write_text')
+    @patch('pyrise.HiColorNorm.isis.mask')
     def test_HiColorNorm(self, m_mask, m_Pathwrite, m_cubeit, m_pc, m_pb,
                          m_hcs):
         conf = {'HiColorNorm': {'HiColorNorm_Crop_Top': 1000,
