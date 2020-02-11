@@ -87,10 +87,10 @@ from pathlib import Path
 
 import pvl
 import kalasiris as isis
-from PyRISE.bitflips import find_smart_window
 
 import pyrise.hirise as hirise
 import pyrise.util as util
+from pyrise.bitflips import find_smart_window
 
 
 def main():

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import PyRISE.reverse_clean as rc
+import pyrise.reverse_clean as rc
 
 rc.main()

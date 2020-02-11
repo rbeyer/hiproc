@@ -225,7 +225,7 @@ def histogram(in_path: Path, hist_path: Path):
 def mask(in_path: Path, out_path: Path, line=False, plot=True, keep=False):
     """Attempt to mask out pixels beyond the central DNs of the median
     based on minima in the histogram."""
-    from PyRISE.HiCal import analyze_cubenorm_stats2
+    from pyrise.HiCal import analyze_cubenorm_stats2
 
     to_del = isis.PathSet()
 

@@ -38,8 +38,8 @@ from shutil import copyfile
 
 import kalasiris as isis
 
-import PyRISE.util as util
-from PyRISE.bitflips import mask
+import pyrise.util as util
+from pyrise.bitflips import mask
 
 
 def main():
