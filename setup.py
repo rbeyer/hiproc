@@ -10,7 +10,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = [ ]
+requirements = []
 
 setup(
     author="Ross A. Beyer",
@@ -28,7 +28,23 @@ setup(
     description="A library to help process HiRISE EDRs with ISIS.",
     entry_points={
         'console_scripts': [
-            'pyrise=pyrise.cli:main',
+            'EDR_Stats=pyrise.EDR_Stats:main',
+            'HiBeautify=pyrise.HiBeautify:main',
+            'HiCal=pyrise.HiCal:main',
+            'HiColorInit=pyrise.HiColorInit:main',
+            'HiColorNorm=pyrise.HiColorNorm:main',
+            'HiJACK=pyrise.HiJACK:main',
+            'HiJitReg=pyrise.HiJitReg:main',
+            'HiNoProj=pyrise.HiNoProj:main',
+            'HiPrecisionInit=pyrise.HiPrecisionInit:main',
+            'HiSlither=pyrise.HiSlither:main',
+            'HiStitch=pyrise.HiStitch:main',
+            'HiccdStitch=pyrise.HiccdStitch:main',
+            'JitPlot=pyrise.JitPlot:main',
+            'SlitherStats=pyrise.SlitherStats:main',
+            'bitflips=pyrise.bitflips:main',
+            'hirise_proc=pyrise.hirise_proc:main',
+            'mdr2cub=pyrise.mdr2cub:main',
         ],
     },
     install_requires=requirements,
