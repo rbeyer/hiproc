@@ -229,7 +229,7 @@ def mask(in_path: Path, out_path: Path, line=False, plot=True, keep=False):
 
     to_del = isis.PathSet()
 
-    hist_p = in_path.with_suffix('.hist')
+    hist_p = to_del.add(in_path.with_suffix('.hist'))
     hist = histogram(in_path, hist_p)
 
     median = math.trunc(float(hist['Median']))
@@ -254,7 +254,7 @@ def mask(in_path: Path, out_path: Path, line=False, plot=True, keep=False):
     #                    maximum=maskmax).args)
 
     if not keep:
-        hist_p.unlink()
+        to_del.unlink()
     return (mindn, maxdn)
 
 
@@ -486,3 +486,7 @@ def unflip(in_p: Path, out_p: Path, keep=False):
         to_del.unlink()
 
     return
+
+
+if __name__ == "__main__":
+    main()

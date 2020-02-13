@@ -31,6 +31,7 @@ import argparse
 import csv
 import logging
 import math
+import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -95,44 +96,123 @@ def start(cube_path: Path, out_path: Path, keep=False):
     masked = to_del.add(cube_path.with_suffix(f'.{temp_token}.mask.cub'))
     (mindn, maxdn) = mask(reverse, masked, line=True, plot=False, keep=keep)
 
-    # run tabledump to get CSV file
-    rev_csv = to_del.add(cube_path.with_suffix(f'.{temp_token}.reverse.csv'))
-    util.log(isis.tabledump(cube_path, to=rev_csv,
-                            name='HiRISE Calibration Image').args)
-    rev_rows = list()
-    with open(rev_csv) as csvfile:
-        reader = csv.reader(csvfile)
-        for row in reader:
-            out_row = list()
-            for elem in row:
-                try:
-                    if(int(elem) < 0 or
-                       (int(elem) >= mindn and int(elem) <= maxdn)):
-                        out_row.append(elem)
-                    else:
-                        # Replace with the integer value of the ISIS NULL pixel
-                        # out_row.append(-32768')
-                        out_row.append('0')
-                except ValueError:
-                    out_row.append(elem)
-            rev_rows.append(out_row)
+    # # run tabledump to get CSV file
+    # rev_csv = to_del.add(cube_path.with_suffix(f'.{temp_token}.reverse.csv'))
+    # util.log(isis.tabledump(cube_path, to=rev_csv,
+    #                         name='HiRISE Calibration Image').args)
+    # rev_rows = list()
+    # with open(rev_csv) as csvfile:
+    #     reader = csv.reader(csvfile)
+    #     for row in reader:
+    #         out_row = list()
+    #         for elem in row:
+    #             try:
+    #                 if(int(elem) < 0 or
+    #                    (int(elem) >= mindn and int(elem) <= maxdn)):
+    #                     out_row.append(elem)
+    #                 else:
+    #                     # Replace with the integer value of the ISIS NULL pixel
+    #                     # out_row.append(-32768')
+    #                     out_row.append('0')
+    #             except ValueError:
+    #                 out_row.append(elem)
+    #         rev_rows.append(out_row)
 
-    # open CSV file, read, filter, write out new CSV file
-    rev_clean_csv = to_del.add(
-        cube_path.with_suffix(f'.{temp_token}.rev-clean.csv'))
+    # # open CSV file, read, filter, write out new CSV file
+    # rev_clean_csv = to_del.add(
+    #     cube_path.with_suffix(f'.{temp_token}.rev-clean.csv'))
 
-    with open(rev_clean_csv, 'w') as cleaned:
-        writer = csv.writer(cleaned)
-        writer.writerows(rev_rows)
+    # with open(rev_clean_csv, 'w') as cleaned:
+    #     writer = csv.writer(cleaned)
+    #     writer.writerows(rev_rows)
 
-    # copy input to output
-    copyfile(cube_path, out_path)
+    # # copy input to output
+    # copyfile(cube_path, out_path)
 
-    # run csv2table
-    util.log(isis.csv2table(csv=rev_clean_csv, to=out_path,
-                            tablename='"HiRISE Calibration Image"').args)
+    # # run csv2table
+    # util.log(isis.csv2table(csv=rev_clean_csv, to=out_path,
+    #                         tablename='"HiRISE Calibration Image"').args)
+
+    filter_reverse(cube_path, out_path, 1420, 1500)
 
     if not keep:
         to_del.unlink()
 
     return
+
+
+def filter_reverse(cube, out_cube, mindn, maxdn, replacement=None):
+    """Creates a new file at *out_cube* (or overwrites it) based
+    on filtering the contents of the reverse-clocked area.
+
+    The contents of the reverse-clocked area (not its buffer or
+    dark pixel areas) are examined.  If the DN value is in the
+    allowable range, it is checked against *mindn* and *maxdn*, if
+    it is between them, it is left unchanged.  If it is outside of
+    the range, the value of *replacement* is written into that
+    location in *out_path*.  If *replacement* is ``None`` then the
+    appropriate value for ISIS NULL will be used.
+
+    No other areas of the image are affected, and the new file at
+    *out_path* should otherwise be identical to the file given by
+    *img_path*.
+    """
+    label = pvl.load(str(cube))
+    cal_start, samples = get_cal_table_info(label)
+    lines = 20
+    width = None
+    b_order = None
+    b_signed = None
+    pixels_d = label['IsisCube']['Core']['Pixels']
+    if pixels_d['Type'].casefold() == 'SignedWord'.casefold():
+        width = 4
+        b_signed = True
+        if replacement is None:
+            replacement = -32768
+        else:
+            raise ValueError(
+                "Don't know how to deal with Pixel Type" + pixels_d['Type'])
+
+    if pixels_d['ByteOrder'].casefold() == 'Lsb'.casefold():
+        b_order = 'little'
+    else:
+        raise ValueError("Don't know how to deal with "
+                         "ByteOrder '{}'".format(pixels_d['ByteOrder']))
+
+    # print(f"min: {mindn}, max: {maxdn}")
+    with open(cube, mode='rb') as (f):
+        with open(out_cube, mode='wb') as (of):
+            of.write(f.read(cal_start))  # Copy first part of file
+            # Filter the Calibration table
+            for lineno in range(lines):
+                for sampno in range(samples):
+                    b_pixel = f.read(width)
+                    # dn = struct.unpack('f', b_pixel)[0]
+                    dn = int.from_bytes(b_pixel, byteorder=b_order,
+                                        signed=b_signed)
+                    # print(f"dn: {dn}")
+                    if 0 < dn < mindn or maxdn < dn < 16383:
+                        # logging.info(f"foudn dn to replace: {dn}")
+                        of.write(replacement.to_bytes(width,
+                                                      byteorder=b_order,
+                                                      signed=b_signed))
+                    else:
+                        of.write(b_pixel)
+
+            of.write(f.read())  # Copy last part of file
+
+
+def get_cal_table_info(label: dict):
+    start = None
+    samples = None
+    for t in label.getlist('Table'):
+        if t['Name'] == 'HiRISE Calibration Image':
+            start = t['StartByte']
+            samples = t['Field']['Size']
+            break
+
+    return (start, samples)
+
+
+if __name__ == '__main__':
+    main()

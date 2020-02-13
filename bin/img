@@ -1,0 +1,5 @@
+#!/usr/bin/env python
+
+import pyrise.img as img
+
+img.main()
