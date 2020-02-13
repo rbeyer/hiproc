@@ -1,5 +1,15 @@
 #!/usr/bin/env python
 """Functions to work with HiRISE .img files.
+
+   At the moment, if just given a .img file, it will
+   perform some basic, canned, filtering of the reverse-clock
+   area.
+
+   If also given an ISIS cube, then it will assume that the
+   ISIS cube is a result of running hi2isis on the given .img
+   file.  It will analyze that ISIS cube's reverse-clock area
+   and come up with a masking window and the resulting .img file
+   will have its reverse-clock area filtered with that window.
 """
 
 # Copyright 2020, Ross A. Beyer (rbeyer@seti.org)

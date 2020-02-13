@@ -103,3 +103,24 @@ ENV/
 
 # IDE settings
 .vscode/
+
+# temporary executables
+EDR_Stats
+HiBeautify
+HiCal
+HiColorInit
+HiColorNorm
+HiJACK
+HiJitReg
+HiNoProj
+HiPrecisionInit
+HiSlither
+HiStitch
+HiccdStitch
+JitPlot
+SlitherStats
+bitflips
+hirise_proc
+img
+mdr2cub
+reverse_clean
