@@ -32,12 +32,15 @@ import csv
 import logging
 import math
 import os
+import struct
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from shutil import copyfile
 
+
 import kalasiris as isis
+import pvl
 
 import pyrise.util as util
 from pyrise.bitflips import mask
@@ -93,8 +96,8 @@ def start(cube_path: Path, out_path: Path, keep=False):
     util.log(isis.crop(higlob, to=reverse, nline=20).args)
 
     # run mask() to get DN range
-    masked = to_del.add(cube_path.with_suffix(f'.{temp_token}.mask.cub'))
-    (mindn, maxdn) = mask(reverse, masked, line=True, plot=False, keep=keep)
+    # masked = to_del.add(cube_path.with_suffix(f'.{temp_token}.mask.cub'))
+    (mindn, maxdn) = mask(reverse, 'dummy', line=True, plot=False, keep=keep)
 
     # # run tabledump to get CSV file
     # rev_csv = to_del.add(cube_path.with_suffix(f'.{temp_token}.reverse.csv'))
@@ -133,7 +136,7 @@ def start(cube_path: Path, out_path: Path, keep=False):
     # util.log(isis.csv2table(csv=rev_clean_csv, to=out_path,
     #                         tablename='"HiRISE Calibration Image"').args)
 
-    filter_reverse(cube_path, out_path, 1420, 1500)
+    filter_reverse(cube_path, out_path, 1450, 1500)
 
     if not keep:
         to_del.unlink()
@@ -158,26 +161,29 @@ def filter_reverse(cube, out_cube, mindn, maxdn, replacement=None):
     *img_path*.
     """
     label = pvl.load(str(cube))
-    cal_start, samples = get_cal_table_info(label)
+    cal_start, samples, data_fmt, null, width = get_cal_table_info(label)
     lines = 20
-    width = None
-    b_order = None
-    b_signed = None
-    pixels_d = label['IsisCube']['Core']['Pixels']
-    if pixels_d['Type'].casefold() == 'SignedWord'.casefold():
-        width = 4
-        b_signed = True
-        if replacement is None:
-            replacement = -32768
-        else:
-            raise ValueError(
-                "Don't know how to deal with Pixel Type" + pixels_d['Type'])
+    # width = None
+    # b_order = None
+    # b_signed = None
+    # data_fmt = None
+    # pixels_d = label['IsisCube']['Core']['Pixels']
+    # if pixels_d['Type'].casefold() == 'SignedWord'.casefold():
+    #     width = 4
+    #     b_signed = True
+    #     if replacement is None:
+    #         replacement = -32768
+    #     else:
+    #         raise ValueError(
+    #             "Don't know how to deal with Pixel Type" + pixels_d['Type'])
+    if replacement is None:
+        replacement = null
 
-    if pixels_d['ByteOrder'].casefold() == 'Lsb'.casefold():
-        b_order = 'little'
-    else:
-        raise ValueError("Don't know how to deal with "
-                         "ByteOrder '{}'".format(pixels_d['ByteOrder']))
+    # if pixels_d['ByteOrder'].casefold() == 'Lsb'.casefold():
+    #     b_order = 'little'
+    # else:
+    #     raise ValueError("Don't know how to deal with "
+    #                      "ByteOrder '{}'".format(pixels_d['ByteOrder']))
 
     # print(f"min: {mindn}, max: {maxdn}")
     with open(cube, mode='rb') as (f):
@@ -187,17 +193,21 @@ def filter_reverse(cube, out_cube, mindn, maxdn, replacement=None):
             for lineno in range(lines):
                 for sampno in range(samples):
                     b_pixel = f.read(width)
-                    # dn = struct.unpack('f', b_pixel)[0]
-                    dn = int.from_bytes(b_pixel, byteorder=b_order,
-                                        signed=b_signed)
-                    # print(f"dn: {dn}")
+                    dn = struct.unpack(data_fmt, b_pixel)[0]
+                    # dn = int.from_bytes(b_pixel, byteorder=b_order,
+                    #                     signed=b_signed)
+                    print(f"dn: {dn}")
                     if 0 < dn < mindn or maxdn < dn < 16383:
                         # logging.info(f"foudn dn to replace: {dn}")
-                        of.write(replacement.to_bytes(width,
-                                                      byteorder=b_order,
-                                                      signed=b_signed))
-                    else:
-                        of.write(b_pixel)
+                        # print(f'repl: {replacement}
+                        # of type {type(replacement)}')
+                        b_pixel = struct.pack(data_fmt, replacement)
+                        # of.write(replacement.to_bytes(width,
+                        #                               byteorder=b_order,
+                        #                               signed=b_signed))
+                    # else:
+                    #    of.write(b_pixel)
+                    of.write(b_pixel)
 
             of.write(f.read())  # Copy last part of file
 
@@ -205,13 +215,111 @@ def filter_reverse(cube, out_cube, mindn, maxdn, replacement=None):
 def get_cal_table_info(label: dict):
     start = None
     samples = None
+    data_fmt = None
+    size = None
+
+    data_sizes = {'Integer': 4,
+                  'Double': 8,
+                  'Real': 4,
+                  'Text': 1}
+    data_formats = {'Integer': 'i',
+                    'Double': 'd',
+                    'Real': 'f'}
+
+    null_val = {'Integer': -32768}
+
     for t in label.getlist('Table'):
         if t['Name'] == 'HiRISE Calibration Image':
-            start = t['StartByte']
+            start = t['StartByte'] - 1
             samples = t['Field']['Size']
+            data_fmt = data_formats[t['Field']['Type']]
+            null = null_val[t['Field']['Type']]
+            size = data_sizes[t['Field']['Type']]
             break
 
-    return (start, samples)
+    return (start, samples, data_fmt, null, size)
+
+
+# This function comes from
+# https://github.com/USGS-Astrogeology/ale/blob/master/ale/base/data_isis.py
+# commit 5454875e75e900444abf77a9b01ae2e3fd600beb (tag: 0.7.3)
+# Make no changes that are not pushed upstream to this file.
+# Perhaps one day we will just be able to simply import.
+def read_table_data(table_label, cube):
+    """
+    Helper function to read all of the binary table data
+
+    Parameters
+    ----------
+    table_label : PVLModule
+                  The ISIS table label
+    cube : file
+           The ISIS cube file
+
+    Returns
+    -------
+    bytes :
+        The binary portion of the table data
+    """
+    cubehandle = open(cube, "rb")
+    cubehandle.seek(table_label['StartByte'] - 1)
+    return cubehandle.read(table_label['Bytes'])
+
+
+# This function comes from
+# https://github.com/USGS-Astrogeology/ale/blob/master/ale/base/data_isis.py
+# commit 5454875e75e900444abf77a9b01ae2e3fd600beb (tag: 0.7.3)
+# Make no changes that are not pushed upstream to this file.
+# Perhaps one day we will just be able to simply import.
+def parse_table(table_label, data):
+    """
+    Parse an ISIS table into a dictionary.
+
+    Parameters
+    ----------
+    table_label : PVLModule
+                  The ISIS table label
+    data : bytes
+           The binary component of the ISIS table
+
+    Returns
+    -------
+    dict :
+           The table as a dictionary with the keywords from the label and the
+           binary data
+    """
+    data_sizes = {'Integer': 4,
+                  'Double': 8,
+                  'Real': 4,
+                  'Text': 1}
+    data_formats = {'Integer': 'i',
+                    'Double': 'd',
+                    'Real': 'f'}
+
+    # Parse the binary data
+    fields = table_label.getlist('Field')
+    results = {field['Name']: [] for field in fields}
+    offset = 0
+    for record in range(table_label['Records']):
+        for field in fields:
+            if field['Type'] == 'Text':
+                field_data = data[
+                    offset:offset + field['Size']].decode(encoding='latin_1')
+            else:
+                data_format = data_formats[field['Type']] * field['Size']
+                field_data = struct.unpack_from(data_format, data[offset:])
+                if len(field_data) == 1:
+                    field_data = field_data[0]
+
+            results[field['Name']].append(field_data)
+            offset += data_sizes[field['Type']] * field['Size']
+
+    # Parse the keywords from the label
+    results.update({key: value for key,
+                    value in table_label.items() if not isinstance(
+                        value, pvl._collections.PVLGroup)})
+
+    return results
 
 
 if __name__ == '__main__':
