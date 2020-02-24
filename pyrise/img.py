@@ -91,38 +91,44 @@ def filter_reverse_cube(img_path: os.PathLike, cube_path: os.PathLike,
     return
 
 
-def get_params(label: dict) -> tuple:
-    """Returns a tuple of specific parameters from the *label*
+def get_info(name: str, label: dict) -> dict:
+    """Returns a dict of parameters from the *label*
     dict-like that are used in reading and writing the binary
-    contents of a .IMG file.
+    contents of a .IMG file based on *name*.
     """
+    info = dict()
 
-    width = None
-    if label['CALIBRATION_IMAGE']['SAMPLE_BITS'] == 16:
-        width = 2
-    elif label['CALIBRATION_IMAGE']['SAMPLE_BITS'] == 8:
-        width = 1
+    info['offset'] = int(label[f'^{name}'].value)
+
+    if 'SAMPLE_BITS' in label[name]:
+        if label[name]['SAMPLE_BITS'] == 16:
+            info['width'] = 2
+        elif label[name]['SAMPLE_BITS'] == 8:
+            info['width'] = 1
+        else:
+            raise ValueError(
+                "Don't know how to handle '{}'".format(
+                    label[name]['SAMPLE_BITS']) +
+                f"as a value of SAMPLE_BITS in {name}, should be 8 or 16.")
+    elif 'COLUMN' in label[name]:
+        for t in label[name].getlist('COLUMN'):
+            if 'Pixels' in t['NAME']:
+                info['width'] = t['ITEM_BYTES']
     else:
-        raise ValueError(
-            "Don't know how to handle '{}'".format(
-                label['CALIBRATION_IMAGE']['SAMPLE_BITS']) +
-            "as a value of SAMPLE_BITS, should be 8 or 16.")
+        raise ValueError("Can't determine how to set the width.")
 
-    b_order = 'little'
     if label['CALIBRATION_IMAGE']['SAMPLE_TYPE'].startswith('MSB'):
-        b_order = 'big'
+        info['b_order'] = 'big'
 
-    b_signed = True
     if 'UNSIGNED' in label['CALIBRATION_IMAGE']['SAMPLE_TYPE']:
-        b_signed = False
+        info['b_signed'] = False
 
-    return (
-        label['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_CONVERSION_TABLE'],
-        int(label['^CALIBRATION_IMAGE'].value),
-        width, b_order, b_signed,
-        label['CALIBRATION_IMAGE']['LINE_PREFIX_BYTES'],
-        label['CALIBRATION_IMAGE']['LINE_SAMPLES'],
-        label['CALIBRATION_IMAGE']['LINE_SUFFIX_BYTES'])
+    info['lines'] = label[name]['LINES']
+    info['samples'] = label[name]['LINE_SAMPLES']
+    info['prefix'] = label[name]['LINE_PREFIX_BYTES']
+    info['suffix'] = label[name]['LINE_SUFFIX_BYTES']
+
+    return info
 
 
 def get_reverse(img_path: os.PathLike) -> list:
@@ -156,60 +162,94 @@ def get_reverse(img_path: os.PathLike) -> list:
     return rev_list
 
 
-def filter_reverse(img_path: os.PathLike, out_path: os.PathLike,
-                   mindn: int, maxdn: int, replacement=None):
+def filter(img_path: os.PathLike, out_path: os.PathLike,
+           reverse=None, buf=None, image=None, dark=None,
+           replacement=None):
     """Creates a new file at *out_path* (or overwrites it) based
-    on filtering the contents of the reverse-clocked area.
+    on filtering the selected contents of the image.
 
-    The contents of the reverse-clocked area (not its buffer or dark
-    pixel areas) are examined and unlutted to 14-bit HiRISE DN values.
-    If the DN value isn't a special value (that would end up being NULL,
-    HIS, or LIS in the ISIS image) it is checked against *mindn* and *maxdn*,
-    if it is between them, it is left unchanged.  If it is outside of the
-    range, the value of *replacement* is converted to bytes and written
-    into that spot of *out_path*.  If *replacement* is ``None`` then
-    the appropriate value for ISIS NULL will be used.
+    The four 'areas' are indicated by the *reverse*, *buf*, *image*,
+    and *dark* arguments.  If they are ``None`` then that area will
+    not be altered.  Otherwise, they should be a two-tuple of ``int``
+    values that define a low and a high DN value.
+
+    For each area that is not ``None``, the pixels are examined and
+    unlutted to 14-bit HiRISE DN values.  If the DN value isn't a
+    special value (that would end up being NULL, HIS, or LIS in the
+    ISIS image) it is checked against the first and second items
+    of the two-tuple. If the value is between them, the pixel
+    is left unchanged.  If it is outside of the range, the value of
+    *replacement* is converted to bytes and written into that spot
+    of *out_path*.  If *replacement* is ``None`` then the appropriate
+    value for ISIS NULL will be used.
 
     No other areas of the image are affected, and the new file at
     *out_path* should otherwise be identical to the file given by
     *img_path*.
     """
+    if not all(map(isinstance, (reverse, buf, image, dark), repeat(tuple))):
+        raise ValueError("No two-tuples were given for any area.")
 
-    (lut, cal_start, width, b_order, b_signed,
-     prefix, samples, suffix) = get_params(pvl.load(img_path))
-    lines = 20
+    label = pvl.load(img_path)
+    lut = label['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_CONVERSION_TABLE']
 
-    if width == 1:  # 8 bit
-        if replacement is None:
+    rev_info = get_info('CALIBRATION_IMAGE', label)
+    rev_info['lines'] = 20
+
+    buf_info = get_info('LINE_PREFIX_TABLE', label)
+    img_info = get_info('IMAGE', label)
+    dark_info = get_info('LINE_SUFFIX_TABLE', label)
+
+    w_set = set(i['width'] for i in (rev_info, buf_info, img_info, dark_info))
+    if len(w_set) == 1:
+        width = w_set[0]
+    else:
+        raise ValueError("The different areas have different bit-widths: "
+                         f"{w_set}")
+
+    if replacement is None:
+        if width == 1:  # 8 bit
             replacement = 255
-    elif width == 2:  # 16 bit
-        if replacement is None:
+        elif width == 2:  # 16 bit
             replacement = -1
+        else:
+            raise ValueError("Don't know how to set NULL value for bit-width "
+                             f"{width}")
+
+    if(buf_info['offset'] == img_info['offset']
+       and img_info['offset'] == dark_info['offset']):
+        image_offset = img_info['offset']
+    else:
+        raise ValueError("The offsets for the buffer, image, and dark areas "
+                         "should all be the same, but they're not.")
 
     # print(f'mindn: {mindn}, maxdn: {maxdn}')
     with open(img_path, mode='rb') as f:
         with open(out_path, mode='wb') as of:
             # Copy the data from beginning to the beginning of the
             # Calibration Image
-            of.write(f.read(cal_start))
-            for lineno in range(lines):
-                # Copy the prefix from each line
-                of.write(f.read(prefix))
-                # This is the meat:
-                for sampno in range(samples):
-                    byte = f.read(width)
-                    dn = unlut(lut, int.from_bytes(byte,
-                                                   byteorder=b_order,
-                                                   signed=b_signed))
-                    # print(f'dn: {dn}')
-                    if((0 < dn < mindn) or (maxdn < dn < 16383)):
-                        of.write((replacement).to_bytes(width,
-                                                        byteorder=b_order,
-                                                        signed=b_signed))
-                    else:
-                        of.write(byte)
-                # Copy the suffix from each line
-                of.write(f.read(suffix))
+            of.write(f.read(rev_info['offset']))
+            if reverse is None:
+                of.write(f.read(image_offset - rev_info['offset']))
+            else:
+                for lineno in range(lines):
+                    # Copy the prefix from each line
+                    of.write(f.read(prefix))
+                    # This is the meat:
+                    for sampno in range(samples):
+                        byte = f.read(width)
+                        dn = unlut(lut, int.from_bytes(byte,
+                                                       byteorder=b_order,
+                                                       signed=b_signed))
+                        # print(f'dn: {dn}')
+                        if((0 < dn < mindn) or (maxdn < dn < 16383)):
+                            of.write((replacement).to_bytes(width,
+                                                            byteorder=b_order,
+                                                            signed=b_signed))
+                        else:
+                            of.write(byte)
+                    # Copy the suffix from each line
+                    of.write(f.read(suffix))
             # Copy the rest.
             of.write(f.read())
 
