@@ -105,9 +105,16 @@ def main():
     out_p = util.path_w_suffix(args.output, args.img)
 
     if args.cube is not None:
-        clean_from_cube(args.img, args.cube, out_p,
-                        rev=True, img=True,
-                        keep=args.keep)
+        try:
+            clean_from_cube(args.img, args.cube, out_p,
+                            rev=True, masked=True, ramp=True,
+                            buf=True, img=True, dark=True,
+                            keep=args.keep)
+        except subprocess.CalledProcessError as err:
+            print('Had an ISIS error:')
+            print(' '.join(err.cmd))
+            print(err.stdout)
+            print(err.stderr)
     else:
         clean(args.img, out_p, (500, 1500))
 
@@ -126,9 +133,9 @@ def main():
 
 
 def clean_from_cube(img_path: os.PathLike, cube_path: os.PathLike,
-                    out_path: Path, rev=False, buf=False, img=False,
-                    dark=False, keep=False):
-    temp_token = datetime.now().strftime('ImgRevClean-%y%m%d%H%M%S')
+                    out_path: Path, rev=False, masked=False, ramp=False,
+                    buf=False, img=False, dark=False, keep=False):
+    temp_token = datetime.now().strftime('BitClean-%y%m%d%H%M%S')
     to_del = isis.PathSet()
 
     cube_p = Path(cube_path)
@@ -136,8 +143,10 @@ def clean_from_cube(img_path: os.PathLike, cube_path: os.PathLike,
     higlob = to_del.add(cube_p.with_suffix(f".{temp_token}.higlob.cub"))
     util.log(isis.higlob(cube_p, to=higlob).args)
 
+    info_str = '-- clean_from_cube {} DN Window --'
+
     if rev:
-        logging.info('clean_from_cube Reverse-Clock DN Window')
+        logging.info(info_str.format('Reverse-Clock'))
         revcub = to_del.add(cube_p.with_suffix(f".{temp_token}.reverse.cub"))
         util.log(isis.crop(higlob, to=revcub, nline=20).args)
 
@@ -145,8 +154,32 @@ def clean_from_cube(img_path: os.PathLike, cube_path: os.PathLike,
     else:
         rev_tup = None
 
+    binning = int(isis.getkey_k(cube_p, 'Instrument', 'Summing'))
+    mask_lines = int(20 / binning)
+    if masked:
+        logging.info(info_str.format('Masked Pixels'))
+        maskcub = to_del.add(cube_p.with_suffix(f".{temp_token}.masked.cub"))
+        binning = int(isis.getkey_k(cube_p, 'Instrument', 'Summing'))
+        util.log(isis.crop(higlob, to=maskcub, line=21,
+                           nlines=mask_lines).args)
+
+        mask_tup = mask(maskcub, 'dummy', line=True, plot=False, keep=keep)
+    else:
+        mask_tup = None
+
+    if ramp:
+        logging.info(info_str.format('Ramp Pixels'))
+        maskcub = to_del.add(cube_p.with_suffix(f".{temp_token}.ramp.cub"))
+        tdi = int(isis.getkey_k(cube_p, 'Instrument', 'Tdi'))
+        util.log(isis.crop(higlob, to=maskcub, line=(21 + mask_lines),
+                           nlines=int(tdi / binning)).args)
+
+        ramp_tup = mask(maskcub, 'dummy', line=True, plot=False, keep=keep)
+    else:
+        ramp_tup = None
+
     if buf:
-        logging.info('clean_from_cube Buffer DN Window')
+        logging.info(info_str.format('Buffer'))
         bufcub = to_del.add(cube_p.with_suffix(f".{temp_token}.buffer.cub"))
         util.log(isis.crop(higlob, to=bufcub, samp=1, nsamp=12).args)
 
@@ -155,9 +188,9 @@ def clean_from_cube(img_path: os.PathLike, cube_path: os.PathLike,
         buf_tup = None
 
     if dark:
-        logging.info('clean_from_cube Dark DN Window')
+        logging.info(info_str.format('Dark'))
         darkcub = to_del.add(cube_p.with_suffix(f".{temp_token}.dark.cub"))
-        samples = isis.getkey_k(higlob, 'Dimensions', 'Samples')
+        samples = int(isis.getkey_k(higlob, 'Dimensions', 'Samples'))
         startsamp = samples - 15
         util.log(isis.crop(higlob, to=darkcub, samp=startsamp).args)
 
@@ -166,14 +199,14 @@ def clean_from_cube(img_path: os.PathLike, cube_path: os.PathLike,
         dark_tup = None
 
     if img:
-        logging.info('clean_from_cube Image Area DN Window')
+        logging.info(info_str.format('Image Area'))
         img_tup = mask(cube_p, 'dummy', line=False, plot=False, keep=keep)
     else:
         img_tup = None
 
     clean(img_path, out_path,
-          reverse=rev_tup, ramp=None, buf=buf_tup, image=img_tup,
-          dark=dark_tup, replacement=None)
+          reverse=rev_tup, masked=mask_tup, ramp=ramp_tup, buf=buf_tup,
+          image=img_tup, dark=dark_tup, replacement=None)
 
     if not keep:
         to_del.unlink()
@@ -264,12 +297,12 @@ def get_reverse(img_path: os.PathLike) -> list:
     return rev_list
 
 
-def clean_check(reverse, ramp, buf, image, dark,
+def clean_check(reverse, masked, ramp, buf, image, dark,
                 rr_info, img_info) -> tuple:
     """Checks various values for consistency."""
     width = None
 
-    if not any(map(isinstance, (reverse, ramp, buf, image, dark),
+    if not any(map(isinstance, (reverse, masked, ramp, buf, image, dark),
                    repeat(tuple))):
         raise ValueError("No two-tuples were given for any area.")
 
@@ -300,7 +333,7 @@ def clean_check(reverse, ramp, buf, image, dark,
 
 
 def clean(img_path: os.PathLike, out_path: os.PathLike,
-          reverse=None, ramp=None, buf=None, image=None, dark=None,
+          reverse=None, masked=None, ramp=None, buf=None, image=None, dark=None,
           replacement=None):
     """Creates a new file at *out_path* (or overwrites it) based
     on filtering the selected contents of the image.
@@ -328,8 +361,8 @@ def clean(img_path: os.PathLike, out_path: os.PathLike,
     rr_info = get_info('CALIBRATION_IMAGE', label)
     img_info = get_info('IMAGE', label)
 
-    width, b_order, b_signed = clean_check(reverse, ramp, buf, image, dark,
-                                           rr_info, img_info)
+    width, b_order, b_signed = clean_check(reverse, masked, ramp, buf, image,
+                                           dark, rr_info, img_info)
     d = decoder(
         label['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_CONVERSION_TABLE'],
         b_order, b_signed,
@@ -343,32 +376,44 @@ def clean(img_path: os.PathLike, out_path: os.PathLike,
             # Calibration Image
             of.write(f.read(rr_info['offset']))
             for lineno in range(20):
-                of.write(f.read(6))
-                for sampno in range(rr_info['prefix']
-                                    + rr_info['samples']
-                                    + rr_info['suffix']):
-                    of.write(d.process(f.read(width), reverse))
+                readwriteline(f, of, d,
+                              rr_info['prefix'], rr_info['samples'],
+                              rr_info['suffix'],
+                              reverse, reverse, reverse)
 
-            for lineno in range(rr_info['lines'] - 20):
-                of.write(f.read(6))
-                for sampno in range(rr_info['prefix']
-                                    + rr_info['samples']
-                                    + rr_info['suffix']):
-                    of.write(d.process(f.read(width), ramp))
+            mask_lines = int(
+                20 / label['INSTRUMENT_SETTING_PARAMETERS']['MRO:BINNING'])
+            for lineno in range(mask_lines):
+                readwriteline(f, of, d,
+                              rr_info['prefix'], rr_info['samples'],
+                              rr_info['suffix'],
+                              masked, masked, masked)
+
+            for lineno in range(rr_info['lines'] - 20 - mask_lines):
+                readwriteline(f, of, d,
+                              rr_info['prefix'], rr_info['samples'],
+                              rr_info['suffix'],
+                              ramp, ramp, ramp)
 
             for lineno in range(img_info['lines']):
-                of.write(f.read(6))
-                for sampno in range(img_info['prefix']):
-                    of.write(d.process(f.read(width), buf))
-
-                for sampno in range(img_info['samples']):
-                    of.write(d.process(f.read(width), image))
-
-                for sampno in range(img_info['suffix']):
-                    of.write(d.process(f.read(width), dark))
+                readwriteline(f, of, d,
+                              img_info['prefix'], img_info['samples'],
+                              img_info['suffix'],
+                              buf, image, dark)
 
             # Write the rest
             of.write(f.read())
+
+
+def readwriteline(in_f, out_f, decoder,
+                  prefix_s: int, main_s: int, suffix_s: int,
+                  prefix_p, main_p, suffix_p):
+    out_f.write(in_f.read(6))  # Line Identification bytes
+    for (samples, pair) in zip((prefix_s, main_s, suffix_s),
+                               (prefix_p, main_p, suffix_p)):
+        for sample in range(samples):
+            out_f.write(decoder.process(in_f.read(decoder.width), pair))
+    return
 
 
 def unlut(lut_table: list, pixel: int) -> int:
