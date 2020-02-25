@@ -233,6 +233,7 @@ def mask(in_path: Path, out_path: Path, line=False, plot=True, keep=False):
     hist = histogram(in_path, hist_p)
 
     median = math.trunc(float(hist['Median']))
+    logging.info(f'Median: {median}')
 
     cubenorm_stats_file = to_del.add(in_path.with_suffix('.cn.stats'))
     if line:

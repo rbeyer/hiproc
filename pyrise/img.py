@@ -20,11 +20,13 @@
 
 import argparse
 import csv
-# import logging
-from datetime import datetime
+import logging
 import os
 import statistics
 import subprocess
+
+from datetime import datetime
+from itertools import repeat
 from pathlib import Path
 
 import pvl
@@ -34,11 +36,64 @@ import pyrise.util as util
 from pyrise.bitflips import mask
 
 
+class decoder:
+
+    def __init__(self, lut, b_order, b_signed, min_dn, max_dn,
+                 width, replacement=None):
+        self.b_order = b_order
+        self.b_signed = b_signed
+        self.min_dn = min_dn
+        self.max_dn = max_dn
+        self.width = width
+
+        if replacement is None:
+            if self.width == 1:  # 8 bit
+                replacement = 255
+            elif self.width == 2:  # 16 bit
+                replacement = -1
+            else:
+                raise ValueError("Don't know how to set NULL value for "
+                                 f"bit-width {width}")
+        self.replacement = replacement.to_bytes(self.width,
+                                                byteorder=self.b_order,
+                                                signed=self.b_signed)
+
+        # Pre-compute the lookups:
+        self.lut_table = list()
+        for pair in lut:
+            self.lut_table.append(int(statistics.mean(pair)))
+
+        # Ensure the first element is zero.
+        if lut[0][0] == 0:
+            self.lut_table[0] = 0
+        else:
+            ValueError(f"The first LUT pair doesn't have a zero: {lut[0]}")
+
+    def unlut(self, pixel: int) -> int:
+        if len(self.lut_table) == 1:
+            # That means there's a single pair "(0, 0)" which indicates
+            # that no lut has been applied, so this function should no-op.
+            return pixel
+
+        return self.lut_table[pixel]
+
+    def process(self, byte, area):
+        dn = self.unlut(int.from_bytes(byte,
+                                       byteorder=self.b_order,
+                                       signed=self.b_signed))
+
+        if(area is not None and ((self.min_dn < dn < area[0])
+                                 or (area[1] < dn < self.max_dn))):
+            return self.replacement
+        else:
+            return byte
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()])
     parser.add_argument('-o', '--output',
-                        required=False, default='.clean.IMG')
+                        required=False, default='.bitclean.IMG')
     parser.add_argument('-c', '--cube', required=False)
     parser.add_argument('img', metavar="some.img-file",
                         help='A HiRISE EDR.img file.')
@@ -50,9 +105,11 @@ def main():
     out_p = util.path_w_suffix(args.output, args.img)
 
     if args.cube is not None:
-        filter_reverse_cube(args.img, args.cube, out_p, keep=args.keep)
+        clean_from_cube(args.img, args.cube, out_p,
+                        rev=True, img=True,
+                        keep=args.keep)
     else:
-        filter_reverse(args.img, out_p, 500, 1500)
+        clean(args.img, out_p, (500, 1500))
 
     # rev = get_reverse(args.img)
 
@@ -68,8 +125,9 @@ def main():
     return
 
 
-def filter_reverse_cube(img_path: os.PathLike, cube_path: os.PathLike,
-                        out_path: Path, keep=False):
+def clean_from_cube(img_path: os.PathLike, cube_path: os.PathLike,
+                    out_path: Path, rev=False, buf=False, img=False,
+                    dark=False, keep=False):
     temp_token = datetime.now().strftime('ImgRevClean-%y%m%d%H%M%S')
     to_del = isis.PathSet()
 
@@ -78,12 +136,44 @@ def filter_reverse_cube(img_path: os.PathLike, cube_path: os.PathLike,
     higlob = to_del.add(cube_p.with_suffix(f".{temp_token}.higlob.cub"))
     util.log(isis.higlob(cube_p, to=higlob).args)
 
-    reverse = to_del.add(cube_p.with_suffix(f".{temp_token}.reverse.cub"))
-    util.log(isis.crop(higlob, to=reverse, nline=20).args)
+    if rev:
+        logging.info('clean_from_cube Reverse-Clock DN Window')
+        revcub = to_del.add(cube_p.with_suffix(f".{temp_token}.reverse.cub"))
+        util.log(isis.crop(higlob, to=revcub, nline=20).args)
 
-    mindn, maxdn = mask(reverse, 'dummy', line=True, plot=False, keep=keep)
-    # filter_reverse(cube_path, out_path, mindn, maxdn)
-    filter_reverse(img_path, out_path, mindn, maxdn)
+        rev_tup = mask(revcub, 'dummy', line=True, plot=False, keep=keep)
+    else:
+        rev_tup = None
+
+    if buf:
+        logging.info('clean_from_cube Buffer DN Window')
+        bufcub = to_del.add(cube_p.with_suffix(f".{temp_token}.buffer.cub"))
+        util.log(isis.crop(higlob, to=bufcub, samp=1, nsamp=12).args)
+
+        buf_tup = mask(bufcub, 'dummy', line=False, plot=False, keep=keep)
+    else:
+        buf_tup = None
+
+    if dark:
+        logging.info('clean_from_cube Dark DN Window')
+        darkcub = to_del.add(cube_p.with_suffix(f".{temp_token}.dark.cub"))
+        samples = isis.getkey_k(higlob, 'Dimensions', 'Samples')
+        startsamp = samples - 15
+        util.log(isis.crop(higlob, to=darkcub, samp=startsamp).args)
+
+        dark_tup = mask(darkcub, 'dummy', line=False, plot=False, keep=keep)
+    else:
+        dark_tup = None
+
+    if img:
+        logging.info('clean_from_cube Image Area DN Window')
+        img_tup = mask(cube_p, 'dummy', line=False, plot=False, keep=keep)
+    else:
+        img_tup = None
+
+    clean(img_path, out_path,
+          reverse=rev_tup, ramp=None, buf=buf_tup, image=img_tup,
+          dark=dark_tup, replacement=None)
 
     if not keep:
         to_del.unlink()
@@ -110,23 +200,35 @@ def get_info(name: str, label: dict) -> dict:
                 "Don't know how to handle '{}'".format(
                     label[name]['SAMPLE_BITS']) +
                 f"as a value of SAMPLE_BITS in {name}, should be 8 or 16.")
-    elif 'COLUMN' in label[name]:
-        for t in label[name].getlist('COLUMN'):
-            if 'Pixels' in t['NAME']:
-                info['width'] = t['ITEM_BYTES']
+    # elif 'COLUMN' in label[name]:
+    #     for t in label[name].getlist('COLUMN'):
+    #         if 'Pixels' in t['NAME']:
+    #             info['width'] = t['ITEM_BYTES']
     else:
         raise ValueError("Can't determine how to set the width.")
 
     if label['CALIBRATION_IMAGE']['SAMPLE_TYPE'].startswith('MSB'):
         info['b_order'] = 'big'
+    else:
+        info['b_order'] = 'little'
 
     if 'UNSIGNED' in label['CALIBRATION_IMAGE']['SAMPLE_TYPE']:
         info['b_signed'] = False
+    else:
+        info['b_signed'] = True
 
     info['lines'] = label[name]['LINES']
     info['samples'] = label[name]['LINE_SAMPLES']
-    info['prefix'] = label[name]['LINE_PREFIX_BYTES']
-    info['suffix'] = label[name]['LINE_SUFFIX_BYTES']
+
+    if label[name]['LINE_PREFIX_BYTES'] == 18:
+        info['prefix'] = 12
+    else:
+        raise Exception()
+
+    if label[name]['LINE_SUFFIX_BYTES'] == 16:
+        info['suffix'] = 16
+    else:
+        raise Exception()
 
     return info
 
@@ -162,16 +264,51 @@ def get_reverse(img_path: os.PathLike) -> list:
     return rev_list
 
 
-def filter(img_path: os.PathLike, out_path: os.PathLike,
-           reverse=None, buf=None, image=None, dark=None,
-           replacement=None):
+def clean_check(reverse, ramp, buf, image, dark,
+                rr_info, img_info) -> tuple:
+    """Checks various values for consistency."""
+    width = None
+
+    if not any(map(isinstance, (reverse, ramp, buf, image, dark),
+                   repeat(tuple))):
+        raise ValueError("No two-tuples were given for any area.")
+
+    w_set = set(i['width'] for i in (rr_info, img_info))
+    if len(w_set) == 1:
+        width = w_set.pop()
+    else:
+        raise ValueError("The different areas have different bit-widths: "
+                         f"{w_set}")
+
+    image_offset = img_info['offset']
+
+    o_set = set(i['b_order'] for i in (rr_info, img_info))
+    if len(o_set) == 1:
+        b_order = o_set.pop()
+    else:
+        raise ValueError("The different areas have different byte orders: "
+                         f"{o_set}")
+
+    s_set = set(i['b_signed'] for i in (rr_info, img_info))
+    if len(s_set) == 1:
+        b_signed = s_set.pop()
+    else:
+        raise ValueError("The different areas have different signed bytes: "
+                         f"{s_set}")
+
+    return width, b_order, b_signed
+
+
+def clean(img_path: os.PathLike, out_path: os.PathLike,
+          reverse=None, ramp=None, buf=None, image=None, dark=None,
+          replacement=None):
     """Creates a new file at *out_path* (or overwrites it) based
     on filtering the selected contents of the image.
 
-    The four 'areas' are indicated by the *reverse*, *buf*, *image*,
-    and *dark* arguments.  If they are ``None`` then that area will
-    not be altered.  Otherwise, they should be a two-tuple of ``int``
-    values that define a low and a high DN value.
+    The five 'areas' are indicated by the *reverse*, *ramp*, *buf*,
+    *image*, and *dark* arguments.  If they are ``None`` then that
+    area will not be altered.  Otherwise, they should be a two-tuple
+    of ``int`` values that define a low and a high DN value.
 
     For each area that is not ``None``, the pixels are examined and
     unlutted to 14-bit HiRISE DN values.  If the DN value isn't a
@@ -187,70 +324,50 @@ def filter(img_path: os.PathLike, out_path: os.PathLike,
     *out_path* should otherwise be identical to the file given by
     *img_path*.
     """
-    if not all(map(isinstance, (reverse, buf, image, dark), repeat(tuple))):
-        raise ValueError("No two-tuples were given for any area.")
-
     label = pvl.load(img_path)
-    lut = label['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_CONVERSION_TABLE']
-
-    rev_info = get_info('CALIBRATION_IMAGE', label)
-    rev_info['lines'] = 20
-
-    buf_info = get_info('LINE_PREFIX_TABLE', label)
+    rr_info = get_info('CALIBRATION_IMAGE', label)
     img_info = get_info('IMAGE', label)
-    dark_info = get_info('LINE_SUFFIX_TABLE', label)
 
-    w_set = set(i['width'] for i in (rev_info, buf_info, img_info, dark_info))
-    if len(w_set) == 1:
-        width = w_set[0]
-    else:
-        raise ValueError("The different areas have different bit-widths: "
-                         f"{w_set}")
-
-    if replacement is None:
-        if width == 1:  # 8 bit
-            replacement = 255
-        elif width == 2:  # 16 bit
-            replacement = -1
-        else:
-            raise ValueError("Don't know how to set NULL value for bit-width "
-                             f"{width}")
-
-    if(buf_info['offset'] == img_info['offset']
-       and img_info['offset'] == dark_info['offset']):
-        image_offset = img_info['offset']
-    else:
-        raise ValueError("The offsets for the buffer, image, and dark areas "
-                         "should all be the same, but they're not.")
+    width, b_order, b_signed = clean_check(reverse, ramp, buf, image, dark,
+                                           rr_info, img_info)
+    d = decoder(
+        label['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_CONVERSION_TABLE'],
+        b_order, b_signed,
+        0, 16383,  # min and max of the allowable 14-bit range
+        width, replacement)
 
     # print(f'mindn: {mindn}, maxdn: {maxdn}')
     with open(img_path, mode='rb') as f:
         with open(out_path, mode='wb') as of:
             # Copy the data from beginning to the beginning of the
             # Calibration Image
-            of.write(f.read(rev_info['offset']))
-            if reverse is None:
-                of.write(f.read(image_offset - rev_info['offset']))
-            else:
-                for lineno in range(lines):
-                    # Copy the prefix from each line
-                    of.write(f.read(prefix))
-                    # This is the meat:
-                    for sampno in range(samples):
-                        byte = f.read(width)
-                        dn = unlut(lut, int.from_bytes(byte,
-                                                       byteorder=b_order,
-                                                       signed=b_signed))
-                        # print(f'dn: {dn}')
-                        if((0 < dn < mindn) or (maxdn < dn < 16383)):
-                            of.write((replacement).to_bytes(width,
-                                                            byteorder=b_order,
-                                                            signed=b_signed))
-                        else:
-                            of.write(byte)
-                    # Copy the suffix from each line
-                    of.write(f.read(suffix))
-            # Copy the rest.
+            of.write(f.read(rr_info['offset']))
+            for lineno in range(20):
+                of.write(f.read(6))
+                for sampno in range(rr_info['prefix']
+                                    + rr_info['samples']
+                                    + rr_info['suffix']):
+                    of.write(d.process(f.read(width), reverse))
+
+            for lineno in range(rr_info['lines'] - 20):
+                of.write(f.read(6))
+                for sampno in range(rr_info['prefix']
+                                    + rr_info['samples']
+                                    + rr_info['suffix']):
+                    of.write(d.process(f.read(width), ramp))
+
+            for lineno in range(img_info['lines']):
+                of.write(f.read(6))
+                for sampno in range(img_info['prefix']):
+                    of.write(d.process(f.read(width), buf))
+
+                for sampno in range(img_info['samples']):
+                    of.write(d.process(f.read(width), image))
+
+                for sampno in range(img_info['suffix']):
+                    of.write(d.process(f.read(width), dark))
+
+            # Write the rest
             of.write(f.read())
 
 
