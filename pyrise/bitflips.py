@@ -309,10 +309,16 @@ def find_minima_index(central_idx: int, limit_idx: int,
 
 
 def find_smart_window(hist: list, mindn: int, maxdn: int,
-                      centraldn: int, plot=False) -> tuple:
+                      centraldn: int, central_exclude_dn=0,
+                      plot=False) -> tuple:
     '''Returns a minimum and maximum DN value from hist which are
        based on using the find_minima_index() function with the
        given mindn, maxdn, and centraldn values.
+
+       If *central_exclude_dn* is given, the returned minimum and
+       maximum DN are guaranteed to be at least *central_exclude_dn*
+       away from *centraldn*.  This is useful if you don't want returned
+       minimum and maximum DN to be too close to the *centraldn*.
 
        If plot is True, this function will display a plot describing
        its work.  The curve represents the hist values, the shaded
@@ -325,14 +331,27 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
     pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
     dn = np.fromiter((int(x.DN) for x in hist_list), int)
 
+    # print(f'mindn {mindn}')
+    # print(f'maxdn {maxdn}')
+
     mindn_i = (np.abs(dn - mindn)).argmin()
     maxdn_i = (np.abs(dn - maxdn)).argmin()
     central_i = np.where(dn == centraldn)
+    # print(f'centraldn: {centraldn}')
+    # print(f'central_exclude_dn: {central_exclude_dn}')
+    central_min_i = (np.abs(dn - (centraldn - central_exclude_dn))).argmin()
+    central_max_i = (np.abs(dn - (centraldn + central_exclude_dn))).argmin()
 
     minima_i, _ = find_peaks(np.negative(pixel_counts))
 
-    min_i = find_minima_index(central_i, mindn_i, minima_i, pixel_counts)
-    max_i = find_minima_index(central_i, maxdn_i, minima_i, pixel_counts)
+    # print(f'central_i {central_i}')
+    # print(f'central_min_i {central_min_i}')
+    # print(f'central_max_i {central_max_i}')
+    # print(f'mindn_i {mindn_i}')
+    # print(f'maxdn_i {maxdn_i}')
+
+    min_i = find_minima_index(central_min_i, mindn_i, minima_i, pixel_counts)
+    max_i = find_minima_index(central_max_i, maxdn_i, minima_i, pixel_counts)
     logging.info(f'DN window: {dn[min_i]}, {dn[max_i]}')
 
     if plot:

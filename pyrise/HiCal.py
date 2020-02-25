@@ -855,7 +855,13 @@ def analyze_cubenorm_stats2(statsfile: os.PathLike, central: float,
     mindn = central - (width * medstd)
     maxdn = central + (width * medstd)
 
-    return find_smart_window(hist, mindn, maxdn, central, plot=plot)
+    # We want to ignore minima that are too close to the central value.
+    # Sometimes the medstd is a good choice, sometimes 32 DN (which is a
+    # minimal bit flip level) is better, so use the greatest:
+    ex = max(medstd, 32)
+
+    return find_smart_window(hist, mindn, maxdn, central,
+                             central_exclude_dn=ex, plot=plot)
 
 
 def HiGainFx(cube: os.PathLike, outcube: os.PathLike,
