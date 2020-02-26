@@ -94,7 +94,10 @@ def main():
                                      parents=[util.parent_parser()])
     parser.add_argument('-o', '--output',
                         required=False, default='.bitclean.IMG')
-    parser.add_argument('-c', '--cube', required=False)
+    parser.add_argument('-i', '--img', required=False, action='store_true',
+                        help='Run bitflip cleaning on the image area.')
+    parser.add_argument('-c', '--cube', required=False,
+                        help='Cube to use to gather statistics from.')
     parser.add_argument('img', metavar="some.img-file",
                         help='A HiRISE EDR.img file.')
 
@@ -108,7 +111,7 @@ def main():
         try:
             clean_from_cube(args.img, args.cube, out_p,
                             rev=True, masked=True, ramp=True,
-                            buf=True, img=True, dark=True,
+                            buf=True, img=args.img, dark=True,
                             keep=args.keep)
         except subprocess.CalledProcessError as err:
             print('Had an ISIS error:')
