@@ -16,7 +16,7 @@ of two things, it will either attempt to un-flip the bits on
 the bit-flipped pixels or it will attempt to mask them out.
 """
 
-# Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
+# Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,8 +30,8 @@ the bit-flipped pixels or it will attempt to mask them out.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on clean_bit_flips.pro by Alan Delamere, Oct 2019.
-
+# This program was originally inspired by clean_bit_flips.pro by Alan Delamere,
+# Oct 2019, but was written from scratch.
 
 import argparse
 import itertools

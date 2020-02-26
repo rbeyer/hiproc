@@ -3,7 +3,13 @@
 a simple text data file that can be plotted.
 """
 
-# Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
+# Copyright 2004-2020, Arizona Board of Regents on behalf of the Lunar and
+# Planetary Laboratory at the University of Arizona.
+#   - Orignal Java programs.
+#
+# Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
+#   - Elements of this Python program are are based on the original Java
+#     but the logic here is rewritten from scratch to emulate functionality.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,21 +22,13 @@ a simple text data file that can be plotted.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-# This program is based on HiColor version 1.99 2017/10/10
-# and on the Java programs
-#   JitPlot: $Id: JitPlot.java,v 1.7 2013/01/02 18:31:38 guym Exp $
-# and
-#   JitParser: $Id: JitParser.java,v 1.9 2013/04/29 20:55:55 guym Exp $
-# by Guy McArthur
-# which are Copyright(C) 2004 Arizona Board of Regents, under the GNU GPL.
 #
-# Since that suite of software is under the GPL, none of it can be directly
-# incorporated in this program, since I wish to distribute this software
-# under the Apache 2 license.  Elements of this software (written in an
-# entirely different language) are based on that software but rewritten
-# from scratch to emulate functionality.
+# This program is based on HiColor version 5.4.2 (2020/02/14)
+# and on the Java programs:
+# - JitPlot.java ($Id: JitPlot.java,v 1.9 2020/02/14 22:46:48 $)
+# - JitParser.java ($Id: JitParser.java,v 1.12 2020/02/14 22:46:48 $)
+# by Guy McArthur and Michael Wendell as employees of the University of
+# Arizona.
 
 import argparse
 import logging

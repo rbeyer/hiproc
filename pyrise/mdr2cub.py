@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Convert one of Alan's MDR files (in DN or I/F) to a cube file (in I/F)."""
 
-# Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
+# Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,10 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 # This program is based on equations in make_IOF.pro, by Alan Delamere,
-# and on equations in the ISIS program hical.
-# 2019-05-22.
+# 2019-05-22, and on equations in the public domain ISIS program hical.
 
 import argparse
 import collections

@@ -1,7 +1,14 @@
 #!/usr/bin/env python
 """SlitherStats computes statistics from the results of HiSlither."""
 
-# Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
+# Copyright 2004-2020, Arizona Board of Regents on behalf of the Lunar and
+# Planetary Laboratory at the University of Arizona.
+#   - Orignal Perl and Octave programs.
+#
+# Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
+#   - Elements of this Python program are are based on the original Perl
+#     and Octave but the logic here is rewritten from scratch to emulate
+#     functionality.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,20 +21,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-# This program is based on HiColor version 1.102 2019/09/30
-# The SlitherStats Perl program $Revision: 1.6 $ $Date: 2019/09/30 21:20:03 $
-# and on the Octave program
-#   readSlitherPolyfit_octave.m $Id: v 1.2 2015/07/31 21:04:11 audrie Exp $
-# by Sarah Sutton and Audrie Fennema
-# which are presumably Copyright(C) Arizona Board of Regents, under the GNU GPL.
 #
-# Since that suite of software is under the GPL, none of it can be directly
-# incorporated in this program, since I wish to distribute this software
-# under the Apache 2 license.  Elements of this software (written in an entirely
-# different language) are based on that software but rewritten from scratch to
-# emulate functionality.
+# This program is based on HiColor version 5.4.2 (2020/02/14),
+# the SlitherStats Perl program ($Revision: 1.7 $ $Date: 2020/02/14 22:46:49 $)
+# and on the Octave program
+# readSlitherPolyfit_octave.m ($Id: v 1.5 2020/02/14 23:35:23 $)
+# by Sarah Sutton and Audrie Fennema as employees of the University of Arizona.
 
 import argparse
 import csv

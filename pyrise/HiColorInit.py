@@ -1,7 +1,13 @@
 #!/usr/bin/env python
 """Prepares an observation for color co-registration and processing."""
 
-# Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
+# Copyright 2007-2020, Arizona Board of Regents on behalf of the Lunar and
+# Planetary Laboratory at the University of Arizona.
+#   - Orignal Perl program.
+#
+# Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
+#   - Elements of this Python program are are based on the original Perl
+#     but the logic here is rewritten from scratch to emulate functionality.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,19 +20,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-# This program is based on HiColor version 1.99 2017/10/10
-# and on the Perl HiColorInit program: ($Revision: 1.37 $
-#                                       $Date: 2011/01/31 20:10:26 $)
-# by Guy McArthur
-# which is Copyright(C) 2007 Arizona Board of Regents, under the GNU GPL.
 #
-# Since that suite of software is under the GPL, none of it can be directly
-# incorporated in this program, since I wish to distribute this software
-# under the Apache 2 license.  Elements of this software (written in an
-# entirely different language) are based on that software but rewritten
-# from scratch to emulate functionality.
+# This program is based on HiColor version 5.4.2 (2020/02/14)
+# and on the Perl HiColorInit program ($Revision: 1.38 $
+#                                      $Date: 2020/02/14 22:46:48 $)
+# by Guy McArthur as an employee of the University of Arizona.
 
 import argparse
 import logging

@@ -3,7 +3,7 @@
 
 """Tests for the `utils` module."""
 
-# Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
+# Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

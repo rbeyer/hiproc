@@ -2,7 +2,13 @@
 """Resamples images from individual CCDs to ideal camera geometry and
 mosaicks them into a single cube."""
 
-# Copyright 2019, Ross A. Beyer (rbeyer@seti.org)
+# Copyright 2008-2020, Arizona Board of Regents on behalf of the Lunar and
+# Planetary Laboratory at the University of Arizona.
+#   - Orignal Perl program.
+#
+# Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
+#   - Elements of this Python program are are based on the original Perl
+#     but the logic here is rewritten from scratch to emulate functionality.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,23 +21,14 @@ mosaicks them into a single cube."""
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-# This program is based on HiPrecision version 1.20 2017/07/19
-# on the Perl HiPrecisionInit program: (Revision: 1.27 $ $Date: 2017/08/30)
-# by Audrie Fennema and Sarah Mattson
-# which is Copyright(C) 2008 Arizona Board of Regents, under the GNU GPL.
-# And on the Perl ResolveJitter program: (Revision: 1.24 $ $Date: 2017/11/08)
-# by Sarah Mattson and Audrie Fennema
-# And on the Perl HiJACK program: (Revision: 1.22 $ $Date: 2018/09/27)
-# by Audrie Fennema and Sarah Mattson
-# which is Copyright(C) 2008 Arizona Board of Regents, under the GNU GPL.
 #
-# Since that suite of software is under the GPL, none of it can be directly
-# incorporated in this program, since I wish to distribute this software
-# under the Apache 2 license.  Elements of this software (written in an entirely
-# different language) are based on that software but rewritten from scratch to
-# emulate functionality.
+# This program is based on HiPrecision version 3.2.1 (2020/02/15),
+# and the following Perl Programs:
+# - HiPrecisionInit ($Revision: 1.28 $ $Date: 2020/02/15 00:36:20 $)
+# - ResolveJitter ($Revision: 1.25 $ $Date: 2020/02/15 00:36:20 $)
+# - HiJACK ($Revision: 1.23 $ $Date: 2020/02/15 00:36:19 $)
+# by Audrie Fennema and Sarah Mattson as employees of the University of
+# Arizona.
 
 import argparse
 import csv

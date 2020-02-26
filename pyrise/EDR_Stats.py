@@ -14,21 +14,30 @@ reproduced here:
 * Calculate the Signal-to-Noise Ratio (SNR).
 """
 
-# Copyright 2019-2020, Ross A. Beyer (rbeyer@seti.org)
+# Copyright 2004-2020, Arizona Board of Regents on behalf of the Lunar and
+# Planetary Laboratory at the University of Arizona.
+#   - Orignal Perl program.
 #
-# Reuse is permitted under the terms of the license.
-# The LICENSE file is at the top level of this library.
+# Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
+#   - Elements of this Python program are are based on the original Perl
+#     but the logic here is rewritten from scratch to emulate functionality.
 #
-# This program is based on EDR_Stats version 2.16.1 (2016/06/16),
-# and on the Perl EDR_Stats program: ($Revision: 1.38 $
-#                                     $Date: 2016/08/16 23:43:17 $)
-# by Eric Eliason and Audrie Fennema
-# which is Copyright(C) 2004 Arizona Board of Regents, under the GNU GPL.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# Since that suite of software is under the GPL, none of it can be
-# directly incorporated in this program.  Elements of this software
-# (written in an entirely different language) are based on that
-# software but rewritten from scratch to emulate functionality.
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# This Python program is based on EDR_Stats version 2.16.2 (2020/02/14)
+# and on the Perl EDR_Stats program ($Revision: 1.39 $
+#                                    $Date: 2020/02/14 17:36:39$)
+# by Eric Eliason and Audrie Fennema as employees of the University of Arizona.
 
 import argparse
 import hashlib
