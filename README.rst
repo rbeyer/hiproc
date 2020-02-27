@@ -38,6 +38,13 @@ However, it does depend on the pvl library (https://pvl.readthedocs.io),
 the kalasiris library (https://kalasiris.readthedocs.io), numpy, scipy, and
 matplotlib.
 
+The HiJACK program also requires an external ``resolveJitter``
+program that has not been publicly released, but isn't that far
+off.  There is a MATLAB version that has the appropriate licensing,
+and there is a C++ version.  The C++ version could also be made to
+have the appropriate licensing, it just hasn't gone through a release
+process.  Maybe we'll write it in Python, too, and distribute it here.
+
 Details
 -------
 The image processing pipelines that the HiRISE team operates
