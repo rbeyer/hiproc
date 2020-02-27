@@ -268,6 +268,8 @@ def find_minima_index(central_idx: int, limit_idx: int,
        If no minima_idx values are found in the range, the next value in
        minima_idx past the limit_idx will be returned.
     '''
+    # print(f'central_idx: {central_idx}')
+    # print(f'limit_idx: {limit_idx}')
     info_str = 'Looking for {} {} range ...'
     try:
         if limit_idx < central_idx:
@@ -275,11 +277,13 @@ def find_minima_index(central_idx: int, limit_idx: int,
             inrange_iter = filter(lambda i: i < central_idx and i >= limit_idx,
                                   minima_idxs)
             select_idx = 0
-        else:
+        elif limit_idx > central_idx:
             logging.info(info_str.format('max', 'inside'))
             inrange_iter = filter(lambda i: i > central_idx and i <= limit_idx,
                                   minima_idxs)
             select_idx = -1
+        else:
+            raise ValueError
 
         inrange_i = np.fromiter(inrange_iter, int)
         logging.info(str(inrange_i) + ' are the indexes inside the range.')
@@ -295,9 +299,11 @@ def find_minima_index(central_idx: int, limit_idx: int,
             if limit_idx < central_idx:
                 logging.info(info_str.format('min', 'outside'))
                 idx = max(filter(lambda i: i < limit_idx, minima_idxs))
-            else:
+            elif limit_idx > central_idx:
                 logging.info(info_str.format('max', 'outside'))
                 idx = min(filter(lambda i: i > limit_idx, minima_idxs))
+            else:
+                raise ValueError
 
             logging.info(f'{idx} is the minimum index.')
         except ValueError:
