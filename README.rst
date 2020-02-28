@@ -19,9 +19,9 @@ pyrise
 A library to help process HiRISE EDRs with ISIS.
 
 
-* Free software: BSD license
+* Free software: Apache 2 License
 .. * Documentation: https://pyrise.readthedocs.io.
-* `PlanetaryPy`_ Affiliate Package (someday).
+.. * `PlanetaryPy`_ Affiliate Package (someday).
 
 
 Features
@@ -34,9 +34,12 @@ External Dependencies
 ---------------------
 These programs use as much 'vanilla' Python 3 as possible.
 
-However, it does depend on the pvl library (https://pvl.readthedocs.io),
-the kalasiris library (https://kalasiris.readthedocs.io), numpy, scipy, and
-matplotlib.
+However, it does depend on the following:
+- pvl library (https://pvl.readthedocs.io)
+- kalasiris library (https://kalasiris.readthedocs.io)
+- numpy
+- scipy
+- matplotlib
 
 The HiJACK program also requires an external ``resolveJitter``
 program that has not been publicly released, but isn't that far
@@ -44,6 +47,18 @@ off.  There is a MATLAB version that has the appropriate licensing,
 and there is a C++ version.  The C++ version could also be made to
 have the appropriate licensing, it just hasn't gone through a release
 process.  Maybe we'll write it in Python, too, and distribute it here.
+
+Warning !
+---------
+
+The algorithms based on the HiRISE Processing Pipelines were emulated
+and tested locally, but the results of each pipeline **have not**
+been tested directly against the results of the HiRISE Processing
+Pipelines, and this warning will remain until we have done so.  As
+a result, I would not particularly 'trust' anything produced by
+these programs at this time, and consider these algorithms a
+work-in-progress.
+
 
 Details
 -------
@@ -63,7 +78,7 @@ However, that same complexity makes it difficult to reproduce exactly
 what that system is doing on a small scale.
 
 The programs here are meant to replicate the HiRISE processing chain
-on a small scale, so that individual algorithms and processes can
+on a local scale, so that individual algorithms and processes can
 be investigated, without needing a massive data processing system and
 lots of infrastructure.
 
