@@ -29,8 +29,11 @@ from datetime import datetime
 from itertools import repeat
 from pathlib import Path
 
+import numpy as np
 import pvl
 import kalasiris as isis
+
+from scipy import interpolate
 
 import pyrise.util as util
 from pyrise.bitflips import mask
@@ -54,14 +57,14 @@ class decoder:
             else:
                 raise ValueError("Don't know how to set NULL value for "
                                  f"bit-width {width}")
-        self.replacement = replacement.to_bytes(self.width,
-                                                byteorder=self.b_order,
-                                                signed=self.b_signed)
+        self.replacement = self.to_bytes(replacement)
 
         # Pre-compute the lookups:
         self.lut_table = list()
         for pair in lut:
             self.lut_table.append(int(statistics.mean(pair)))
+
+        self.lut = lut
 
         # Ensure the first element is zero.
         if lut[0][0] == 0:
@@ -77,16 +80,35 @@ class decoder:
 
         return self.lut_table[pixel]
 
-    def process(self, byte, area):
-        dn = self.unlut(int.from_bytes(byte,
-                                       byteorder=self.b_order,
-                                       signed=self.b_signed))
+    def lookup(self, dn: int) -> int:
+        for i, pair in enumerate(self.lut):
+            if dn >= pair[0] and dn <= pair[1]:
+                return i
+
+        return 255
+
+    def from_bytes(self, byte: bytes) -> int:
+        return int.from_bytes(byte, byteorder=self.b_order,
+                              signed=self.b_signed)
+
+    def to_bytes(self, i: int) -> bytes:
+        return i.to_bytes(self.width, byteorder=self.b_order,
+                          signed=self.b_signed)
+
+    def process(self, byte, area, return_byte=True):
+        dn = self.unlut(self.from_bytes(byte))
 
         if(area is not None and ((self.min_dn < dn < area[0])
                                  or (area[1] < dn < self.max_dn))):
-            return self.replacement
+            if return_byte:
+                return self.replacement
+            else:
+                return self.from_bytes(self.replacement)
         else:
-            return byte
+            if return_byte:
+                return byte
+            else:
+                return dn
 
 
 def main():
@@ -96,6 +118,8 @@ def main():
                         required=False, default='.bitclean.IMG')
     parser.add_argument('-i', '--img', required=False, action='store_true',
                         help='Run bitflip cleaning on the image area.')
+    parser.add_argument('-f', '--fit', required=False, action='store_true',
+                        help='Run spline fit zeros and bitflips in rev-clock.')
     parser.add_argument('-c', '--cube', required=False,
                         help='Cube to use to gather statistics from.')
     parser.add_argument('img', metavar="some.img-file",
@@ -112,7 +136,7 @@ def main():
             clean_from_cube(args.img, args.cube, out_p,
                             rev=True, masked=True, ramp=True,
                             buf=True, img=args.img, dark=True,
-                            keep=args.keep)
+                            fit=args.fit, keep=args.keep)
         except subprocess.CalledProcessError as err:
             print('Had an ISIS error:')
             print(' '.join(err.cmd))
@@ -137,7 +161,7 @@ def main():
 
 def clean_from_cube(img_path: os.PathLike, cube_path: os.PathLike,
                     out_path: Path, rev=False, masked=False, ramp=False,
-                    buf=False, img=False, dark=False, keep=False):
+                    buf=False, img=False, dark=False, fit=False, keep=False):
     temp_token = datetime.now().strftime('BitClean-%y%m%d%H%M%S')
     to_del = isis.PathSet()
 
@@ -209,7 +233,7 @@ def clean_from_cube(img_path: os.PathLike, cube_path: os.PathLike,
 
     clean(img_path, out_path,
           reverse=rev_tup, masked=mask_tup, ramp=ramp_tup, buf=buf_tup,
-          image=img_tup, dark=dark_tup, replacement=None)
+          image=img_tup, dark=dark_tup, replacement=None, fit=fit)
 
     if not keep:
         to_del.unlink()
@@ -337,7 +361,7 @@ def clean_check(reverse, masked, ramp, buf, image, dark,
 
 def clean(img_path: os.PathLike, out_path: os.PathLike,
           reverse=None, masked=None, ramp=None, buf=None, image=None, dark=None,
-          replacement=None):
+          replacement=None, fit=False):
     """Creates a new file at *out_path* (or overwrites it) based
     on filtering the selected contents of the image.
 
@@ -378,11 +402,17 @@ def clean(img_path: os.PathLike, out_path: os.PathLike,
             # Copy the data from beginning to the beginning of the
             # Calibration Image
             of.write(f.read(rr_info['offset']))
-            for lineno in range(20):
-                readwriteline(f, of, d,
-                              rr_info['prefix'], rr_info['samples'],
-                              rr_info['suffix'],
-                              reverse, reverse, reverse)
+            if fit:
+                readwritebox(f, of, d,
+                             (rr_info['prefix'] + rr_info['samples'] +
+                              rr_info['suffix']),
+                             20, reverse, fit=True)
+            else:
+                for lineno in range(20):
+                    readwriteline(f, of, d,
+                                  rr_info['prefix'], rr_info['samples'],
+                                  rr_info['suffix'],
+                                  reverse, reverse, reverse, main_fit=fit)
 
             mask_lines = int(
                 20 / label['INSTRUMENT_SETTING_PARAMETERS']['MRO:BINNING'])
@@ -410,13 +440,82 @@ def clean(img_path: os.PathLike, out_path: os.PathLike,
 
 def readwriteline(in_f, out_f, decoder,
                   prefix_s: int, main_s: int, suffix_s: int,
-                  prefix_p, main_p, suffix_p):
+                  prefix_p, main_p, suffix_p,
+                  prefix_fit=False, main_fit=False, suffix_fit=False):
     out_f.write(in_f.read(6))  # Line Identification bytes
-    for (samples, pair) in zip((prefix_s, main_s, suffix_s),
-                               (prefix_p, main_p, suffix_p)):
-        for sample in range(samples):
-            out_f.write(decoder.process(in_f.read(decoder.width), pair))
+    for (samples, pair, fit) in zip((prefix_s, main_s, suffix_s),
+                                    (prefix_p, main_p, suffix_p),
+                                    (prefix_fit, main_fit, suffix_fit)):
+        if fit:
+            line_int_values = list()
+            for sample in range(samples):
+                line_int_values.append(
+                    decoder.process(in_f.read(decoder.width), pair,
+                                    return_byte=False))
+
+            # print(line_int_values)
+            # print(len(line_int_values))
+            line_int_array = np.array(line_int_values)
+
+            dn_arr = np.where(
+                line_int_array != decoder.from_bytes(decoder.replacement),
+                line_int_array, 0)
+
+            non_zero_idx = np.nonzero(dn_arr)[0]
+            zero_idx = np.where(dn_arr == 0)[0]
+            # print(non_zero_idx)
+            # print(line_int_array[non_zero_idx])
+            # print(zero_idx)
+            if zero_idx.size != 0:
+                tck = interpolate.splrep(non_zero_idx,
+                                         dn_arr[non_zero_idx])
+
+                ynew = interpolate.splev(zero_idx, tck)
+
+                np.put(dn_arr, zero_idx, ynew.astype(int))
+                # print(line_int_array)
+            for sample in dn_arry.astype(int):
+                out_f.write(decoder.to_bytes(decoder.lookup(sample)))
+        else:
+            for sample in range(samples):
+                out_f.write(decoder.process(in_f.read(decoder.width), pair))
     return
+
+
+def readwritebox(in_f, out_f, decoder,
+                 samples: int, lines: int,
+                 pair: tuple, fit=False):
+    # This is wicked slow.
+    if fit:
+        id_bytes = list()
+        all_xy = list()
+        known_xy = list()
+        known_z = list()
+        for lineno in range(lines):
+            id_bytes.append(in_f.read(6))  # Line Identification bytes
+            for sampno in range(samples):
+                read_byte = in_f.read(decoder.width)
+                dn = decoder.process(read_byte, pair, return_byte=False)
+                if(dn == decoder.from_bytes(decoder.replacement) or dn == 0):
+                    pass
+                else:
+                    known_xy.append((sampno, lineno))
+                    known_z.append(dn)
+                all_xy.append((sampno, lineno))
+
+        interp_z = interpolate.griddata(known_xy, known_z, all_xy,
+                                        method='nearest')
+
+        int_interp = interp_z.astype(int)
+        i = 0
+        for lineno in range(lines):
+            out_f.write(id_bytes[lineno])
+            for sampno in range(samples):
+                int_interp[i]
+                out_f.write(decoder.to_bytes(decoder.lookup(int_interp[i])))
+                i += 1
+    else:
+        raise Exception()
 
 
 def unlut(lut_table: list, pixel: int) -> int:
@@ -427,14 +526,6 @@ def unlut(lut_table: list, pixel: int) -> int:
     if pixel == 0:
         return 0
     return int(statistics.mean(lut_table[pixel]))
-
-
-# def relut(lut_table: list, real: float) -> int:
-#     for i, pair in enumerate(lut_table):
-#         if real >= pair[0] and real <= pair[1]:
-#             return i
-#
-#     return 255
 
 
 def to_isis(values, out_pathlike: os.PathLike):
