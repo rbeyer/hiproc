@@ -53,7 +53,7 @@ class decoder:
             if self.width == 1:  # 8 bit
                 replacement = 255
             elif self.width == 2:  # 16 bit
-                replacement = -1
+                replacement = 65535
             else:
                 raise ValueError("Don't know how to set NULL value for "
                                  f"bit-width {width}")
@@ -280,15 +280,23 @@ def get_info(name: str, label: dict) -> dict:
     info['lines'] = label[name]['LINES']
     info['samples'] = label[name]['LINE_SAMPLES']
 
+    # Maybe this is just always LINE_PREFIX_BYTES minus six?
     if label[name]['LINE_PREFIX_BYTES'] == 18:
         info['prefix'] = 12
+    elif label[name]['LINE_PREFIX_BYTES'] == 30:
+        info['prefix'] = 24
     else:
-        raise Exception()
+        raise ValueError(
+            'Unknown LINE_PREFIX_BYTES: ' + label[name]['LINE_PREFIX_BYTES'])
 
+    # This maybe isn't mysterious, could just pass through?
     if label[name]['LINE_SUFFIX_BYTES'] == 16:
         info['suffix'] = 16
+    elif label[name]['LINE_SUFFIX_BYTES'] == 32:
+        info['suffix'] = 32
     else:
-        raise Exception()
+        raise ValueError(
+            'Unknown LINE_SUFFIX_BYTES: ' + label[name]['LINE_SUFFIX_BYTES'])
 
     return info
 
@@ -390,6 +398,8 @@ def clean(img_path: os.PathLike, out_path: os.PathLike,
 
     width, b_order, b_signed = clean_check(reverse, masked, ramp, buf, image,
                                            dark, rr_info, img_info)
+    print('width, b_order, b_signed')
+    print(f'{width}, {b_order}, {b_signed}')
     d = decoder(
         label['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_CONVERSION_TABLE'],
         b_order, b_signed,
