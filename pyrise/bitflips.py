@@ -235,6 +235,24 @@ def mask(in_path: Path, out_path: Path, line=False, plot=True, keep=False):
     median = math.trunc(float(hist['Median']))
     logging.info(f'Median: {median}')
 
+    # With terrible noise, the computed median is the median of the
+    # noise, not of the data, so if that happens, try and find a
+    # DN peak that is more reasonable:
+    median_limit = 4000
+    if median > median_limit:
+        trunc_hist = list()
+        for row in hist:
+            if int(row.DN) < median_limit:
+                trunc_hist.append((int(row.DN), int(row.Pixels)))
+        try:
+            median = max(trunc_hist, key=lambda x: x[1])[0]
+            logging.info(
+                f'The median was too high, found a better one: {median}.')
+        except ValueError:
+            # No values in the trunc_hist, which means that there are no
+            # DN less than maedian_limit, so we just leave things as they are.
+            pass
+
     cubenorm_stats_file = to_del.add(in_path.with_suffix('.cn.stats'))
     if line:
         util.log(isis.cubenorm(in_path, stats=cubenorm_stats_file,
@@ -260,10 +278,13 @@ def mask(in_path: Path, out_path: Path, line=False, plot=True, keep=False):
 
 
 def find_minima_index(central_idx: int, limit_idx: int,
-                      minima_idxs: np.ndarray, pixel_counts: np.ndarray) -> int:
+                      minima_idxs: np.ndarray, pixel_counts: np.ndarray,
+                      closest=True) -> int:
     '''Searches the pixel_counts at the minima_idxs positions between
        central_idx and limit_idx to find the one with the lowest pixel_count
-       value (if multiple, choose the closest to the limit_idx position).
+       value. If multiple lowest values, choose the closest to the limit_idx
+       position (the default, if *closest* is true, otherwise picks the index
+       closest to *central_idx* if *closest* is False).
 
        If no minima_idx values are found in the range, the next value in
        minima_idx past the limit_idx will be returned.
@@ -276,12 +297,18 @@ def find_minima_index(central_idx: int, limit_idx: int,
             logging.info(info_str.format('min', 'inside'))
             inrange_iter = filter(lambda i: i < central_idx and i >= limit_idx,
                                   minima_idxs)
-            select_idx = 0
+            if closest is False:
+                select_idx = -1
+            else:
+                select_idx = 0
         elif limit_idx > central_idx:
             logging.info(info_str.format('max', 'inside'))
             inrange_iter = filter(lambda i: i > central_idx and i <= limit_idx,
                                   minima_idxs)
-            select_idx = -1
+            if closest is False:
+                select_idx = 0
+            else:
+                select_idx = -1
         else:
             raise ValueError
 
@@ -316,7 +343,7 @@ def find_minima_index(central_idx: int, limit_idx: int,
 
 def find_smart_window(hist: list, mindn: int, maxdn: int,
                       centraldn: int, central_exclude_dn=0,
-                      plot=False) -> tuple:
+                      plot=False, closest=True) -> tuple:
     '''Returns a minimum and maximum DN value from hist which are
        based on using the find_minima_index() function with the
        given mindn, maxdn, and centraldn values.
@@ -332,10 +359,14 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
        'x'es mark all the detected minima, and the red dots indicate
        the minimum and maximum DN values that this function will
        return.
+
+       The value of *closest* is passed on to find_minima_index().
     '''
     hist_list = sorted(hist, key=lambda x: int(x.DN))
     pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
     dn = np.fromiter((int(x.DN) for x in hist_list), int)
+
+    # print(dn)
 
     # print(f'mindn {mindn}')
     # print(f'maxdn {maxdn}')
@@ -346,6 +377,8 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
     # print(f'centraldn: {centraldn}')
     # print(f'central_exclude_dn: {central_exclude_dn}')
     central_min_i = (np.abs(dn - (centraldn - central_exclude_dn))).argmin()
+    # tobemin = np.abs(dn - (centraldn + central_exclude_dn))
+    # print(tobemin)
     central_max_i = (np.abs(dn - (centraldn + central_exclude_dn))).argmin()
 
     minima_i, _ = find_peaks(np.negative(pixel_counts))
@@ -356,8 +389,11 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
     # print(f'mindn_i {mindn_i}')
     # print(f'maxdn_i {maxdn_i}')
 
-    min_i = find_minima_index(central_min_i, mindn_i, minima_i, pixel_counts)
-    max_i = find_minima_index(central_max_i, maxdn_i, minima_i, pixel_counts)
+    min_i = find_minima_index(central_min_i, mindn_i, minima_i, pixel_counts,
+                              closest=closest)
+    max_i = find_minima_index(central_max_i, maxdn_i, minima_i, pixel_counts,
+                              closest=closest)
+    logging.info(f'indexes: {min_i}, {max_i}')
     logging.info(f'DN window: {dn[min_i]}, {dn[max_i]}')
 
     if plot:
