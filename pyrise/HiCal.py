@@ -517,8 +517,8 @@ def set_flags(conf: dict, db: dict, ccdchan: tuple,
 
     noise_filter = False
     # Disabled to process RED7
-    # if ((process_this(ccdchan, conf['HiCal_Noise_Processing'])) and
-    if (((float(db['IMAGE_DARK_STANDARD_DEVIATION']) >=
+    if ((process_this(ccdchan, conf['HiCal_Noise_Processing'])) and
+        ((float(db['IMAGE_DARK_STANDARD_DEVIATION']) >=
           float(conf['HiCal_Noise_Bin_DarkPixel_STD'][bindex])) or
          (float(db['CAL_MASK_STANDARD_DEVIATION']) >=
           float(conf['HiCal_Noise_Bin_Mask_STD'][bindex])) or
