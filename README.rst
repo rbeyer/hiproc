@@ -35,6 +35,7 @@ External Dependencies
 These programs use as much 'vanilla' Python 3 as possible.
 
 However, it does depend on the following:
+
 - pvl library (https://pvl.readthedocs.io)
 - kalasiris library (https://kalasiris.readthedocs.io)
 - numpy
@@ -46,7 +47,7 @@ program that has not been publicly released, but isn't that far
 off.  There is a MATLAB version that has the appropriate licensing,
 and there is a C++ version.  The C++ version could also be made to
 have the appropriate licensing, it just hasn't gone through a release
-process.  Maybe we'll write it in Python, too, and distribute it here.
+process.  Maybe I'll write it in Python, too, and distribute it here.
 
 Warning !
 ---------
@@ -54,7 +55,7 @@ Warning !
 The algorithms based on the HiRISE Processing Pipelines were emulated
 and tested locally, but the results of each pipeline **have not**
 been tested directly against the results of the HiRISE Processing
-Pipelines, and this warning will remain until we have done so.  As
+Pipelines, and this warning will remain until I have done so.  As
 a result, I would not particularly 'trust' anything produced by
 these programs at this time, and consider these algorithms a
 work-in-progress.
