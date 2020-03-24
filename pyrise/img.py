@@ -532,8 +532,7 @@ def readwritebox(in_f, out_f, decoder,
         for lineno in range(lines):
             out_f.write(id_bytes[lineno])
             for sampno in range(samples):
-                int_interp[i]
-                out_f.write(decoder.to_bytes(decoder.lookup(int_interp[i])))
+                out_f.write(decoder.to_bytes(decoder.lookup(int_interp[i].item())))
                 i += 1
     else:
         raise Exception()
