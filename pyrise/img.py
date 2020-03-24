@@ -61,8 +61,12 @@ class decoder:
 
         # Pre-compute the lookups:
         self.lut_table = list()
-        for pair in lut:
-            self.lut_table.append(int(statistics.mean(pair)))
+        for i, pair in enumerate(lut):
+            if pair[0] == pair[1]:
+                self.lut_table.append(pair[0])
+            else:
+                self.lut_table.append(
+                    int(statistics.mean((lut[i][0], lut[i + 1][0]))))
 
         self.lut = lut
 
@@ -81,6 +85,10 @@ class decoder:
         return self.lut_table[pixel]
 
     def lookup(self, dn: int) -> int:
+        if len(self.lut_table) == 1:
+            # See comment in unlut() above.
+            return dn
+
         for i, pair in enumerate(self.lut):
             if dn >= pair[0] and dn <= pair[1]:
                 return i
@@ -99,7 +107,8 @@ class decoder:
         dn = self.unlut(self.from_bytes(byte))
 
         if(area is not None and ((self.min_dn < dn < area[0])
-                                 or (area[1] < dn < self.max_dn))):
+                                 or (area[1] < dn))):
+            # or (area[1] < dn < self.max_dn))):
             if return_byte:
                 return self.replacement
             else:
@@ -248,7 +257,8 @@ def get_info(name: str, label: dict) -> dict:
     """
     info = dict()
 
-    info['offset'] = int(label[f'^{name}'].value)
+    # Since The first byte is location 1 (not 0)!
+    info['offset'] = int(label[f'^{name}'].value) - 1
 
     if 'SAMPLE_BITS' in label[name]:
         if label[name]['SAMPLE_BITS'] == 16:
@@ -398,8 +408,8 @@ def clean(img_path: os.PathLike, out_path: os.PathLike,
 
     width, b_order, b_signed = clean_check(reverse, masked, ramp, buf, image,
                                            dark, rr_info, img_info)
-    print('width, b_order, b_signed')
-    print(f'{width}, {b_order}, {b_signed}')
+    # print('width, b_order, b_signed')
+    # print(f'{width}, {b_order}, {b_signed}')
     d = decoder(
         label['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_CONVERSION_TABLE'],
         b_order, b_signed,
@@ -419,6 +429,7 @@ def clean(img_path: os.PathLike, out_path: os.PathLike,
                              20, reverse, fit=True)
             else:
                 for lineno in range(20):
+                    # print(f'line: {lineno}')
                     readwriteline(f, of, d,
                                   rr_info['prefix'], rr_info['samples'],
                                   rr_info['suffix'],
