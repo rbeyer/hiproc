@@ -852,11 +852,6 @@ def analyze_cubenorm_stats2(statsfile: os.PathLike, central: float,
                  'columns ({}) that have the '.format(len(std_w_maxvp)) +
                  'maximum valid pixel count: {}'.format(medstd))
 
-    # We want to ignore minima that are too close to the central value.
-    # Sometimes the medstd is a good choice, sometimes 16 DN (which is a
-    # minimal bit flip level) is better, so use the greatest:
-    ex = max(medstd, 16)
-
     # Sometimes even the medstd can be too high because the 'good' lines
     # still had too many outliers in it.  What is 'too high' and how do
     # we define it rigorously?  I'm not entirely sure, and I wish there
