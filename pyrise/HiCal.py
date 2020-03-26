@@ -859,22 +859,22 @@ def analyze_cubenorm_stats2(statsfile: os.PathLike, central: float,
     # way to find 'medstd' in the first place.
     # I am going to select an abitrary value based on my experience (300)
     # and then also pick a replacement of 64 which is a complete guess.
-    # Finally, in this case, since the 'statistics are completely broken,
+    # Finally, in this case, since the 'statistics' are completely broken,
     # I'm also going to set the exclusion to be arbitrary, and lower than
-    # the envorced medstd.
+    # the enforced medstd.
     if medstd > 300:
         medstd = 64
         ex = 16
         logging.info('The derived medstd was too big, setting the medstd '
                      f'to {medstd} and the exclusion value to {ex}.')
+    else:
+        # We want to ignore minima that are too close to the central value.
+        # Sometimes the medstd is a good choice, sometimes 16 DN (which is a
+        # minimal bit flip level) is better, so use the greatest:
+        ex = max(medstd, 16)
 
     mindn = central - (width * medstd)
     maxdn = central + (width * medstd)
-
-    # We want to ignore minima that are too close to the central value.
-    # Sometimes the medstd is a good choice, sometimes 16 DN (which is a
-    # minimal bit flip level) is better, so use the greatest:
-    ex = max(medstd, 16)
 
     return find_smart_window(hist, mindn, maxdn, central,
                              central_exclude_dn=ex, plot=plot)
