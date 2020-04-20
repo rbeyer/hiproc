@@ -1,19 +1,61 @@
 #!/usr/bin/env python
 """Deal with stuck bits in HiRISE pixels.
 
-If there is some process which is flipping one of the HiRISE
-bits in a 14-bit pixel the wrong way, it will inadvertently add
-or subtract a certain DN value to a pixel.  Naturally, it goes
+If there is some process which is flipping one (or more) of the
+HiRISE bits in a 14-bit pixel the wrong way, it will inadvertently
+add or subtract a certain DN value to a pixel.  Naturally, it goes
 from 2^13 (8192) all the way down to 2.
 
-In practice, these 'bitflipped' pixels show up as spikes in the
+In practice, these 'bit-flipped' pixels show up as spikes in the
 image histogram at DN values approximately centered on the image
-Median plus or minus the bitflip value (8192, 4096, etc.).
+Median plus or minus the bit-flip value (8192, 4096, etc.).  These
+are not narrow spikes and have variable width, so care must be taken
+when dealing with them.  The large bit-flip values often show up
+as easily-identifiable islands in the DN histogram, but small
+bit-flip values (2, 4, 8, etc.) are often within the variability
+of the data and it is more difficult to cleanly isolate them.
 
-These are not narrow spikes and have variable width, so care
-must be taken when dealing with them.  This program will do one
-of two things, it will either attempt to un-flip the bits on
-the bit-flipped pixels or it will attempt to mask them out.
+This library and program deals with two aspects of the bit-flip
+problem: identification and mitigation.
+
+
+Identification
+--------------
+
+This can be as simple as deciding that some bit-flip position (maybe
+16 or 32) is the cut-off, and simply saying that the DN window of
+'good' pixles is Median plus/minus the cut-off.  However, this is
+often a blunt instrument, and can still leave problematic outliers.
+
+An improved strategy is to attempt to identify the 'islands' in the
+DN histogram that are centered on the bit-flip positions, and attempt
+to find the gaps between those islands.  Again, picking a bit-flip
+value cut-off, but this time selecting the low-point between two
+bit-flip-value-centered islands as the boundaries of the good-DN-window.
+
+The best strategy we have developed so far is to take the above one
+step further and treat the histogram curve as its own signal,
+identify all of the minima in the histogram, along with a sense of
+the standard deviation of the 'good' data in the image, and attempt
+to smartly pick the bounds of the good-DN-window.
+
+
+Mitigation
+----------
+This library and the program can perform one of two general activities
+to mitigate the bit-flip pixels once they have been identified.
+
+1. Unflipping: It can attempt to un-flip the bits in the pixel to
+   attempt to return it to what its 'original' DN value might have
+   been.  This is limited by however you select the bit-flip cut-off.
+   Since you can't identify below that cut-off, you also really can't
+   unflip below that cut-off.
+
+2. Masking: This mitigation strategy simply sets these pixels to
+   an arbitrary DN value or the ISIS NULL value.  This basically just
+   exercises the 'identification' part of this library and leaves
+   it up to other image processing activities to decide how to deal
+   with this data.
 """
 
 # Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
@@ -30,8 +72,8 @@ the bit-flipped pixels or it will attempt to mask them out.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program was originally inspired by clean_bit_flips.pro by Alan Delamere,
-# Oct 2019, but was written from scratch.
+# Parts of this were inspired by clean_bit_flips.pro by Alan Delamere,
+# Oct 2019, but the implementation here was written from scratch.
 
 import argparse
 import itertools
@@ -95,7 +137,7 @@ def main():
     return
 
 
-def get_range(start, stop, step=None):
+def get_range(start, stop, step=None) -> range:
     """Returns a range object given floating point start and
     stop values (the optional step must be an int).  If
     step is none, it will be set to 1 or -1 depending on the
@@ -116,9 +158,12 @@ def get_range(start, stop, step=None):
 
 
 def find_gap(hist: list, start, stop, step=None, findfirst=False) -> int:
-    """Given the range specified by start, stop and step, the DNs are
-    extracted from the list of namedtuples (from kalasiris.Histogram)
-    the 'gaps' between continuous ranges of DN are found (DNs where
+    """Returns a DN between *start* and *stop* which is determined to be a gap.
+
+    Given the range specified by *start*, *stop* and *step*, the
+    DNs are extracted from the list of namedtuples (which must
+    conform to the HistRow namedtuple from kalasiris.Histogram).
+    The 'gaps' between continuous ranges of DN are found (DNs where
     the histogram has no pixels).  The largest gap is found, and
     then the DN value closest to start from that largest gap is
     returned.
@@ -126,9 +171,9 @@ def find_gap(hist: list, start, stop, step=None, findfirst=False) -> int:
     If step is not specified or None, it will be set to 1 or -1
     depending on the relative values of start and stop.
 
-    If findfirst is True, then rather than finding the 'biggest'
+    If *findfirst* is `True`, then rather than finding the 'biggest'
     gap, it will return the DN from the gap that is closest to
-    start.
+    *start*.
     """
     dn_window = get_range(start, stop, step)
 
@@ -158,8 +203,14 @@ def find_gap(hist: list, start, stop, step=None, findfirst=False) -> int:
                          f'{start} to {stop}.')
 
 
-def find_min_dn(hist: list, start, stop, step=None):
-    """Given how the min() mechanics work, this should return the first
+def find_min_dn(hist: list, start, stop, step=None) -> int:
+    """Returns the DN from *hist* with the lowest pixel count.
+
+    Where *hist* is a list of namedtuples (which must conform to
+    the HistRow namedtuple from kalasiris.Histogram).  The *start*,
+    *stop*, and *step* parameters are DN values in that *hist* list.
+
+    Given how the min() mechanics work, this should return the first
     DN value of the entry with the lowest pixel count, in range order
     (if there is more than one).
     """
@@ -172,12 +223,16 @@ def find_min_dn(hist: list, start, stop, step=None):
     return int(h.DN)
 
 
-def subtract_over_thresh(in_path: os.PathLike, out_path: os.PathLike,
+def subtract_over_thresh(in_path: Path, out_path: Path,
                          thresh: int, delta: int, keep=False):
-    """For all pixels in the in_path ISIS cube, if delta is positive, then
-    pixels with a value greater than thresh will have delta subtracted from
-    them.  If delta is negative, then all pixels less than thresh
-    will have delta added to them.
+    """This is a convenience function that runs ISIS programs to add or
+    subtract a value to DN values for pixels that are above or below
+    a threshold.
+
+    For all pixels in the *in_path* ISIS cube, if *delta* is positive,
+    then pixels with a value greater than *thresh* will have *delta*
+    subtracted from them.  If *delta* is negative, then all pixels
+    less than *thresh* will have *delta* added to them.
     """
 
     # Originally, I wanted to just do this simply with fx:
@@ -187,13 +242,7 @@ def subtract_over_thresh(in_path: os.PathLike, out_path: os.PathLike,
 
     shutil.copyfile(in_path, out_path)
 
-    # stats = isis.stats_k(in_path)
-    # dnmin = math.trunc(float(stats['Minimum']))
-    # dnmax = math.trunc(float(stats['Maximum']))
-
-    # suffix = f'+SignedWord+{dnmin}:{dnmax}'
     mask_p = in_path.with_suffix('.threshmask.cub')
-    # mask_args = {'from': in_path, 'to': str(mask_p) + suffix}
     mask_args = {'from': in_path, 'to': mask_p}
     if delta > 0:
         mask_args['min'] = thresh
@@ -202,8 +251,6 @@ def subtract_over_thresh(in_path: os.PathLike, out_path: os.PathLike,
     util.log(isis.mask(**mask_args).args)
 
     delta_p = in_path.with_suffix('.delta.cub')
-    # util.log(isis.algebra(mask_p, to=str(delta_p) + suffix, op='unary',
-    #                      a=0, c=delta).args)
     util.log(isis.algebra(mask_p, from2=in_path, to=delta_p,
                           op='add', a=0, c=(-1 * delta)).args)
 
@@ -279,16 +326,17 @@ def mask(in_path: Path, out_path: Path, line=False, plot=True, keep=False):
 
 def find_minima_index(central_idx: int, limit_idx: int,
                       minima_idxs: np.ndarray, pixel_counts: np.ndarray,
-                      closest=True) -> int:
-    '''Searches the pixel_counts at the minima_idxs positions between
-       central_idx and limit_idx to find the one with the lowest pixel_count
-       value. If multiple lowest values, choose the closest to the limit_idx
-       position (the default, if *closest* is true, otherwise picks the index
-       closest to *central_idx* if *closest* is False).
+                      close_to_limit=True) -> int:
+    """Searches the pixel_counts at the minima_idxs positions between
+    central_idx and limit_idx to find the one with the lowest
+    pixel_count value. If multiple lowest values, choose the closest
+    to the limit_idx position (the default, if *close_to_limit* is true,
+    otherwise picks the index closest to *central_idx* if *close_to_limit*
+    is False).
 
-       If no minima_idx values are found in the range, the next value in
-       minima_idx past the limit_idx will be returned.
-    '''
+    If no minima_idx values are found in the range, the next value
+    in minima_idx past the limit_idx will be returned.
+    """
     # print(f'central_idx: {central_idx}')
     # print(f'limit_idx: {limit_idx}')
     info_str = 'Looking for {} {} range ...'
@@ -297,7 +345,7 @@ def find_minima_index(central_idx: int, limit_idx: int,
             logging.info(info_str.format('min', 'inside'))
             inrange_iter = filter(lambda i: i < central_idx and i >= limit_idx,
                                   minima_idxs)
-            if closest is False:
+            if close_to_limit is False:
                 select_idx = -1
             else:
                 select_idx = 0
@@ -305,7 +353,7 @@ def find_minima_index(central_idx: int, limit_idx: int,
             logging.info(info_str.format('max', 'inside'))
             inrange_iter = filter(lambda i: i > central_idx and i <= limit_idx,
                                   minima_idxs)
-            if closest is False:
+            if close_to_limit is False:
                 select_idx = 0
             else:
                 select_idx = -1
@@ -390,9 +438,9 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
     # print(f'maxdn_i {maxdn_i}')
 
     min_i = find_minima_index(central_min_i, mindn_i, minima_i, pixel_counts,
-                              closest=closest)
+                              close_to_limit=closest)
     max_i = find_minima_index(central_max_i, maxdn_i, minima_i, pixel_counts,
-                              closest=closest)
+                              close_to_limit=closest)
     logging.info(f'indexes: {min_i}, {max_i}')
     logging.info(f'DN window: {dn[min_i]}, {dn[max_i]}')
 
@@ -433,12 +481,13 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
 
 def mask_gap(in_path: Path, out_path: Path, keep=False):
     """Attempt to mask out pixels beyond the central DNs of the median
-    based on gaps in the histogram."""
+    based on gaps in the histogram.
 
-    # This approach worked well based on 'ideal' reverse-clocked data
-    # or 'dark' images, but in 'real' HiRISE images of Mars, the reality
-    # is that there are 'gaps' everywhere along the DN range, and this
-    # approach ends up being too 'dumb'.
+    This approach worked well based on 'ideal' reverse-clocked data
+    or 'dark' images, but in 'real' HiRISE images of Mars, the reality
+    is that there are 'gaps' everywhere along the DN range, and this
+    approach ends up being too 'dumb'.
+    """
 
     to_del = isis.PathSet()
 
@@ -471,7 +520,8 @@ def mask_gap(in_path: Path, out_path: Path, keep=False):
     return
 
 
-def get_unflip_thresh(hist, far, near, lowlimit):
+def get_unflip_thresh(hist: list, far, near, lowlimit) -> int:
+    """Provides a robust threshhold for the unflipping process."""
     try:
         thresh = find_gap(hist, far, near)
     except ValueError:
@@ -487,8 +537,8 @@ def get_unflip_thresh(hist, far, near, lowlimit):
 
 
 def unflip(in_p: Path, out_p: Path, keep=False):
-    """Attempt to indentify DNs whose bits have been flipped, and
-    unflip them.
+    """Attempt to indentify DNs whose bits have been flipped in the
+    ISIS cube indicated by *in_p*, and unflip them.
     """
     to_del = isis.PathSet()
 
