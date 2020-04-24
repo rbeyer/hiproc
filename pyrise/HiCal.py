@@ -90,7 +90,7 @@ import kalasiris as isis
 
 import pyrise.hirise as hirise
 import pyrise.util as util
-from pyrise.bitflips import find_smart_window
+import pyrise.bitflips as bf
 
 
 def main():
@@ -106,9 +106,10 @@ def main():
                         "starts with a '.' it is considered an extension "
                         "and will be swapped with the input file's "
                         "extension to find the .json file to use.")
-    parser.add_argument('-n', '--newalg', required=False, type=int,
+    parser.add_argument('-b', '--bitflipwidth', required=False, type=int,
                         default=0,
-                        help="The number of medstd widths.")
+                        help="The number of medstd widths for bit-flip "
+                        "cleaning.")
     # parser.add_argument('--hgfconf', required=False, default='HiGainFx.conf')
     parser.add_argument('--nfconf', required=False, default='NoiseFilter.conf')
     parser.add_argument('--bin2', required=False, action='store_true',
@@ -148,7 +149,7 @@ def main():
 
         out_cube = util.path_w_suffix(args.output, c)
         try:
-            db = start(c, out_cube, db, conf, args.conf, args.newalg,
+            db = start(c, out_cube, db, conf, args.conf, args.bitflipwidth,
                        args.bin2, args.bin4, keep=args.keep)
         except UserWarning as err:
             logging.warning(err)
@@ -189,7 +190,7 @@ def conf_setup(conf_path: os.PathLike, nfconf_path: os.PathLike) -> dict:
 
 
 def start(cube: os.PathLike, out_cube: Path, db: dict,
-          conf: dict, conf_path: os.PathLike, newalg,
+          conf: dict, conf_path: os.PathLike, bitflipwidth,
           bin2: bool, bin4: bool, keep=False) -> dict:
 
     in_cube = Path(cube)
@@ -234,7 +235,7 @@ def start(cube: os.PathLike, out_cube: Path, db: dict,
                                             ccdchan, conf,
                                             conf_path, db,
                                             destripe=destripe_filter,
-                                            newalg=newalg,
+                                            bitflipwidth=bitflipwidth,
                                             keep=keep)
 
     db['HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION'] = std
@@ -249,7 +250,7 @@ def start(cube: os.PathLike, out_cube: Path, db: dict,
 
 def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
           conf: dict, conf_path: os.PathLike, db: dict,
-          destripe=False, newalg=0, keep=False) -> tuple:
+          destripe=False, bitflipwidth=0, keep=False) -> tuple:
     logging.info('HiCal start.')
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
@@ -287,7 +288,7 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
     hical_status = run_hical(next_cube, hical_file, conf, conf_path,
                              lis_per, float(db['IMAGE_BUFFER_MEAN']),
                              int(db['BINNING']), flags.noise_filter,
-                             newalg=newalg, keep=keep)
+                             bitflipwidth=bitflipwidth, keep=keep)
     next_cube = hical_file
 
     if furrows_found:
@@ -561,7 +562,7 @@ def set_lines(skip_top: int, skip_bottom: int,
 def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
               conf: dict, conf_path: os.PathLike,
               lis_per: float, image_buffer_mean: float, binning: int,
-              noise_filter: bool, newalg=0, keep=False) -> str:
+              noise_filter: bool, bitflipwidth=0, keep=False) -> str:
 
     to_d = isis.PathSet()
     in_cub_path = Path(in_cube)
@@ -588,7 +589,7 @@ def run_hical(in_cube: os.PathLike, hical_cub: os.PathLike,
         mask(in_cub_path, mask_cube,
              conf['NoiseFilter']['NoiseFilter_Raw_Min'],
              conf['NoiseFilter']['NoiseFilter_Raw_Max'], binning,
-             newalg=newalg, keep=keep)
+             width=bitflipwidth, keep=keep)
         util.log(isis.hical(mask_cube, **hical_args).args)
     else:
         util.log(isis.hical(in_cub_path, **hical_args).args)
@@ -673,7 +674,7 @@ def furrow_nulling(cube: os.PathLike, out_cube: os.PathLike, binning: int,
 
 
 def mask(in_cube: os.PathLike, out_cube: os.PathLike, noisefilter_min: float,
-         noisefilter_max: float, binning: int, newalg=10,
+         noisefilter_max: float, binning: int, width=5,
          keep=False) -> None:
     """mask out unwanted pixels"""
     logging.info(mask.__doc__)
@@ -687,30 +688,15 @@ def mask(in_cube: os.PathLike, out_cube: os.PathLike, noisefilter_min: float,
 
     cubenorm_stats_file = to_del.add(temp_cube.with_suffix('.cn.stats'))
     util.log(isis.cubenorm(temp_cube, stats=cubenorm_stats_file).args)
-    if newalg == 0:
+    if width == 0:
         (mindn, maxdn) = analyze_cubenorm_stats(cubenorm_stats_file, binning)
+        util.log(isis.mask(temp_cube, mask=temp_cube, to=out_path,
+                 minimum=mindn, maximum=maxdn,
+                 preserve='INSIDE', spixels='NONE').args)
     else:
-        results = pvl.loads(isis.stats(temp_cube).stdout)['Results']
-        img_mean = float(results['Average'])
-        img_mode = float(results['Mode'])
-        img_median = float(results['Median'])
-
-        hist_p = to_del.add(temp_cube.with_suffix('.hist'))
-        util.log(isis.hist(temp_cube, to=hist_p).args)
-        hist = isis.Histogram(hist_p)
-        # median = math.trunc(float(hist['Median']))
-
-        d = img_mean - img_mode
-        logging.info(f'{temp_cube} Mean: {img_mean}, Mode: {img_mode}, '
-                     f'diff: {d}, Median: {img_median}')
-
-        (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file,
-                                                 img_median, hist,
-                                                 newalg)
-
-    util.log(isis.mask(temp_cube, mask=temp_cube, to=out_path,
-                       minimum=mindn, maximum=maxdn,
-                       preserve='INSIDE', spixels='NONE').args)
+        logging.info('More severe handling of images with LIS pixels engaged.')
+        bf.clean_cube(temp_cube, out_path, width=width,
+                      cubenorm_path=cubenorm_stats_file, keep=keep)
 
     if not keep:
         to_del.unlink()
@@ -798,15 +784,14 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
     return(mindn, maxdn)
 
 
-def analyze_cubenorm_stats2(statsfile: os.PathLike, central: float,
-                            hist: list, width=10, plot=False) -> tuple:
+def median_std(statsfile: os.PathLike) -> float:
     # The analyze_cubenorm_stats() function is meant to make sure we
     # don't blow away valid data, with the philosphy that it is better to
     # let in a little bad data in order to keep the good.  However, in
     # images with a high percentage of LIS%, there is so much bad that it
-    # swamps the good, so this approach is a little more severe.
-
-    logging.info('More severe handling of images with LIS pixels engaged.')
+    # swamps the good, so this approach attempts to find the median
+    # standard deviation that might be an approximation to the 'real'
+    # standard devation of the data without the bit-flip noise.
 
     with open(statsfile) as csvfile:
         valid_points = list()
@@ -823,61 +808,17 @@ def analyze_cubenorm_stats2(statsfile: os.PathLike, central: float,
     maxvp = max(valid_points)
     logging.info(f'Maximum count of valid pixels: {maxvp}')
 
-    # Original note:
-    # # Get the median standard deviation value for all columns that have
-    # # the maximum valid pixel count
-    # #
-    # # 2016-12-02 Note: this may not pick the median standard
-    # # deviation value but the value from an index 0.95 times the number
-    # # of entries in the sorted cubenorm statistics file.
-    #
-    # That seems to be exactly what it does.  I think the term 'median'
-    # in the original (apparently pre-2016) comment is wrong.
-    # The variable is called 'facstd' and when it is used below, it refers
-    # to this being 'medstd + tol' which indicates that it really is
-    # meant to be a factor above the median, which it is.
     std_w_maxvp = list()
     for (vp, std) in zip(valid_points, std_devs):
         if vp == maxvp:
             std_w_maxvp.append(std)
-
-    # std_w_maxvp.sort()
-    # facstd = std_w_maxvp[int((len(std_w_maxvp) - 1) * 0.95)]
-    # logging.info('95th percentile standard deviation of all ' +
-    #              'columns ({}) that have the '.format(len(std_w_maxvp)) +
-    #              'maximum valid pixel count: {}'.format(facstd))
 
     medstd = statistics.median_high(std_w_maxvp)
     logging.info('median standard deviation of all ' +
                  'columns ({}) that have the '.format(len(std_w_maxvp)) +
                  'maximum valid pixel count: {}'.format(medstd))
 
-    # Sometimes even the medstd can be too high because the 'good' lines
-    # still had too many outliers in it.  What is 'too high' and how do
-    # we define it rigorously?  I'm not entirely sure, and I wish there
-    # was a better way to determine this, or, alternately an even more robust
-    # way to find 'medstd' in the first place.
-    # I am going to select an abitrary value based on my experience (300)
-    # and then also pick a replacement of 64 which is a complete guess.
-    # Finally, in this case, since the 'statistics' are completely broken,
-    # I'm also going to set the exclusion to be arbitrary, and lower than
-    # the enforced medstd.
-    if medstd > 300:
-        medstd = 64
-        ex = 16
-        logging.info('The derived medstd was too big, setting the medstd '
-                     f'to {medstd} and the exclusion value to {ex}.')
-    else:
-        # We want to ignore minima that are too close to the central value.
-        # Sometimes the medstd is a good choice, sometimes 16 DN (which is a
-        # minimal bit flip level) is better, so use the greatest:
-        ex = max(medstd, 16)
-
-    mindn = central - (width * medstd)
-    maxdn = central + (width * medstd)
-
-    return find_smart_window(hist, mindn, maxdn, central,
-                             central_exclude_dn=ex, plot=plot)
+    return medstd
 
 
 def HiGainFx(cube: os.PathLike, outcube: os.PathLike,

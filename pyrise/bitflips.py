@@ -32,6 +32,9 @@ DN histogram that are centered on the bit-flip positions, and attempt
 to find the gaps between those islands.  Again, picking a bit-flip
 value cut-off, but this time selecting the low-point between two
 bit-flip-value-centered islands as the boundaries of the good-DN-window.
+This strategy works okay for test data, but real data of the martian
+surface often has complicated histograms, so something a little more
+robust is needed.
 
 The best strategy we have developed so far is to take the above one
 step further and treat the histogram curve as its own signal,
@@ -269,6 +272,144 @@ def histogram(in_path: Path, hist_path: Path):
     return isis.Histogram(hist_path)
 
 
+def clean_cube(cube: os.PathLike, outcube: os.PathLike, width=5,
+               cubenorm_path=None, plot=False, keep=False):
+    """The file at *outcube* will be the result of running
+    bit-flip cleaning of the file at *cube*.
+
+    **WARNING**: at this time, only the image-area and the reverse-clock
+    area are undergoing bit-flip cleaning.
+
+    This means that pixels that are identified as being beyond the
+    allowable DN window (which may be defined differently for each
+    of the image areas), will be set to the ISIS NULL value.
+
+    If ISIS cubenorm has already been run on *cube*, the path to
+    the output can be specified with *cubenorm_path*.  If *cubenorm_path*
+    is left unspecified, it will be created.
+
+    If *keep* is True, then all intermediate files will be preserved,
+    otherwise, this function will clean up any intermediary files
+    it creates.
+    """
+    in_p = Path(cube)
+    out_p = Path(cube)
+    cn_p = None
+
+    if cubenorm_path is None:
+        cn_p = in_p.with_suffix('.cn.stats')
+        util.log(isis.cubenorm(in_p, stats=cn_p).args)
+    else:
+        cn_p = Path(cubenorm_path)
+
+    # Go bit-flip correct the non-image areas somehow.
+    clean_tables(in_p, tableclean, width=width, keep=keep)
+
+    results = pvl.loads(isis.stats(in_p).stdout)['Results']
+    img_mean = float(results['Average'])
+    img_mode = float(results['Mode'])
+    img_median = float(results['Median'])
+
+    hist_p = to_del.add(in_p.with_suffix('.hist'))
+    util.log(isis.hist(in_p, to=hist_p).args)
+    hist = isis.Histogram(hist_p)
+    # median = math.trunc(float(hist['Median']))
+
+    d = img_mean - img_mode
+    logging.info(f'{temp_cube} Mean: {img_mean}, Mode: {img_mode}, '
+                 f'diff: {d}, Median: {img_median}')
+
+    medstd = median_std(cn_p)
+
+    # Sometimes even the medstd can be too high because the 'good' lines
+    # still had too many outliers in it.  What is 'too high' and how do
+    # we define it rigorously?  I'm not entirely sure, and I wish there
+    # was a better way to determine this, or, alternately an even more robust
+    # way to find 'medstd' in the first place.
+    # I am going to select an abitrary value based on my experience (300)
+    # and then also pick a replacement of 64 which is a complete guess.
+    # Finally, in this case, since the 'statistics' are completely broken,
+    # I'm also going to set the exclusion to be arbitrary, and lower than
+    # the enforced medstd.
+    if medstd > 300:
+        medstd = 64
+        ex = 16
+        logging.info('The derived medstd was too big, setting the medstd '
+                     f'to {medstd} and the exclusion value to {ex}.')
+    else:
+        # We want to ignore minima that are too close to the central value.
+        # Sometimes the medstd is a good choice, sometimes 16 DN (which is a
+        # minimal bit flip level) is better, so use the greatest:
+        ex = max(medstd, 16)
+
+    mindn = img_median - (width * medstd)
+    maxdn = img_median + (width * medstd)
+
+    hist_list = sorted(hist, key=lambda x: int(x.DN))
+    pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
+    dn = np.fromiter((int(x.DN) for x in hist_list), int)
+
+    (sm_mindn, sm_maxdn) = find_smart_window(hist, mindn, maxdn, img_median,
+                                             central_exclude_dn=ex, plot=plot)
+
+    util.log(isis.mask(in_p, mask=in_p, to=out_p,
+             minimum=sm_mindn, maximum=sm_maxdn,
+             preserve='INSIDE', spixels='NONE').args)
+
+    if not keep:
+        to_del.unlink()
+
+    return
+
+
+def clean_tables(cube: Path, outcube: Path, width=5,
+                 rev_area=True, mask_area=False, ramp_area=False,
+                 buffer_area=False, dark_area=False,
+                 keep=False):
+    """The file at *outcube* will be the result of running bit-flip
+    cleaning of the specified non-image areas in table objects within
+    the ISIS cube file.
+
+    The various *_area* booleans direct whether these areas will
+    undergo bit-flip cleaning.
+
+    **WARNING**: at this time, only the reverse-clock area is
+    enabled for undergoing bit-flip cleaning.  Specifying True
+    for any others will result in a NotImplementedError.
+
+    This means that pixels that are identified as being beyond the
+    allowable DN window (which may be defined differently for each
+    of the image areas), will be set to the ISIS NULL value.
+
+    If *keep* is True, then all intermediate files will be preserved,
+    otherwise, this function will clean up any intermediary files
+    it creates.
+
+    This function anticipates a HiRISE cube that has the following
+    table objects in its label: HiRISE Calibration Ancillary,
+    HiRISE Calibration Image, HiRISE Ancillary.
+
+    The HiRISE Calibration Ancillary table contains the BufferPixels
+    and DarkPixels from either side of the HiRISE Calibration Image.
+    The HiRISE Calibration Image table contains the Reverse-Clock,
+    Mask, and Ramp Image areas.  The HiRISE Ancillary table contains
+    the BufferPixels and DarkPixels from either side of the main
+    Image Area.
+    """
+    for notimpl in (mask_area, ramp_area, buffer_area, dark_area):
+        if notimpl is True:
+            raise NotImplementedError(
+                f"Bit-flip cleaning for {notimpl} is not yet implemented.")
+
+    shutil.copy(cube, outcube)
+
+    # for each area
+    # read the table data
+    # analyze the table data
+    # filter the table data
+    # write the table back out into outcube
+
+
 def mask(in_path: Path, out_path: Path, line=False, plot=True, keep=False):
     """Attempt to mask out pixels beyond the central DNs of the median
     based on minima in the histogram."""
@@ -389,12 +530,15 @@ def find_minima_index(central_idx: int, limit_idx: int,
     return idx
 
 
-def find_smart_window(hist: list, mindn: int, maxdn: int,
+def find_smart_window(dn: np.ndarray, counts: np.ndarray,
+                      mindn: int, maxdn: int,
                       centraldn: int, central_exclude_dn=0,
                       plot=False, closest=True) -> tuple:
-    '''Returns a minimum and maximum DN value from hist which are
+    '''Returns a minimum and maximum DN value from *dn* which are
        based on using the find_minima_index() function with the
-       given mindn, maxdn, and centraldn values.
+       given *mindn*, *maxdn*, and *centraldn* values.  The *dn*
+       array must be a sorted list of unique values, and *counts*
+       is the number of times each of the values in *dn* occurs.
 
        If *central_exclude_dn* is given, the returned minimum and
        maximum DN are guaranteed to be at least *central_exclude_dn*
@@ -410,9 +554,9 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
 
        The value of *closest* is passed on to find_minima_index().
     '''
-    hist_list = sorted(hist, key=lambda x: int(x.DN))
-    pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
-    dn = np.fromiter((int(x.DN) for x in hist_list), int)
+    # hist_list = sorted(hist, key=lambda x: int(x.DN))
+    # pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
+    # dn = np.fromiter((int(x.DN) for x in hist_list), int)
 
     # print(dn)
 
@@ -429,7 +573,7 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
     # print(tobemin)
     central_max_i = (np.abs(dn - (centraldn + central_exclude_dn))).argmin()
 
-    minima_i, _ = find_peaks(np.negative(pixel_counts))
+    minima_i, _ = find_peaks(np.negative(counts))
 
     # print(f'central_i {central_i}')
     # print(f'central_min_i {central_min_i}')
@@ -437,9 +581,9 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
     # print(f'mindn_i {mindn_i}')
     # print(f'maxdn_i {maxdn_i}')
 
-    min_i = find_minima_index(central_min_i, mindn_i, minima_i, pixel_counts,
+    min_i = find_minima_index(central_min_i, mindn_i, minima_i, counts,
                               close_to_limit=closest)
-    max_i = find_minima_index(central_max_i, maxdn_i, minima_i, pixel_counts,
+    max_i = find_minima_index(central_max_i, maxdn_i, minima_i, counts,
                               close_to_limit=closest)
     logging.info(f'indexes: {min_i}, {max_i}')
     logging.info(f'DN window: {dn[min_i]}, {dn[max_i]}')
@@ -450,27 +594,27 @@ def find_smart_window(hist: list, mindn: int, maxdn: int,
         plt.ioff()
         fig, (ax0, ax1) = plt.subplots(2, 1)
 
-        indices = np.arange(0, len(pixel_counts))
+        indices = np.arange(0, len(counts))
         dn_window = np.fromiter(map((lambda i: i >= mindn_i and i <= maxdn_i),
-                                    (x for x in range(len(pixel_counts)))),
+                                    (x for x in range(len(counts)))),
                                 dtype=bool)
         ax0.set_ylabel('Pixel Count')
         ax0.set_xlabel('DN Index')
         ax0.set_yscale('log')
-        ax0.fill_between(indices, pixel_counts, where=dn_window,
+        ax0.fill_between(indices, counts, where=dn_window,
                          color='lightgray')
         ax0.axvline(x=central_i, c='gray')
-        ax0.axvline(x=np.argmax(pixel_counts), c='lime', ls='--')
-        ax0.plot(pixel_counts)
-        ax0.plot(minima_i, pixel_counts[minima_i], "x")
-        ax0.plot(min_i, pixel_counts[min_i], "o", c='red')
-        ax0.plot(max_i, pixel_counts[max_i], "o", c='red')
+        ax0.axvline(x=np.argmax(counts), c='lime', ls='--')
+        ax0.plot(counts)
+        ax0.plot(minima_i, counts[minima_i], "x")
+        ax0.plot(min_i, counts[min_i], "o", c='red')
+        ax0.plot(max_i, counts[max_i], "o", c='red')
 
         ax1.set_ylabel('Pixel Count')
         ax1.set_xlabel('DN')
         ax1.set_yscale('log')
         ax1.set_ybound(lower=0.5)
-        ax1.scatter(dn, pixel_counts, marker='.', s=1)
+        ax1.scatter(dn, counts, marker='.', s=1)
         ax1.axvline(x=dn[min_i], c='red')
         ax1.axvline(x=dn[max_i], c='red')
 
