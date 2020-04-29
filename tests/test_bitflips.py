@@ -18,7 +18,7 @@
 import collections
 import unittest
 from pathlib import Path
-from unittest.mock import call, patch
+from unittest.mock import call, mock_open, patch
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -111,6 +111,13 @@ class TestHist(unittest.TestCase):
         self.assertEqual(m_hand.call_args_list,
                          [call(d_path, mosaic=out_p)])
 
+    def test_find_select_idx_name(self):
+        self.assertRaises(ValueError, bf.find_select_idx_name, 1, 1, True)
+        self.assertEqual(bf.find_select_idx_name(1, 2, True), (-1, 'max'))
+        self.assertEqual(bf.find_select_idx_name(1, 2, False), (0, 'max'))
+        self.assertEqual(bf.find_select_idx_name(2, 1, True), (0, 'min'))
+        self.assertEqual(bf.find_select_idx_name(2, 1, False), (-1, 'min'))
+
     def test_find_minima_index(self):
         pixel_counts = np.fromiter((int(x.Pixels) for x in self.hist), int)
         minima_i, _ = find_peaks(np.negative(pixel_counts))
@@ -131,50 +138,143 @@ class TestHist(unittest.TestCase):
                                               1, 12, 6, plot=False))
 
 
-@unittest.skip("Until refactor is done.")
-class TestMask(unittest.TestCase):
+class TestArrays(unittest.TestCase):
+
+    def test_median_limit(self):
+        data = np.array([[1, 2, 3],
+                         [3, 4, 5]])
+
+        self.assertEqual(3, bf.median_limit(np.median(data), data))
+        self.assertEqual(1.5, bf.median_limit(np.median(data), data,
+                                              limit=2.9))
+
+    def test_medstd(self):
+        data = [[1, 3, 3],
+                [9, 5, 6]]
+
+        nomask = np.ma.array(data, mask=np.ma.nomask)
+        nm_vp = nomask.count(axis=0)
+        nm_sd = np.std(nomask, axis=0)
+
+        mask = np.ma.array(data, mask=[[1, 0, 0],
+                                       [0, 0, 1]])
+        ma_vp = mask.count(axis=0)
+        ma_sd = np.std(mask, axis=0)
+
+        self.assertEqual(1.5, bf.median_std(nm_vp, nm_sd))
+        self.assertEqual(1, bf.median_std(ma_vp, ma_sd))
+
+    def test_medstd_from_ma(self):
+        data = [[1, 3, 3],
+                [9, 5, 6]]
+
+        nomask = np.ma.array(data, mask=np.ma.nomask)
+        mask = np.ma.array(data, mask=[[1, 0, 0],
+                                       [0, 0, 1]])
+        self.assertEqual(1.5, bf.median_std_from_ma(nomask))
+        self.assertEqual(1, bf.median_std_from_ma(mask))
+
+    def test_clean_array(self):
+        data = [[1, 3, 3],
+                [9, 5, 6]]
+
+        arr = np.ma.array(data)
+        np.testing.assert_array_equal(np.ma.masked_outside(arr, 2.9, 5.9),
+                                      bf.clean_array(arr, width=1))
+
+        masked = np.ma.array(data, mask=[[1, 0, 0], [0, 0, 1]])
+        np.testing.assert_array_equal(np.ma.masked_outside(arr, 2.9, 5.9),
+                                      bf.clean_array(masked, width=1))
+
+    def test_min_max_ex(self):
+        self.assertEqual(bf.min_max_ex(5, 2, 2), (1, 9, 16))
+        self.assertEqual(bf.min_max_ex(5, 20, 2), (-35, 45, 20))
+        self.assertEqual(bf.min_max_ex(100, 400, 2), (-28, 228, 16))
+
+    def test_find_smart_window_from_ma(self):
+        data = [[1, 3, 3],
+                [9, 5, 6]]
+
+        masked = np.ma.array(data, mask=[[1, 0, 0], [0, 0, 1]])
+        self.assertEqual((3, 5),
+                         bf.find_smart_window_from_ma(
+                             masked, width=1, axis=0, plot=False))
+
+    def test_mask_lists(self):
+        data = [[1, 3, 3],
+                [9, 5, 6]]
+        arr = np.ma.array(data, mask=[[1, 0, 0], [0, 0, 1]])
+
+        self.assertEqual([[0, 3, 3],
+                          [9, 5, 0]],
+                         bf.mask_lists(data, arr,
+                                       isis.specialpixels.UnsignedByte))
+
+
+class TestMock(unittest.TestCase):
 
     def setUp(self):
-        self.h = isis.Histogram('''Cube:           foo.cub
-Band:           1
-Average:        6490.68
-Std Deviation:  166.739
-Variance:       27801.9
-Median:         1000
-Mode:           6489
-Skew:           0.0302975
-Minimum:        3889
-Maximum:        8230
+        self.cal = [[0,  1000, 1001, 991, 1000,    0],
+                    [1,  1000, 1002, 992, 1000, 1000],
+                    [2,  1000, 1003, 993, 1000, 1000],
+                    [3,  1000, 1004, 994, 1000, 1000],
+                    [4,  1000, 1005, 995, 1000, 1000],
+                    [5,  1000, 1011, 990, 1000, 1000],
+                    [6,  1000, 1010, 990, 1000, 1000],
+                    [7,  1000, 1010, 990, 1000, 1000],
+                    [8,  1000, 1010, 990, 1000, 1000],
+                    [9,   999, 1010, 990, 1001, 1001],
+                    [10, 1000, 1010, 990, 1000, 1000],
+                    [11, 1000, 1010, 990, 1000, 1000],
+                    [12, 1000, 1010, 990, 1000, 1000],
+                    [13, 1000, 1010, 990, 1000, 1000],
+                    [14, 1000, 1010, 990, 1000, 1000],
+                    [15, 1000, 1010, 990, 1000, 1000],
+                    [16, 1000, 1010, 990, 1000, 1000],
+                    [17, 1000, 1010, 990, 1000, 1000],
+                    [18, 1000, 1010, 990, 1000, 1000],
+                    [19, 1000, 1010, 990, 1000, 1000],
+                    [20, 1000, 1010, 990, 1000, 1000]]
 
-Total Pixels:    2048000
-Valid Pixels:    2048000
-Null Pixels:     0
-Lis Pixels:      0
-Lrs Pixels:      0
-His Pixels:      0
-Hrs Pixels:      0
+    @patch('pyrise.bitflips.shutil.copy')
+    @patch('pyrise.bitflips.pvl.load',
+           return_value={'IsisCube': {'Core': {'Pixels':
+                                               {'Type': 'UnsignedWord'}},
+                                      'Instrument': {'Summing': 1}}})
+    @patch('pyrise.bitflips.open', new_callable=mock_open)
+    @patch('pyrise.bitflips.isis.cube.overwrite_table')
+    def test_clean_tables(self, m_wtable, m_open, m_pvl, m_copy):
+        for notimpl in ('mask_area', 'ramp_area', 'buffer_area', 'dark_area'):
+            self.assertRaises(NotImplementedError,
+                              bf.clean_tables, 'dummy-in.cub', 'dummy-out.cub',
+                              **{notimpl: True})
 
+        with patch('pyrise.bitflips.isis.cube.get_table',
+                   return_value={'Calibration': self.cal}):
+            bf.clean_tables('dummy-in.cub', 'dummy-out.cub', width=5,
+                            rev_area=True)
 
-DN,Pixels,CumulativePixels,Percent,CumulativePercent
-3889,1,1,4.88281e-05,4.88281e-05
-3924,1,2,4.88281e-05,9.76563e-05
-3960,2,4,9.76563e-05,0.000195313
-3995,1,5,4.88281e-05,0.000244141
-4030,4,9,0.000195313,0.000439453
-4065,6,15,0.000292969,0.000732422
-4101,12,27,0.000585937,0.00131836
-4136,13,40,0.000634766,0.00195312
-4171,11,51,0.000537109,0.00249023
-4207,11,62,0.000537109,0.00302734
-4242,10,72,0.000488281,0.00351562
-4277,14,86,0.000683594,0.00419922
-4312,4,90,0.000195313,0.00439453''')
+            cleaned = list()
+            for row in self.cal:
+                # Values less than 3 are less than the specialpixel Min
+                # and the reverse-clocked area is only the first 20 lines.
+                if 3 < row[0] < 20:
+                    cleaned.append([0] + row[1:])
+                else:
+                    cleaned.append(row)
 
-    @patch('pyrise.HiCal.analyze_cubenorm_stats2', return_value=(1, 2))
-    @patch('pyrise.bitflips.isis.cubenorm')
-    def test_mask(self, m_cn, m_acns2):
-        in_p = Path('in.dummy')
-        out_p = Path('out.dummy')
+            self.assertEqual(cleaned,
+                             m_wtable.call_args[0][2]['Calibration'])
 
-        with patch('pyrise.bitflips.histogram', return_value=self.h):
-            bf.mask(in_p, out_p)
+    @patch('pyrise.bitflips.clean_tables')
+    @patch('pyrise.bitflips.pvl.load',
+           return_value={'IsisCube': {'Core': {'Pixels':
+                                               {'Type': 'UnsignedWord'}}}})
+    @patch('pyrise.bitflips.isis.mask')
+    def test_clean_cube(self, m_mask, m_load, m_clntbl):
+        with patch('pyrise.bitflips.gdal_array.LoadFile',
+                   return_value=self.cal):
+            bf.clean_cube('dummy-in.cub', 'dummy-out.cub', keep=True)
+
+        self.assertEqual(m_mask.call_args[1]['minimum'], 993)
+        self.assertEqual(m_mask.call_args[1]['maximum'], 1003)

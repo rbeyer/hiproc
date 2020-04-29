@@ -685,18 +685,23 @@ def mask(in_cube: os.PathLike, out_cube: os.PathLike, noisefilter_min: float,
     util.log(isis.mask(in_cube, mask=in_cube, to=temp_cube,
                        minimum=noisefilter_min, maximum=noisefilter_max,
                        preserve='INSIDE', spixels='NONE').args)
-
-    cubenorm_stats_file = to_del.add(temp_cube.with_suffix('.cn.stats'))
-    util.log(isis.cubenorm(temp_cube, stats=cubenorm_stats_file).args)
     if width == 0:
+        cubenorm_stats_file = to_del.add(temp_cube.with_suffix('.cn.stats'))
+        util.log(isis.cubenorm(temp_cube, stats=cubenorm_stats_file).args)
         (mindn, maxdn) = analyze_cubenorm_stats(cubenorm_stats_file, binning)
         util.log(isis.mask(temp_cube, mask=temp_cube, to=out_path,
                  minimum=mindn, maximum=maxdn,
                  preserve='INSIDE', spixels='NONE').args)
     else:
+        # The analyze_cubenorm_stats() function is meant to make sure we
+        # don't blow away valid data, with the philosphy that it is better to
+        # let in a little bad data in order to keep the good.  However, in
+        # images with a high percentage of LIS%, there is so much bad that it
+        # swamps the good, so *this* approach attempts to find the median
+        # standard deviation that might be an approximation to the 'real'
+        # standard devation of the data without the bit-flip noise.
         logging.info('More severe handling of images with LIS pixels engaged.')
-        bf.clean_cube(temp_cube, out_path, width=width,
-                      cubenorm_path=cubenorm_stats_file, keep=keep)
+        bf.clean_cube(temp_cube, out_path, width=width, keep=keep)
 
     if not keep:
         to_del.unlink()
@@ -782,43 +787,6 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
         maxdn *= 1.5
 
     return(mindn, maxdn)
-
-
-def median_std(statsfile: os.PathLike) -> float:
-    # The analyze_cubenorm_stats() function is meant to make sure we
-    # don't blow away valid data, with the philosphy that it is better to
-    # let in a little bad data in order to keep the good.  However, in
-    # images with a high percentage of LIS%, there is so much bad that it
-    # swamps the good, so this approach attempts to find the median
-    # standard deviation that might be an approximation to the 'real'
-    # standard devation of the data without the bit-flip noise.
-
-    with open(statsfile) as csvfile:
-        valid_points = list()
-        std_devs = list()
-        mins = list()
-        maxs = list()
-        reader = csv.DictReader(csvfile, dialect=isis.cubenormfile.Dialect)
-        for row in reader:
-            valid_points.append(int(row['ValidPoints']))
-            std_devs.append(float(row['StdDev']))
-            mins.append(int(row['Minimum']))
-            maxs.append(int(row['Maximum']))
-
-    maxvp = max(valid_points)
-    logging.info(f'Maximum count of valid pixels: {maxvp}')
-
-    std_w_maxvp = list()
-    for (vp, std) in zip(valid_points, std_devs):
-        if vp == maxvp:
-            std_w_maxvp.append(std)
-
-    medstd = statistics.median_high(std_w_maxvp)
-    logging.info('median standard deviation of all ' +
-                 'columns ({}) that have the '.format(len(std_w_maxvp)) +
-                 'maximum valid pixel count: {}'.format(medstd))
-
-    return medstd
 
 
 def HiGainFx(cube: os.PathLike, outcube: os.PathLike,

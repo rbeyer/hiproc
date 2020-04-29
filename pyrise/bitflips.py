@@ -78,6 +78,11 @@ to mitigate the bit-flip pixels once they have been identified.
 # Parts of this were inspired by clean_bit_flips.pro by Alan Delamere,
 # Oct 2019, but the implementation here was written from scratch.
 
+# This program can also be run from within the Perl HiCal program's
+# Mask() function like so:
+#
+#   $cmd = "bitflips.py -o $mask_file $tmask_file"
+
 import argparse
 import itertools
 import logging
@@ -85,59 +90,71 @@ import math
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
+from osgeo import gdal_array
 from scipy.signal import find_peaks
+from scipy.stats import mstats
 
 import pvl
-
-import pyrise.hirise as hirise
-import pyrise.util as util
 import kalasiris as isis
+
+import pyrise.util as util
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     parents=[util.parent_parser()])
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        parents=[util.parent_parser()])
     parser.add_argument('-o', '--output',
                         required=False, default='.bitflip.cub')
-    parser.add_argument('-m', '--mask', required=False, action='store_true',
-                        help=('If set, the program will mask the '
-                              'bit-flipped pixels, otherwise will '
-                              'try to collapse them.'))
+    parser.add_argument('-u', '--unflip', required=False, action='store_true',
+                        help="If set, the program will attempt to unflip "
+                        "the bit-flipped pixels, otherwise will mask them. "
+                        "only the image area is affected by this option.")
+    parser.add_argument('-w', '--width', required=False, default=5,
+                        help="The number of medstd widths for bit-flip "
+                        "cleaning.")
     parser.add_argument('--line', required=False, action='store_true',
-                        help='In conjunction with -m applies cubenorm in '
-                        'the line direction instead of column.')
-    parser.add_argument('cube', metavar="some.cub-file", nargs='+',
-                        help='More than one can be listed here.')
+                        help="Performs statistics along the line direction "
+                        "instead of column for the image area.")
+    parser.add_argument('-p', '--plot', required=False, action='store_true',
+                        help="Displays plot for each area.")
+    parser.add_argument('-n', '--dryrun', required=False, action='store_true',
+                        help="Does not produce a cleaned output file.")
+    parser.add_argument('cube', metavar="some.cub-file",
+                        help='ISIS Cube file to clean.')
 
     args = parser.parse_args()
 
     util.set_logging(args.log, args.logfile)
 
-    if(len(args.cube) > 1 and
-       not args.output.startswith('.')):
-        logging.critical('With more than one input cube file, the --output '
-                         'must start with a period, and it '
-                         f'does not: {args.output}')
-        sys.exit()
+    out_p = util.path_w_suffix(args.output, args.cube)
 
-    for i in args.cube:
-        out_p = util.path_w_suffix(args.output, i)
-
-        try:
-            if args.mask:
-                mask(Path(i), out_p, line=args.line, keep=args.keep)
-            else:
-                unflip(Path(i), out_p, keep=args.keep)
-        except subprocess.CalledProcessError as err:
-            print('Had an ISIS error:')
-            print(' '.join(err.cmd))
-            print(err.stdout)
-            print(err.stderr)
-            raise err
-    return
+    try:
+        if args.unflip:
+            if args.plot:
+                print('The unflip option has no plotting option. Ignoring.',
+                      file=sys.stderr)
+            if args.dryrun:
+                print('The unflip option has no dryrun option. Quitting.',
+                      file=sys.stderr)
+                sys.exit(1)
+            unflip(Path(args.cube), out_p, keep=args.keep)
+        else:
+            clean_cube(args.cube, out_p, width=args.width,
+                       axis=(1 if args.line else 0),
+                       plot=args.plot, dryrun=args.dryrun, keep=args.keep)
+        sys.exit(0)
+    except subprocess.CalledProcessError as err:
+        print('Had an ISIS error:', file=sys.stderr)
+        print(' '.join(err.cmd), file=sys.stderr)
+        print(err.stdout, file=sys.stderr)
+        print(err.stderr, file=sys.stderr)
+        sys.exit(1)
 
 
 def get_range(start, stop, step=None) -> range:
@@ -273,7 +290,7 @@ def histogram(in_path: Path, hist_path: Path):
 
 
 def clean_cube(cube: os.PathLike, outcube: os.PathLike, width=5,
-               cubenorm_path=None, plot=False, keep=False):
+               axis=0, plot=False, dryrun=False, keep=False):
     """The file at *outcube* will be the result of running
     bit-flip cleaning of the file at *cube*.
 
@@ -284,80 +301,45 @@ def clean_cube(cube: os.PathLike, outcube: os.PathLike, width=5,
     allowable DN window (which may be defined differently for each
     of the image areas), will be set to the ISIS NULL value.
 
-    If ISIS cubenorm has already been run on *cube*, the path to
-    the output can be specified with *cubenorm_path*.  If *cubenorm_path*
-    is left unspecified, it will be created.
-
     If *keep* is True, then all intermediate files will be preserved,
     otherwise, this function will clean up any intermediary files
     it creates.
     """
+
+    to_del = isis.PathSet()
+
     in_p = Path(cube)
-    out_p = Path(cube)
-    cn_p = None
+    out_p = Path(outcube)
 
-    if cubenorm_path is None:
-        cn_p = in_p.with_suffix('.cn.stats')
-        util.log(isis.cubenorm(in_p, stats=cn_p).args)
-    else:
-        cn_p = Path(cubenorm_path)
+    # Bit-flip correct the non-image areas somehow.
+    tblcln_p = to_del.add(in_p.with_suffix('.tableclean.cub'))
+    clean_tables(in_p, tblcln_p, width=width, plot=plot, dryrun=dryrun)
 
-    # Go bit-flip correct the non-image areas somehow.
-    clean_tables(in_p, tableclean, width=width, keep=keep)
+    # Now clean the image area.
+    label = pvl.load(in_p)
+    specialpix = getattr(isis.specialpixels,
+                         label['IsisCube']['Core']['Pixels']['Type'])
+    image = np.ma.masked_outside(gdal_array.LoadFile(str(in_p)),
+                                 specialpix.Min, specialpix.Max)
 
-    results = pvl.loads(isis.stats(in_p).stdout)['Results']
-    img_mean = float(results['Average'])
-    img_mode = float(results['Mode'])
-    img_median = float(results['Median'])
-
-    hist_p = to_del.add(in_p.with_suffix('.hist'))
-    util.log(isis.hist(in_p, to=hist_p).args)
-    hist = isis.Histogram(hist_p)
-    # median = math.trunc(float(hist['Median']))
-
+    logging.info(f"Bit-flip cleaning Image area.")
+    # These four lines are just informational.
+    img_mean = np.ma.mean(image)
+    img_mode = mstats.mode(image, axis=None)[0][0]
     d = img_mean - img_mode
-    logging.info(f'{temp_cube} Mean: {img_mean}, Mode: {img_mode}, '
-                 f'diff: {d}, Median: {img_median}')
+    logging.info(f"Mean: {img_mean}, Mode: {img_mode}, diff: {d}")
 
-    medstd = median_std(cn_p)
+    (s_min, s_max) = find_smart_window_from_ma(
+        image, width=width, axis=axis,
+        plot=(f"{in_p.name} Image Area" if plot else False))
 
-    # Sometimes even the medstd can be too high because the 'good' lines
-    # still had too many outliers in it.  What is 'too high' and how do
-    # we define it rigorously?  I'm not entirely sure, and I wish there
-    # was a better way to determine this, or, alternately an even more robust
-    # way to find 'medstd' in the first place.
-    # I am going to select an abitrary value based on my experience (300)
-    # and then also pick a replacement of 64 which is a complete guess.
-    # Finally, in this case, since the 'statistics' are completely broken,
-    # I'm also going to set the exclusion to be arbitrary, and lower than
-    # the enforced medstd.
-    if medstd > 300:
-        medstd = 64
-        ex = 16
-        logging.info('The derived medstd was too big, setting the medstd '
-                     f'to {medstd} and the exclusion value to {ex}.')
-    else:
-        # We want to ignore minima that are too close to the central value.
-        # Sometimes the medstd is a good choice, sometimes 16 DN (which is a
-        # minimal bit flip level) is better, so use the greatest:
-        ex = max(medstd, 16)
+    if not dryrun:
+        util.log(isis.mask(tblcln_p, mask=tblcln_p, to=out_p,
+                 minimum=s_min, maximum=s_max,
+                 preserve='INSIDE', spixels='NONE').args)
 
-    mindn = img_median - (width * medstd)
-    maxdn = img_median + (width * medstd)
-
-    hist_list = sorted(hist, key=lambda x: int(x.DN))
-    pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
-    dn = np.fromiter((int(x.DN) for x in hist_list), int)
-
-    (sm_mindn, sm_maxdn) = find_smart_window(hist, mindn, maxdn, img_median,
-                                             central_exclude_dn=ex, plot=plot)
-
-    util.log(isis.mask(in_p, mask=in_p, to=out_p,
-             minimum=sm_mindn, maximum=sm_maxdn,
-             preserve='INSIDE', spixels='NONE').args)
-
-    if not keep:
-        to_del.unlink()
+        if not keep:
+            to_del.unlink()
 
     return
 
@@ -365,7 +347,7 @@ def clean_cube(cube: os.PathLike, outcube: os.PathLike, width=5,
 def clean_tables(cube: Path, outcube: Path, width=5,
                  rev_area=True, mask_area=False, ramp_area=False,
                  buffer_area=False, dark_area=False,
-                 keep=False):
+                 plot=False, dryrun=False):
     """The file at *outcube* will be the result of running bit-flip
     cleaning of the specified non-image areas in table objects within
     the ISIS cube file.
@@ -401,68 +383,329 @@ def clean_tables(cube: Path, outcube: Path, width=5,
             raise NotImplementedError(
                 f"Bit-flip cleaning for {notimpl} is not yet implemented.")
 
-    shutil.copy(cube, outcube)
+    label = pvl.load(cube)
+    binning = label['IsisCube']['Instrument']['Summing']
+    mask_lines = int(20 / binning)
+    specialpix = getattr(isis.specialpixels,
+                         label['IsisCube']['Core']['Pixels']['Type'])
+    if not dryrun:
+        shutil.copy(cube, outcube)
 
-    # for each area
-    # read the table data
-    # analyze the table data
-    # filter the table data
-    # write the table back out into outcube
+    # Deal with the HiRISE Calibration Image first (Reverse-clock, Mask,
+    # and Ramp
+    if any((rev_area, mask_area, ramp_area)):
+        t_name = 'HiRISE Calibration Image'
+        HCI_dict = isis.cube.get_table(cube, t_name)
+        cal_vals = np.array(HCI_dict['Calibration'])
+        cal_image = np.ma.masked_outside(cal_vals,
+                                         specialpix.Min,
+                                         specialpix.Max)
+        if rev_area:
+            logging.info(f"Bit-flip cleaning Reverse-Clock area.")
+            rev_clean = clean_array(
+                cal_image[:20, :], width=width, axis=1,
+                plot=(f"{cube.name} Reverse-Clock" if plot else False))
+            cal_image.put(np.arange(rev_clean.size), rev_clean)
+
+        # if mask_area:
+        #     mask_pixels = cal_image[20:mask_lines, :]
+
+        # if ramp_area:
+        #     ramp_pixels = cal_image[20 + mask_lines:, :]
+
+        if not dryrun:
+            # write the table back out into outcube
+            HCI_dict['Calibration'] = mask_lists(HCI_dict['Calibration'],
+                                                 cal_image, specialpix)
+            isis.cube.overwrite_table(outcube, t_name, HCI_dict)
+
+    # if any((buffer_area, dark_area)):
+    #     t_name = 'HiRISE Ancillary'
+    #     HA_dict = isis.cube.get_table(cube, t_name)
+    #     buffer_image = np.array(HA_dict['BufferPixels'])
+    #     dark_image = np.array(HA_dict['DarkPixels'])
+    #
+    #     # write the table back out into outcube
+    #     if not dryrun:
+    #         HA_dict['BufferPixels'] = mask_listoflists(
+    #             HA_dict['BufferPixels'], buffer_image, specialpix)
+    #         HA_dict['DarkPixels'] = mask_listoflists(
+    #             HA_dict['DarkPixels'], buffer_image, specialpix)
+    #         isis.cube.overwrite_table(outcube, t_name, HA_dict)
+
+    return
 
 
-def mask(in_path: Path, out_path: Path, line=False, plot=True, keep=False):
-    """Attempt to mask out pixels beyond the central DNs of the median
-    based on minima in the histogram."""
-    from pyrise.HiCal import analyze_cubenorm_stats2
+def clean_array(data: np.ma.array, width=5, axis=0, plot=False):
+    """Returns a numpy masked array whose mask is based on applying
+    the smart window bounds from find_smart_window_from_ma() applied
+    to *data* with the specified *wdith* and *axis*.
+    """
+    (w_min, w_max) = find_smart_window_from_ma(data, width=width, axis=axis,
+                                               plot=plot)
+    return np.ma.masked_outside(data, w_min, w_max)
 
-    to_del = isis.PathSet()
 
-    hist_p = to_del.add(in_path.with_suffix('.hist'))
-    hist = histogram(in_path, hist_p)
+def mask_lists(lists: list, array: np.ndarray, specialpix) -> list:
+    """Return a modified version of *lists* which is a list of lists
+    with the same shape as *array*.  The modified version is based
+    on the provided masked *array* and the *specialpix* named tuple.
 
-    median = math.trunc(float(hist['Median']))
-    logging.info(f'Median: {median}')
+    It essentially returns *array*.data as the returned list of lists,
+    but if any values were masked in *array* that weren't already
+    special pixels in *specialpix* they are set to the appropriate
+    value.
+    """
+    shape = (len(lists), len(lists[0]))
+    # Should we check all of the lists in lists?  Probably.
+    if array.shape != shape:
+        raise ValueError(f"The shape of the array ({array.shape}) doesn't "
+                         f"match the shape of the list of lists ({shape}).")
 
-    # With terrible noise, the computed median is the median of the
-    # noise, not of the data, so if that happens, try and find a
-    # DN peak that is more reasonable:
-    median_limit = 4000
-    if median > median_limit:
-        trunc_hist = list()
-        for row in hist:
-            if int(row.DN) < median_limit:
-                trunc_hist.append((int(row.DN), int(row.Pixels)))
-        try:
-            median = max(trunc_hist, key=lambda x: x[1])[0]
-            logging.info(
-                f'The median was too high, found a better one: {median}.')
-        except ValueError:
-            # No values in the trunc_hist, which means that there are no
-            # DN less than maedian_limit, so we just leave things as they are.
-            pass
+    values = array.data
+    mask = array.mask
+    for row in range(array.shape[0]):
+        for col in range(array.shape[1]):
+            # print(f"row: {row}, col: {col}")
+            # print(values[row, col])
+            # print(lists[row][col])
+            if mask[row, col]:
+                # Make sure the pixel gets the proper value
+                if values[row, col] in (specialpix.Null, specialpix.Lrs,
+                                        specialpix.Lis, specialpix.His,
+                                        specialpix.Hrs):
+                    pass  # lists just keeps its value
+                elif values[row, col] < specialpix.Min:
+                    lists[row][col] = specialpix.Lrs
+                elif values[row, col] > specialpix.Max:
+                    lists[row][col] = specialpix.Hrs
+                else:
+                    lists[row][col] = specialpix.Null
 
-    cubenorm_stats_file = to_del.add(in_path.with_suffix('.cn.stats'))
-    if line:
-        util.log(isis.cubenorm(in_path, stats=cubenorm_stats_file,
-                               direction='line').args)
+            # else it isn't masked, and should be left as-is.
+    return lists
+
+
+def find_smart_window_from_ma(data: np.ma.array, width=5, axis=0, plot=False):
+    """Returns a two-tuple with the result of find_smart_window().
+
+    This function mostly just does set-up based on the provided
+    masked array *data* and the provided *width* and *axis* value
+    to calculate the inputs for find_smart_window().
+    """
+    median = median_limit(np.ma.median(data), data)
+    medstd = median_std_from_ma(data, axis=axis)
+
+    unique, unique_counts = np.unique(data.compressed(), return_counts=True)
+
+    mindn, maxdn, ex = min_max_ex(median, medstd, width)
+
+    return find_smart_window(unique, unique_counts, mindn, maxdn, median,
+                             central_exclude_dn=ex, plot=plot)
+
+
+def median_limit(median, data: np.ndarray, limit=4000):
+    """Return the 'best' median of the provided data.
+
+    If the extracted median is larger than *limit*, the algorithm
+    will attempt to find a better representation of the median.  If
+    it cannot, it will return the median, even if larger than
+    *limit*.
+    """
+    logging.info(f"Median: {median}")
+
+    if median > limit and np.any([data < limit]):
+        median = np.median(data[data < limit])
+        logging.info(f"The median was too high (> {limit}), "
+                     f"found a better one: {median}.")
+
+    return median
+
+
+def median_std_from_ma(data: np.ma, axis=0):
+    """On the assumption that there are bit-flips in the *data*,
+    attempt to find a value that might represent the standard
+    deviation of the 'real' data.  The *data* object must be a
+    numpy masked array.
+
+    The value of *axis* determines which way the data are handled.
+    The default is 0 to scan vertially to accumulate statistics for
+    columns.  In this case, only those columns with the most unmasked
+    data are evaluated.  For them, the standard deviation is found
+    for each column, and the returned value is the median of those
+    standard deviations.  If *axis* is 1, then this is applied to
+    rows, not columns.
+    """
+    valid_points = data.count(axis=axis)
+    std_devs = np.std(data, axis=axis)
+    return median_std(valid_points, std_devs)
+
+
+# def median_std_from_cn(statsfile: os.PathLike):
+#     """On the assumption that there are bit-flips in the cube
+#     that ISIS cubenorm was run on, and the path to that output file
+#     provided via *statsfile*, attempt to find a value that might
+#     represent the standard deviation of the 'real' data.
+#     """
+#     valid_points = list()
+#     std_devs = list()
+#     with open(statsfile) as csvfile:
+#         reader = csv.DictReader(csvfile, dialect=isis.cubenormfile.Dialect)
+#         for row in reader:
+#             valid_points.append(int(row['ValidPoints']))
+#             std_devs.append(float(row['StdDev']))
+#
+#     return median_std(valid_points, std_devs)
+
+
+def median_std(valid_points: np.ma, std_devs: np.ma):
+    """On the assumption that there are bit-flips in the data
+    represented by the two arrays *valid_points* and *std_devs*,
+    attempt to find a value that might represent the standard
+    deviation of the 'real' data.  The *valid_points* numpy masked
+    array should be the count of valid points along some axis (for
+    the rows or columns).  The *std_devs* numpy masked array
+    should be the same size as *valid_points* and should be the
+    standard deviation of those rows or columns.
+    """
+    maxvp = max(valid_points)
+    logging.info(f"Maximum count of valid pixels along axis: {maxvp}")
+
+    std_w_maxvp = np.extract(valid_points == maxvp, std_devs)
+    medstd = np.ma.median(std_w_maxvp)
+    logging.info(f"Number of rows/columns with that count: {len(std_w_maxvp)}")
+    logging.info("Median standard deviation of elements along the axis "
+                 f"that have the maximum valid pixel count: {medstd}.")
+    return medstd
+
+
+def min_max_ex(central, medstd, width) -> tuple:
+    """Return a minimum, maximum, and exclusion value based on the
+    provided *central* value, and adding and subtracting the result
+    of multiplying the *medstd* by the *width*.
+
+    If the medstd is too large, the resulting values are based on
+    conservative guesses.
+    """
+    # Sometimes even the medstd can be too high because the 'good' lines
+    # still had too many outliers in it.  What is 'too high' and how do
+    # we define it rigorously?  I'm not entirely sure, and I wish there
+    # was a better way to determine this, or, alternately an even more robust
+    # way to find 'medstd' in the first place.
+    # I am going to select an abitrary value based on my experience (300)
+    # and then also pick a replacement of 64 which is a complete guess.
+    # Finally, in this case, since the 'statistics' are completely broken,
+    # I'm also going to set the exclusion to be arbitrary, and lower than
+    # the enforced medstd.
+    if medstd > 300:
+        medstd = 64
+        ex = 16
+        logging.info("The derived medstd was too big, setting the medstd "
+                     f"to {medstd} and the exclusion value to {ex}.")
     else:
-        util.log(isis.cubenorm(in_path, stats=cubenorm_stats_file).args)
-    (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, median,
-                                             hist, width=5, plot=plot)
+        # We want to ignore minima that are too close to the central value.
+        # Sometimes the medstd is a good choice, sometimes 16 DN (which is a
+        # minimal bit flip level) is better, so use the greatest:
+        ex = max(medstd, 16)
 
-    # To bypass the 'medstd' calculations in analyze_cubenorm_stats2(),
-    # this mechanism can be used to set the limits directly.
-    # (mindn, maxdn) = find_smart_window(hist,
-    #                                    math.trunc(float(hist['Minimum'])),
-    #                                    math.trunc(float(hist['Maximum'])),
-    #                                    median, plot=True)
+    mindn = central - (width * medstd)
+    maxdn = central + (width * medstd)
 
-    # util.log(isis.mask(in_path, to=out_path, minimum=maskmin,
-    #                    maximum=maskmax).args)
+    return mindn, maxdn, ex
 
-    if not keep:
-        to_del.unlink()
-    return (mindn, maxdn)
+
+# def mask(in_path: Path, out_path: Path, line=False, plot=True, keep=False):
+#     """Attempt to mask out pixels beyond the central DNs of the median
+#     based on minima in the histogram.
+#
+#     This is now superceded by clean_cube()
+#     """
+#
+#     from pyrise.HiCal import analyze_cubenorm_stats2
+#
+#     to_del = isis.PathSet()
+#
+#     hist_p = to_del.add(in_path.with_suffix('.hist'))
+#     hist = histogram(in_path, hist_p)
+#
+#     median = math.trunc(float(hist['Median']))
+#     logging.info(f'Median: {median}')
+#
+#     # With terrible noise, the computed median is the median of the
+#     # noise, not of the data, so if that happens, try and find a
+#     # DN peak that is more reasonable:
+#     median_limit = 4000
+#     if median > median_limit:
+#         trunc_hist = list()
+#         for row in hist:
+#             if int(row.DN) < median_limit:
+#                 trunc_hist.append((int(row.DN), int(row.Pixels)))
+#         try:
+#             median = max(trunc_hist, key=lambda x: x[1])[0]
+#             logging.info(
+#                 f'The median was too high, found a better one: {median}.')
+#         except ValueError:
+#             # No values in the trunc_hist, which means that there are no
+#             # DN less than maedian_limit, so we just leave things as they
+#             # are.
+#             pass
+#
+#     cubenorm_stats_file = to_del.add(in_path.with_suffix('.cn.stats'))
+#     if line:
+#         util.log(isis.cubenorm(in_path, stats=cubenorm_stats_file,
+#                                direction='line').args)
+#     else:
+#         util.log(isis.cubenorm(in_path, stats=cubenorm_stats_file).args)
+#     (mindn, maxdn) = analyze_cubenorm_stats2(cubenorm_stats_file, median,
+#                                              hist, width=5, plot=plot)
+#
+#     # To bypass the 'medstd' calculations in analyze_cubenorm_stats2(),
+#     # this mechanism can be used to set the limits directly.
+#     # (mindn, maxdn) = find_smart_window(hist,
+#     #                                    math.trunc(float(hist['Minimum'])),
+#     #                                    math.trunc(float(hist['Maximum'])),
+#     #                                    median, plot=True)
+#
+#     # util.log(isis.mask(in_path, to=out_path, minimum=maskmin,
+#     #                    maximum=maskmax).args)
+#
+#     if not keep:
+#         to_del.unlink()
+#     return (mindn, maxdn)
+
+
+def find_select_idx_name(central_idx: int, limit_idx: int,
+                         close_to_limit: bool):
+    """Returns a two-tuple which contains an int of value 0 or -1 in
+    the first posiion and a string of value 'min' or 'max' in the second.
+
+    The string is determined based on the relative values of
+    *central_idx* to *limit_idx*, and the value of the int is meant
+    as an index to a list, based on the three input variables.
+
+    Raises *ValueError* if *central_idx* and *limit_idx* are the same.
+
+    This is primarily a helper function to find_minima_index().
+    """
+    select_idx = None
+    idx_name = None
+
+    if limit_idx < central_idx:
+        idx_name = 'min'
+        if close_to_limit is False:
+            select_idx = -1
+        else:
+            select_idx = 0
+    elif limit_idx > central_idx:
+        idx_name = 'max'
+        if close_to_limit is False:
+            select_idx = 0
+        else:
+            select_idx = -1
+    else:
+        raise ValueError
+
+    return select_idx, idx_name
 
 
 def find_minima_index(central_idx: int, limit_idx: int,
@@ -481,27 +724,16 @@ def find_minima_index(central_idx: int, limit_idx: int,
     # print(f'central_idx: {central_idx}')
     # print(f'limit_idx: {limit_idx}')
     info_str = 'Looking for {} {} range ...'
-    try:
-        if limit_idx < central_idx:
-            logging.info(info_str.format('min', 'inside'))
-            inrange_iter = filter(lambda i: i < central_idx and i >= limit_idx,
-                                  minima_idxs)
-            if close_to_limit is False:
-                select_idx = -1
-            else:
-                select_idx = 0
-        elif limit_idx > central_idx:
-            logging.info(info_str.format('max', 'inside'))
-            inrange_iter = filter(lambda i: i > central_idx and i <= limit_idx,
-                                  minima_idxs)
-            if close_to_limit is False:
-                select_idx = 0
-            else:
-                select_idx = -1
-        else:
-            raise ValueError
 
-        inrange_i = np.fromiter(inrange_iter, int)
+    try:
+        select_idx, idx_name = find_select_idx_name(central_idx, limit_idx,
+                                                    close_to_limit)
+        logging.info(info_str.format(idx_name, 'inside'))
+
+        min_i = min(central_idx, limit_idx)
+        max_i = max(central_idx, limit_idx)
+        inrange_i = minima_idxs[
+            (minima_idxs >= min_i) * (minima_idxs < max_i)]
         logging.info(str(inrange_i) + ' are the indexes inside the range.')
 
         value = min(np.take(pixel_counts, inrange_i))
@@ -514,10 +746,10 @@ def find_minima_index(central_idx: int, limit_idx: int,
         try:
             if limit_idx < central_idx:
                 logging.info(info_str.format('min', 'outside'))
-                idx = max(filter(lambda i: i < limit_idx, minima_idxs))
+                idx = max(minima_idxs[minima_idxs < limit_idx])
             elif limit_idx > central_idx:
                 logging.info(info_str.format('max', 'outside'))
-                idx = min(filter(lambda i: i > limit_idx, minima_idxs))
+                idx = min(minima_idxs[minima_idxs > limit_idx])
             else:
                 raise ValueError
 
@@ -598,6 +830,10 @@ def find_smart_window(dn: np.ndarray, counts: np.ndarray,
         dn_window = np.fromiter(map((lambda i: i >= mindn_i and i <= maxdn_i),
                                     (x for x in range(len(counts)))),
                                 dtype=bool)
+
+        if isinstance(plot, str):
+            fig.suptitle(plot)
+
         ax0.set_ylabel('Pixel Count')
         ax0.set_xlabel('DN Index')
         ax0.set_yscale('log')
@@ -632,8 +868,6 @@ def mask_gap(in_path: Path, out_path: Path, keep=False):
     is that there are 'gaps' everywhere along the DN range, and this
     approach ends up being too 'dumb'.
     """
-
-    to_del = isis.PathSet()
 
     hist_p = in_path.with_suffix('.hist')
     hist = histogram(in_path, hist_p)
@@ -670,6 +904,10 @@ def get_unflip_thresh(hist: list, far, near, lowlimit) -> int:
         thresh = find_gap(hist, far, near)
     except ValueError:
         logging.info('No zero threshold found.')
+        # d is not defined here, and I think this was the victim of
+        # some cut'n'paste work, but would need to go analyze the
+        # repo history to track it down.  For the moment, this will
+        # just error!
         if d >= lowlimit:
             thresh = find_min_dn(hist, far, near)
             logging.info(f'Found a minimum threshold: {thresh}')
@@ -683,6 +921,8 @@ def get_unflip_thresh(hist: list, far, near, lowlimit) -> int:
 def unflip(in_p: Path, out_p: Path, keep=False):
     """Attempt to indentify DNs whose bits have been flipped in the
     ISIS cube indicated by *in_p*, and unflip them.
+
+    Only operates on image-area.
     """
     to_del = isis.PathSet()
 
