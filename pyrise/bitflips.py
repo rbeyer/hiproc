@@ -95,12 +95,14 @@ from pathlib import Path
 
 import numpy as np
 from osgeo import gdal_array
+from scipy import interpolate
 from scipy.signal import find_peaks
 from scipy.stats import mstats
 
 import pvl
 import kalasiris as isis
 
+import pyrise.img as img
 import pyrise.util as util
 
 
@@ -121,18 +123,21 @@ def main():
     parser.add_argument('--line', required=False, action='store_true',
                         help="Performs statistics along the line direction "
                         "instead of column for the image area.")
+    parser.add_argument('-r', '--replacement', required=False, type=int,
+                        help="By default, the program will replace identified "
+                        "pixels with an appropriate NULL data value, but if"
+                        "provided this value will be used instead.")
     parser.add_argument('-p', '--plot', required=False, action='store_true',
                         help="Displays plot for each area.")
     parser.add_argument('-n', '--dryrun', required=False, action='store_true',
                         help="Does not produce a cleaned output file.")
-    parser.add_argument('cube', metavar="some.cub-file",
-                        help='ISIS Cube file to clean.')
+    parser.add_argument('file', help='ISIS Cube file or PDS IMG to clean.')
 
     args = parser.parse_args()
 
     util.set_logging(args.log, args.logfile)
 
-    out_p = util.path_w_suffix(args.output, args.cube)
+    out_p = util.path_w_suffix(args.output, args.file)
 
     try:
         if args.unflip:
@@ -143,11 +148,11 @@ def main():
                 print('The unflip option has no dryrun option. Quitting.',
                       file=sys.stderr)
                 sys.exit(1)
-            unflip(Path(args.cube), out_p, keep=args.keep)
+            unflip(Path(args.file), out_p, keep=args.keep)
         else:
-            clean_cube(args.cube, out_p, width=args.width,
-                       axis=(1 if args.line else 0),
-                       plot=args.plot, dryrun=args.dryrun, keep=args.keep)
+            clean(args.file, out_p, width=args.width,
+                  axis=(1 if args.line else 0), replacement=args.replacement,
+                  plot=args.plot, dryrun=args.dryrun, keep=args.keep)
         sys.exit(0)
     except subprocess.CalledProcessError as err:
         print('Had an ISIS error:', file=sys.stderr)
@@ -289,34 +294,60 @@ def histogram(in_path: Path, hist_path: Path):
     return isis.Histogram(hist_path)
 
 
-def clean_cube(cube: os.PathLike, outcube: os.PathLike, width=5,
-               axis=0, plot=False, dryrun=False, keep=False):
-    """The file at *outcube* will be the result of running
-    bit-flip cleaning of the file at *cube*.
+def clean(in_path: os.PathLike, out_path: os.PathLike, width=5,
+          replacement=None, axis=0, plot=False, dryrun=False, keep=False):
+    """The file at *out_path* will be the result of running bit-flip
+    cleaning of the file at *in-path*.
+
+    The file at *out_path* can be an ISIS cube file, or a PDS IMG file.
 
     **WARNING**: at this time, only the image-area and the reverse-clock
     area are undergoing bit-flip cleaning.
 
-    This means that pixels that are identified as being beyond the
-    allowable DN window (which may be defined differently for each
-    of the image areas), will be set to the ISIS NULL value.
+    If *replacement* is not specified, pixels that are identified
+    as being beyond the allowable DN window (which may be defined
+    differently for each of the image areas), will be set to the
+    equivalent ISIS NULL value, otherwise they will be set to this
+    value.
 
     If *keep* is True, then all intermediate files will be preserved,
     otherwise, this function will clean up any intermediary files
     it creates.
     """
 
+    in_p = Path(in_path)
+    out_p = Path(out_path)
+
+    label = pvl.load(in_p)
+    if 'IsisCube' in label:
+        clean_cube(in_p, out_p, label, width, replacement, axis, plot,
+                   dryrun, keep)
+    elif 'PDS_VERSION_ID' in label:
+        clean_img(in_p, out_p, label, width, replacement, axis, plot,
+                  dryrun, keep)
+    else:
+        raise ValueError(f"The file at {in_p} is not an ISIS Cube or a "
+                         "PDS IMG fie.")
+    return
+
+
+def clean_cube(in_p: Path, out_p: Path, label=None, width=5,
+               replacement=None, axis=0, plot=False, dryrun=False, keep=False):
+    """ISIS Cube version of clean().
+
+    Please see clean() for argument details.
+    """
+
     to_del = isis.PathSet()
 
-    in_p = Path(cube)
-    out_p = Path(outcube)
-
-    # Bit-flip correct the non-image areas somehow.
+    # Bit-flip correct the non-image areas.
     tblcln_p = to_del.add(in_p.with_suffix('.tableclean.cub'))
-    clean_tables(in_p, tblcln_p, width=width, plot=plot, dryrun=dryrun)
+    clean_tables_from_cube(in_p, tblcln_p, width=width, plot=plot,
+                           dryrun=dryrun)
 
     # Now clean the image area.
-    label = pvl.load(in_p)
+    if label is None:
+        label = pvl.load(in_p)
     specialpix = getattr(isis.specialpixels,
                          label['IsisCube']['Core']['Pixels']['Type'])
     image = np.ma.masked_outside(gdal_array.LoadFile(str(in_p)),
@@ -338,19 +369,102 @@ def clean_cube(cube: os.PathLike, outcube: os.PathLike, width=5,
                  minimum=s_min, maximum=s_max,
                  preserve='INSIDE', spixels='NONE').args)
 
+        if replacement is not None:
+            null_p = to_del.add(tblcln_p.with_suffix('.null.cub'))
+            shutil.copy(out_p, null_p)
+            util.log(isis.stretch(null_p, to=out_p, null=replacement))
+
         if not keep:
             to_del.unlink()
 
     return
 
 
-def clean_tables(cube: Path, outcube: Path, width=5,
-                 rev_area=True, mask_area=False, ramp_area=False,
-                 buffer_area=False, dark_area=False,
-                 plot=False, dryrun=False):
-    """The file at *outcube* will be the result of running bit-flip
+def clean_img(in_path: Path, out_path: Path, label=None, width=5,
+              replacement=None, axis=0, plot=False, dryrun=False, keep=False):
+    """PDS IMG file version of clean().
+
+    This function is currently quite slow and takes almost a minute to
+    process a 50,000 line image.  Since the ability to process IMG files
+    isn't a primary task, and this is just a proof-of-concept, we can live
+    with slow.  It can always be optimized, if needed.
+
+    Please see clean() for argument details.
+    """
+
+    if label is None:
+        label = pvl.load(in_path)
+    if 'PDS_VERSION_ID' not in label:
+        raise ValueError(
+            f"The file at {in_p} does not appear to be a PDS IMG file.")
+
+    # Bit-flip correct the non-image areas.
+    # This is going to diverge from cubes for the Buffer and Dark pixels.
+    # In ISIS-land, they are 'tables' but in a IMG these are part of the
+    # image array, and will need to be handled below.
+    tblcln_p = in_path.with_suffix('.tableclean.img')
+    clean_tables_from_img(in_path, tblcln_p, label, width, replacement,
+                          plot=plot, dryrun=dryrun)
+
+    # Now clean the image area.
+    lut = img.LUT_Table(
+        label['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_CONVERSION_TABLE'])
+    specialpix = lut.specialpixels()
+
+    # Just doing this takes almost a minute for a 50,000 line image!
+    img_arr = img.object_asarray(in_path, 'IMAGE')
+
+    # Using GDAL is better, but need to unlut.
+    #   Hunh ... The results when I do this just aren't right, and I'm
+    #   not quite sure what's going wrong.  These print statements seem
+    #   to show well-behaved arrays that are properly unlutted.  However,
+    #   when I run this with ESP_061686_1725_RED3_1.IMG, my test image,
+    #   it only finds a single 'good' column with 34,279 valid pixels
+    #   (instead of 21 with 50,000), but it has a huge medstd: 1207
+    #   (instead of ~50).  So this might mean that the unlut + mask
+    #   operation is somehow masking more values than it should (lower
+    #   valid count), but also leaving some high-value values (to produce
+    #   the high medstd).  The unlut and masking are literally the same
+    #   functions, so that seems odd.  Maybe gdal_array.LoadFile() is
+    #   doing unexpected?  Not sure.  If we really need the speed-up,
+    #   we can try and work this.
+    # unlut = np.vectorize(lut.unlut)
+    # from_gdal = gdal_array.LoadFile(str(in_path))
+    # print(from_gdal)
+    # img_arr = unlut(from_gdal)
+    # print(img_arr)
+
+    img_slice = np.s_[:, 18:-16]
+    image = np.ma.masked_outside(img_arr[img_slice],
+                                 specialpix.Min, specialpix.Max)
+
+    logging.info(f"Bit-flip cleaning Image area.")
+    (s_min, s_max) = find_smart_window_from_ma(
+        image, width=width, axis=axis,
+        plot=(f"{in_path.name} Image Area" if plot else False))
+
+    if not dryrun:
+        shutil.copy(tblcln_p, out_path)
+        clean_image = np.ma.masked_outside(image, s_min, s_max)
+        if replacement is not None:
+            specialpix.Null = replacement
+        img_arr[img_slice] = apply_special_pixels(clean_image, specialpix)
+        img.overwrite_object(out_path, 'IMAGE', img_arr)
+
+        if not keep:
+            tblcln_p.unlink()
+
+    return
+
+
+def clean_tables_from_cube(in_path: Path, out_path: Path, width=5,
+                           replacement=None,
+                           rev_area=True, mask_area=False, ramp_area=False,
+                           buffer_area=False, dark_area=False,
+                           plot=False, dryrun=False):
+    """The file at *out_path* will be the result of running bit-flip
     cleaning of the specified non-image areas in table objects within
-    the ISIS cube file.
+    the ISIS cube file at *in_path*.
 
     The various *_area* booleans direct whether these areas will
     undergo bit-flip cleaning.
@@ -383,47 +497,45 @@ def clean_tables(cube: Path, outcube: Path, width=5,
             raise NotImplementedError(
                 f"Bit-flip cleaning for {notimpl} is not yet implemented.")
 
-    label = pvl.load(cube)
+    label = pvl.load(in_path)
+    if 'IsisCube' not in label:
+        raise ValueError(
+            f"The file at {in_path} does not appear to be an ISIS Cube.")
+
     binning = label['IsisCube']['Instrument']['Summing']
-    mask_lines = int(20 / binning)
     specialpix = getattr(isis.specialpixels,
                          label['IsisCube']['Core']['Pixels']['Type'])
-    if not dryrun:
-        shutil.copy(cube, outcube)
 
-    # Deal with the HiRISE Calibration Image first (Reverse-clock, Mask,
-    # and Ramp
+    if not dryrun:
+        shutil.copy(in_path, out_path)
+
     if any((rev_area, mask_area, ramp_area)):
         t_name = 'HiRISE Calibration Image'
-        HCI_dict = isis.cube.get_table(cube, t_name)
+        HCI_dict = isis.cube.get_table(in_path, t_name)
         cal_vals = np.array(HCI_dict['Calibration'])
+
         cal_image = np.ma.masked_outside(cal_vals,
-                                         specialpix.Min,
-                                         specialpix.Max)
-        if rev_area:
-            logging.info(f"Bit-flip cleaning Reverse-Clock area.")
-            rev_clean = clean_array(
-                cal_image[:20, :], width=width, axis=1,
-                plot=(f"{cube.name} Reverse-Clock" if plot else False))
-            cal_image.put(np.arange(rev_clean.size), rev_clean)
+                                         specialpix.Min, specialpix.Max)
 
-        # if mask_area:
-        #     mask_pixels = cal_image[20:mask_lines, :]
-
-        # if ramp_area:
-        #     ramp_pixels = cal_image[20 + mask_lines:, :]
-
+        clean_cal = clean_cal_tables(cal_image, binning, width,
+                                     rev_area, mask_area, ramp_area,
+                                     (str(in_path.name) if plot else False))
         if not dryrun:
-            # write the table back out into outcube
-            HCI_dict['Calibration'] = mask_lists(HCI_dict['Calibration'],
-                                                 cal_image, specialpix)
-            isis.cube.overwrite_table(outcube, t_name, HCI_dict)
+            # write the table back out
+            if replacement is not None:
+                specialpix.Null = replacement
+            HCI_dict['Calibration'] = apply_special_pixels(
+                clean_cal, specialpix).data.tolist()
+            isis.cube.overwrite_table(out_path, t_name, HCI_dict)
 
     # if any((buffer_area, dark_area)):
     #     t_name = 'HiRISE Ancillary'
     #     HA_dict = isis.cube.get_table(cube, t_name)
     #     buffer_image = np.array(HA_dict['BufferPixels'])
     #     dark_image = np.array(HA_dict['DarkPixels'])
+    #
+    #     clean_buffer = clean_buffer_table()
+    #     clean_dark = clean_dark_table()
     #
     #     # write the table back out into outcube
     #     if not dryrun:
@@ -436,6 +548,121 @@ def clean_tables(cube: Path, outcube: Path, width=5,
     return
 
 
+def clean_tables_from_img(in_path: Path, out_path: Path, label=None, width=5,
+                          replacement=None,
+                          rev_area=True, mask_area=False, ramp_area=False,
+                          buffer_area=False, dark_area=False,
+                          plot=False, dryrun=False):
+    """The file at *out_path* will be the result of running bit-flip
+    cleaning of the specified non-image areas in table objects within
+    the PDS IMG file at *in_path*.
+
+    The various *_area* booleans direct whether these areas will
+    undergo bit-flip cleaning.
+
+    **WARNING**: at this time, only the reverse-clock area is
+    enabled for undergoing bit-flip cleaning.  Specifying True
+    for any others will result in a NotImplementedError.
+
+    This means that pixels that are identified as being beyond the
+    allowable DN window (which may be defined differently for each
+    of the image areas), will be set to the ISIS NULL value.
+
+    If *keep* is True, then all intermediate files will be preserved,
+    otherwise, this function will clean up any intermediary files
+    it creates.
+
+    This function anticipates a HiRISE EDR PDS IMG file that has
+    the following objects in its label: CALIBRATION_IMAGE,
+    LINE_PREFIX_TABLE, and LINE_SUFFIX_TABLE.
+
+    The CALIBRATION_IMAGE contains the Reverse-Clock, Mask, and
+    Ramp Image areas and their Buffer and Dark pixels.  The HiRISE
+    Ancillary table contains the BufferPixels and DarkPixels from
+    either side of the main Image Area.
+
+    The LINE_PREFIX_TABLE contains the Buffer pixels for the image area.
+
+    The LINE_SUFFIX_TABLE contains the Dark pixels for the image area.
+    """
+
+    for notimpl in (mask_area, ramp_area, buffer_area, dark_area):
+        if notimpl is True:
+            raise NotImplementedError(
+                f"Bit-flip cleaning for {notimpl} is not yet implemented.")
+
+    if label is None:
+        label = pvl.load(in_path)
+    if 'PDS_VERSION_ID' not in label:
+        raise ValueError(
+            f"The file at {in_path} does not appear to be a PDS IMG file.")
+
+    binning = label['INSTRUMENT_SETTING_PARAMETERS']['MRO:BINNING']
+    specialpix = img.LUT_Table(
+        label['INSTRUMENT_SETTING_PARAMETERS'][
+            'MRO:LOOKUP_CONVERSION_TABLE']).specialpixels()
+
+    if not dryrun:
+        shutil.copy(in_path, out_path)
+
+    if any((rev_area, mask_area, ramp_area)):
+        t_name = 'CALIBRATION_IMAGE'
+        cal_vals = img.object_asarray(in_path, t_name)
+
+        rev_clock_slice = np.s_[:20, 18:-16]
+
+        # print(cal_vals.shape)
+        # print(cal_vals[:20, 18:-16])
+        # print(cal_vals[:20, 18:-16].shape)
+        # print(specialpix)
+        cal_image = np.ma.masked_outside(cal_vals[rev_clock_slice],
+                                         specialpix.Min, specialpix.Max)
+
+        print("cal_image:")
+        print(cal_image)
+
+        clean_cal = clean_cal_tables(cal_image, binning, width,
+                                     rev_area, mask_area, ramp_area,
+                                     (str(in_path.name) if plot else False))
+        if not dryrun:
+            # write the table back out
+            if replacement is not None:
+                specialpix.Null = replacement
+            cal_vals[rev_clock_slice] = apply_special_pixels(clean_cal,
+                                                             specialpix)
+            img.overwrite_object(out_path, t_name, cal_vals)
+    return
+
+
+def clean_cal_tables(cal_image, binning, width=5,
+                     rev_area=True, mask_area=False, ramp_area=False,
+                     plot=False):
+    # Deal with the HiRISE Calibration Image first (Reverse-clock, Mask,
+    # and Ramp
+
+    for notimpl in (mask_area, ramp_area):
+        if notimpl is True:
+            raise NotImplementedError(
+                f"Bit-flip cleaning for {notimpl} is not yet implemented.")
+
+    mask_lines = int(20 / binning)
+
+    if rev_area:
+        logging.info(f"Bit-flip cleaning Reverse-Clock area.")
+        rev_clean = clean_array(
+            cal_image[:20, :], width=width, axis=1,
+            plot=(f"{plot} Reverse-Clock" if plot else False))
+        cal_image[:20, :] = rev_clean
+
+    # if mask_area:
+    #     mask_pixels = cal_image[20:mask_lines, :]
+
+    # if ramp_area:
+    #     ramp_pixels = cal_image[20 + mask_lines:, :]
+
+    return cal_image
+
+
 def clean_array(data: np.ma.array, width=5, axis=0, plot=False):
     """Returns a numpy masked array whose mask is based on applying
     the smart window bounds from find_smart_window_from_ma() applied
@@ -446,44 +673,62 @@ def clean_array(data: np.ma.array, width=5, axis=0, plot=False):
     return np.ma.masked_outside(data, w_min, w_max)
 
 
-def mask_lists(lists: list, array: np.ndarray, specialpix) -> list:
-    """Return a modified version of *lists* which is a list of lists
-    with the same shape as *array*.  The modified version is based
-    on the provided masked *array* and the *specialpix* named tuple.
+def fit_array(data: np.ma.array):
+    """Returns an array with the masked elements of *data* replaced
+    by fitted values.
 
-    It essentially returns *array*.data as the returned list of lists,
-    but if any values were masked in *array* that weren't already
-    special pixels in *specialpix* they are set to the appropriate
-    value.
+    This function uses the scipy.interpolate.griddata algorithm to
+    interpolate a 2-D function across the unmasked data to replace
+    the masked values of *data*.
     """
-    shape = (len(lists), len(lists[0]))
-    # Should we check all of the lists in lists?  Probably.
-    if array.shape != shape:
-        raise ValueError(f"The shape of the array ({array.shape}) doesn't "
-                         f"match the shape of the list of lists ({shape}).")
+    # An early version of this function had an option to run B-spline
+    # interpolation along the rows, using the code below.  However,
+    # due to the 2D nature of the data, this B-spline interpolation
+    # ended up looking 'stripey' in the row direction, so it was not
+    # developed further.
+    if data.ndim != 2:
+        raise ValueError("The provided array does not have two dimensions, "
+                         f"it has {data.ndim}.")
 
-    values = array.data
-    mask = array.mask
-    for row in range(array.shape[0]):
-        for col in range(array.shape[1]):
-            # print(f"row: {row}, col: {col}")
-            # print(values[row, col])
-            # print(lists[row][col])
-            if mask[row, col]:
-                # Make sure the pixel gets the proper value
-                if values[row, col] in (specialpix.Null, specialpix.Lrs,
-                                        specialpix.Lis, specialpix.His,
-                                        specialpix.Hrs):
-                    pass  # lists just keeps its value
-                elif values[row, col] < specialpix.Min:
-                    lists[row][col] = specialpix.Lrs
-                elif values[row, col] > specialpix.Max:
-                    lists[row][col] = specialpix.Hrs
-                else:
-                    lists[row][col] = specialpix.Null
+    xx, yy = np.meshgrid(np.arange(data.shape[0]),
+                         np.arange(data.shape[1]), indexing='ij')
+    x1 = xx[~data.mask]
+    y1 = yy[~data.mask]
+    good = data[~data.mask]
 
-            # else it isn't masked, and should be left as-is.
-    return lists
+    interp = interpolate.griddata((x1, y1), good.ravel(), (xx, yy),
+                                  method='nearest')
+    return interp
+
+
+def apply_special_pixels(array: np.ma, specialpix) -> np.ma:
+    """Return a modified version of *array* where the values of
+    array.data that are masked (array.mask is True) are examined,
+    and the array.data value is set to one of the values in the
+    *specialpix* namedtuple (which is assumed to conform to the
+    kalasiris.specialpixels.SpecialPixels namedtuple interface).
+
+    If the value is already the same as the Null, Lrs, Lis, His,
+    or Hrs value of *specialpixels* it is left as-is.  If it is
+    less than specialpix.Min it is set to specialpix.Lrs.  If it
+    is greater than specialpix.Max, it is set to specialpix.Hrs.
+    Finally, if it is any other value, it is set to specialpix.Null.
+    """
+
+    def sp_pix(val):
+        if val in (specialpix.Null, specialpix.Lrs, specialpix.Lis,
+                   specialpix.His, specialpix.Hrs):
+            return val
+        elif val < specialpix.Min:
+            return specialpix.Lrs
+        elif val > specialpix.Max:
+            return specialpix.Hrs
+        else:
+            return specialpix.Null
+
+    sp_apply = np.frompyfunc(sp_pix, 1, 1)
+    array.data[array.mask] = sp_apply(array.data[array.mask])
+    return array
 
 
 def find_smart_window_from_ma(data: np.ma.array, width=5, axis=0, plot=False):
@@ -539,23 +784,6 @@ def median_std_from_ma(data: np.ma, axis=0):
     valid_points = data.count(axis=axis)
     std_devs = np.std(data, axis=axis)
     return median_std(valid_points, std_devs)
-
-
-# def median_std_from_cn(statsfile: os.PathLike):
-#     """On the assumption that there are bit-flips in the cube
-#     that ISIS cubenorm was run on, and the path to that output file
-#     provided via *statsfile*, attempt to find a value that might
-#     represent the standard deviation of the 'real' data.
-#     """
-#     valid_points = list()
-#     std_devs = list()
-#     with open(statsfile) as csvfile:
-#         reader = csv.DictReader(csvfile, dialect=isis.cubenormfile.Dialect)
-#         for row in reader:
-#             valid_points.append(int(row['ValidPoints']))
-#             std_devs.append(float(row['StdDev']))
-#
-#     return median_std(valid_points, std_devs)
 
 
 def median_std(valid_points: np.ma, std_devs: np.ma):

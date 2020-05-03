@@ -205,10 +205,9 @@ class TestArrays(unittest.TestCase):
                 [9, 5, 6]]
         arr = np.ma.array(data, mask=[[1, 0, 0], [0, 0, 1]])
 
-        self.assertEqual([[0, 3, 3],
-                          [9, 5, 0]],
-                         bf.mask_lists(data, arr,
-                                       isis.specialpixels.UnsignedByte))
+        np.testing.assert_array_equal(
+            [[0, 3, 3], [9, 5, 0]], bf.apply_special_pixels(
+                arr, isis.specialpixels.UnsignedByte))
 
 
 class TestMock(unittest.TestCase):
@@ -235,6 +234,25 @@ class TestMock(unittest.TestCase):
                     [18, 1000, 1010, 990, 1000, 1000],
                     [19, 1000, 1010, 990, 1000, 1000],
                     [20, 1000, 1010, 990, 1000, 1000]]
+        self.cleaned = list()
+        for row in self.cal:
+            # Values less than 3 are less than the specialpixel Min
+            # and the reverse-clocked area is only the first 20 lines.
+            if 3 <= row[0] < 20:
+                self.cleaned.append([0] + row[1:])
+            else:
+                self.cleaned.append(row)
+
+    def test_clean_cal_tables(self):
+        for notimpl in ('mask_area', 'ramp_area'):
+            self.assertRaises(NotImplementedError,
+                              bf.clean_cal_tables, 'dummy-in.cub',
+                              'dummy-out.cub', **{notimpl: True})
+
+        masked = np.ma.masked_outside(np.array(self.cal), 3, 65522)
+
+        np.testing.assert_array_equal(self.cleaned,
+                                      bf.clean_cal_tables(masked, 1))
 
     @patch('pyrise.bitflips.shutil.copy')
     @patch('pyrise.bitflips.pvl.load',
@@ -243,30 +261,22 @@ class TestMock(unittest.TestCase):
                                       'Instrument': {'Summing': 1}}})
     @patch('pyrise.bitflips.open', new_callable=mock_open)
     @patch('pyrise.bitflips.isis.cube.overwrite_table')
-    def test_clean_tables(self, m_wtable, m_open, m_pvl, m_copy):
+    def test_clean_tables_from_cube(self, m_wtable, m_open, m_pvl, m_copy):
         for notimpl in ('mask_area', 'ramp_area', 'buffer_area', 'dark_area'):
             self.assertRaises(NotImplementedError,
-                              bf.clean_tables, 'dummy-in.cub', 'dummy-out.cub',
+                              bf.clean_tables_from_cube,
+                              'dummy-in.cub', 'dummy-out.cub',
                               **{notimpl: True})
 
         with patch('pyrise.bitflips.isis.cube.get_table',
                    return_value={'Calibration': self.cal}):
-            bf.clean_tables('dummy-in.cub', 'dummy-out.cub', width=5,
-                            rev_area=True)
+            bf.clean_tables_from_cube('dummy-in.cub', 'dummy-out.cub', width=5,
+                                      rev_area=True)
 
-            cleaned = list()
-            for row in self.cal:
-                # Values less than 3 are less than the specialpixel Min
-                # and the reverse-clocked area is only the first 20 lines.
-                if 3 < row[0] < 20:
-                    cleaned.append([0] + row[1:])
-                else:
-                    cleaned.append(row)
-
-            self.assertEqual(cleaned,
+            self.assertEqual(self.cleaned,
                              m_wtable.call_args[0][2]['Calibration'])
 
-    @patch('pyrise.bitflips.clean_tables')
+    @patch('pyrise.bitflips.clean_tables_from_cube')
     @patch('pyrise.bitflips.pvl.load',
            return_value={'IsisCube': {'Core': {'Pixels':
                                                {'Type': 'UnsignedWord'}}}})
@@ -274,7 +284,8 @@ class TestMock(unittest.TestCase):
     def test_clean_cube(self, m_mask, m_load, m_clntbl):
         with patch('pyrise.bitflips.gdal_array.LoadFile',
                    return_value=self.cal):
-            bf.clean_cube('dummy-in.cub', 'dummy-out.cub', keep=True)
+            bf.clean_cube(Path('dummy-in.cub'), Path('dummy-out.cub'),
+                          keep=True)
 
         self.assertEqual(m_mask.call_args[1]['minimum'], 993)
         self.assertEqual(m_mask.call_args[1]['maximum'], 1003)
