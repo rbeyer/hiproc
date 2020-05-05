@@ -18,7 +18,7 @@
 import collections
 import unittest
 from pathlib import Path
-from unittest.mock import call, mock_open, patch
+from unittest.mock import mock_open, patch
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -41,23 +41,6 @@ from pyrise import bitflips as bf
 #         self.assertEqual(truth, test)
 
 
-class TestBasic(unittest.TestCase):
-
-    def test_get_range(self):
-        start = 2
-        stop = 5
-        truth = range(start, stop, 1)
-        self.assertEqual(truth, bf.get_range(start, stop))
-
-        start = 2.1
-        stop = 4.8
-        self.assertEqual(truth, bf.get_range(start, stop))
-
-        start = 9.1
-        truth = range(10, 4, -1)
-        self.assertEqual(truth, bf.get_range(start, stop))
-
-
 class TestHist(unittest.TestCase):
 
     def setUp(self):
@@ -73,43 +56,6 @@ class TestHist(unittest.TestCase):
                      HistRow(12, 2),    # 8 **
                      # Biggest gap here between 12 and 20
                      HistRow(20, 1)]    # 9 *
-
-    def test_find_gap(self):
-        self.assertEqual(13, bf.find_gap(self.hist, 1, 20))
-        self.assertEqual(3, bf.find_gap(self.hist, 1, 20, findfirst=True))
-        self.assertEqual(9, bf.find_gap(self.hist, 5, 12))
-
-    def test_find_min_dn(self):
-        self.assertEqual(1, bf.find_min_dn(self.hist, 1, 20))
-        self.assertEqual(10, bf.find_min_dn(self.hist, 2, 20))
-        self.assertEqual(20, bf.find_min_dn(self.hist, 20, 1))
-
-    @patch('pyrise.bitflips.shutil.copyfile')
-    @patch('pyrise.bitflips.isis.mask')
-    @patch('pyrise.bitflips.isis.algebra')
-    @patch('pyrise.bitflips.isis.handmos')
-    def test_subtract_over_thresh(self, m_hand, m_alg, m_mask, m_copyfile):
-        in_p = Path('in.dummy')
-        out_p = Path('out.dummy')
-        bf.subtract_over_thresh(in_p, out_p, thresh=1, delta=2, keep=True)
-
-        m_copyfile.assert_called_once()
-
-        m_mask.assert_called_once()
-        t_path = in_p.with_suffix('.threshmask.cub')
-        d_path = in_p.with_suffix('.delta.cub')
-        mask_args = {'from': in_p, 'min': 1, 'to': t_path}
-        self.assertEqual(m_mask.call_args_list,
-                         [call(**mask_args)])
-
-        m_alg.assert_called_once()
-        self.assertEqual(m_alg.call_args_list,
-                         [call(t_path, a=0, c=-2, from2=in_p, op='add',
-                               to=d_path)])
-
-        m_hand.assert_called_once()
-        self.assertEqual(m_hand.call_args_list,
-                         [call(d_path, mosaic=out_p)])
 
     def test_find_select_idx_name(self):
         self.assertRaises(ValueError, bf.find_select_idx_name, 1, 1, True)

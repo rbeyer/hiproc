@@ -33,8 +33,8 @@ to find the gaps between those islands.  Again, picking a bit-flip
 value cut-off, but this time selecting the low-point between two
 bit-flip-value-centered islands as the boundaries of the good-DN-window.
 This strategy works okay for test data, but real data of the martian
-surface often has complicated histograms, so something a little more
-robust is needed.
+surface often has complicated histograms, functions for this approach
+can be found un bitunflip.py.
 
 The best strategy we have developed so far is to take the above one
 step further and treat the histogram curve as its own signal,
@@ -52,7 +52,8 @@ to mitigate the bit-flip pixels once they have been identified.
    attempt to return it to what its 'original' DN value might have
    been.  This is limited by however you select the bit-flip cut-off.
    Since you can't identify below that cut-off, you also really can't
-   unflip below that cut-off.
+   unflip below that cut-off.  Functions for this approach can be found
+   in bitunflip.py
 
 2. Masking: This mitigation strategy simply sets these pixels to
    an arbitrary DN value or the ISIS NULL value.  This basically just
@@ -74,17 +75,13 @@ to mitigate the bit-flip pixels once they have been identified.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Parts of this were inspired by clean_bit_flips.pro by Alan Delamere,
-# Oct 2019, but the implementation here was written from scratch.
 
 # This program can also be run from within the Perl HiCal program's
 # Mask() function like so:
 #
-#   $cmd = "bitflips.py -o $mask_file $tmask_file"
+#   $cmd = "bitflips.py -l INFO -o $mask_file $tmask_file"
 
 import argparse
-import itertools
 import logging
 import math
 import os
@@ -107,52 +104,42 @@ import pyrise.util as util
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        parents=[util.parent_parser()])
-    parser.add_argument('-o', '--output',
-                        required=False, default='.bitflip.cub')
-    parser.add_argument('-u', '--unflip', required=False, action='store_true',
-                        help="If set, the program will attempt to unflip "
-                        "the bit-flipped pixels, otherwise will mask them. "
-                        "only the image area is affected by this option.")
-    parser.add_argument('-w', '--width', required=False, default=5,
-                        help="The number of medstd widths for bit-flip "
-                        "cleaning.")
-    parser.add_argument('--line', required=False, action='store_true',
-                        help="Performs statistics along the line direction "
-                        "instead of column for the image area.")
-    parser.add_argument('-r', '--replacement', required=False, type=int,
-                        help="By default, the program will replace identified "
-                        "pixels with an appropriate NULL data value, but if"
-                        "provided this value will be used instead.")
-    parser.add_argument('-p', '--plot', required=False, action='store_true',
-                        help="Displays plot for each area.")
-    parser.add_argument('-n', '--dryrun', required=False, action='store_true',
-                        help="Does not produce a cleaned output file.")
-    parser.add_argument('file', help='ISIS Cube file or PDS IMG to clean.')
-
-    args = parser.parse_args()
-
-    util.set_logging(args.log, args.logfile)
-
-    out_p = util.path_w_suffix(args.output, args.file)
-
     try:
-        if args.unflip:
-            if args.plot:
-                print('The unflip option has no plotting option. Ignoring.',
-                      file=sys.stderr)
-            if args.dryrun:
-                print('The unflip option has no dryrun option. Quitting.',
-                      file=sys.stderr)
-                sys.exit(1)
-            unflip(Path(args.file), out_p, keep=args.keep)
-        else:
-            clean(args.file, out_p, width=args.width,
-                  axis=(1 if args.line else 0), replacement=args.replacement,
-                  plot=args.plot, dryrun=args.dryrun, keep=args.keep)
+        parser = argparse.ArgumentParser(
+            description=__doc__,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            parents=[util.parent_parser()])
+        parser.add_argument('-o', '--output',
+                            required=False, default='.bitflip.cub')
+        parser.add_argument('-w', '--width', required=False, default=5,
+                            help="The number of medstd widths for bit-flip "
+                            "cleaning.")
+        parser.add_argument('--line', required=False, action='store_true',
+                            help="Performs statistics along the line "
+                            "direction instead of column for the image area.")
+        parser.add_argument('-r', '--replacement', required=False, type=int,
+                            help="By default, the program will replace "
+                            "identified pixels with an appropriate NULL data "
+                            "value, but if provided this value will be used "
+                            "instead.")
+        parser.add_argument('-p', '--plot', required=False,
+                            action='store_true',
+                            help="Displays plot for each area.")
+        parser.add_argument('-n', '--dryrun', required=False,
+                            action='store_true',
+                            help="Does not produce a cleaned output file.")
+        parser.add_argument('file', help='ISIS Cube file or PDS IMG to clean.')
+
+        args = parser.parse_args()
+
+        util.set_logging(args.log, args.logfile)
+
+        out_p = util.path_w_suffix(args.output, args.file)
+
+        clean(args.file, out_p, width=args.width,
+              axis=(1 if args.line else 0), replacement=args.replacement,
+              plot=args.plot, dryrun=args.dryrun, keep=args.keep)
+
         sys.exit(0)
     except subprocess.CalledProcessError as err:
         print('Had an ISIS error:', file=sys.stderr)
@@ -160,138 +147,9 @@ def main():
         print(err.stdout, file=sys.stderr)
         print(err.stderr, file=sys.stderr)
         sys.exit(1)
-
-
-def get_range(start, stop, step=None) -> range:
-    """Returns a range object given floating point start and
-    stop values (the optional step must be an int).  If
-    step is none, it will be set to 1 or -1 depending on the
-    relative values of start and stop.
-    """
-    if start < stop:
-        start = math.floor(start)
-        stop = math.ceil(stop)
-        if step is None:
-            step = 1
-    else:
-        start = math.ceil(start)
-        stop = math.floor(stop)
-        if step is None:
-            step = -1
-
-    return range(start, stop, step)
-
-
-def find_gap(hist: list, start, stop, step=None, findfirst=False) -> int:
-    """Returns a DN between *start* and *stop* which is determined to be a gap.
-
-    Given the range specified by *start*, *stop* and *step*, the
-    DNs are extracted from the list of namedtuples (which must
-    conform to the HistRow namedtuple from kalasiris.Histogram).
-    The 'gaps' between continuous ranges of DN are found (DNs where
-    the histogram has no pixels).  The largest gap is found, and
-    then the DN value closest to start from that largest gap is
-    returned.
-
-    If step is not specified or None, it will be set to 1 or -1
-    depending on the relative values of start and stop.
-
-    If *findfirst* is `True`, then rather than finding the 'biggest'
-    gap, it will return the DN from the gap that is closest to
-    *start*.
-    """
-    dn_window = get_range(start, stop, step)
-
-    hist_set = set(filter(lambda d: d in dn_window,
-                          (int(x.DN) for x in hist)))
-
-    missing = sorted(set(dn_window).difference(hist_set),
-                     reverse=(dn_window.step < 0))
-    # logging.info(f'{bs} missing: ' + str(missing))
-
-    if len(missing) > 0:
-        sequences = list()
-        for k, g in itertools.groupby(missing,
-                                      (lambda x,
-                                       c=itertools.count(): next(c) -
-                                       (dn_window.step * x))):
-            sequences.append(list(g))
-
-        if findfirst:
-            return sequences[0][0]
-        else:
-            # find biggest gap
-            return max(sequences, key=len)[0]
-    else:
-        # There was no gap in DN.
-        raise ValueError('There was no gap in the DN window from '
-                         f'{start} to {stop}.')
-
-
-def find_min_dn(hist: list, start, stop, step=None) -> int:
-    """Returns the DN from *hist* with the lowest pixel count.
-
-    Where *hist* is a list of namedtuples (which must conform to
-    the HistRow namedtuple from kalasiris.Histogram).  The *start*,
-    *stop*, and *step* parameters are DN values in that *hist* list.
-
-    Given how the min() mechanics work, this should return the first
-    DN value of the entry with the lowest pixel count, in range order
-    (if there is more than one).
-    """
-    r = get_range(start, stop, step)
-    hist_list = sorted(filter(lambda x: int(x.DN) in r, hist),
-                       key=lambda x: int(x.DN),
-                       reverse=(r.step < 0))
-
-    h = min(hist_list, key=lambda x: int(x.Pixels))
-    return int(h.DN)
-
-
-def subtract_over_thresh(in_path: Path, out_path: Path,
-                         thresh: int, delta: int, keep=False):
-    """This is a convenience function that runs ISIS programs to add or
-    subtract a value to DN values for pixels that are above or below
-    a threshold.
-
-    For all pixels in the *in_path* ISIS cube, if *delta* is positive,
-    then pixels with a value greater than *thresh* will have *delta*
-    subtracted from them.  If *delta* is negative, then all pixels
-    less than *thresh* will have *delta* added to them.
-    """
-
-    # Originally, I wanted to just do this simply with fx:
-    # eqn = "\(f1 + ((f1{glt}={thresh}) * {(-1 * delta)}))"
-    # However, fx writes out floating point pixel values, and we really
-    # need to keep DNs as ints as long as possible.  Sigh.
-
-    shutil.copyfile(in_path, out_path)
-
-    mask_p = in_path.with_suffix('.threshmask.cub')
-    mask_args = {'from': in_path, 'to': mask_p}
-    if delta > 0:
-        mask_args['min'] = thresh
-    else:
-        mask_args['max'] = thresh
-    util.log(isis.mask(**mask_args).args)
-
-    delta_p = in_path.with_suffix('.delta.cub')
-    util.log(isis.algebra(mask_p, from2=in_path, to=delta_p,
-                          op='add', a=0, c=(-1 * delta)).args)
-
-    util.log(isis.handmos(delta_p, mosaic=out_path).args)
-
-    if not keep:
-        mask_p.unlink()
-        delta_p.unlink()
-
-    return
-
-
-def histogram(in_path: Path, hist_path: Path):
-    """This is just a convenience function to facilitate logging."""
-    util.log(isis.hist(in_path, to=hist_path).args)
-    return isis.Histogram(hist_path)
+    except Exception as err:
+        print(err, file=sys.stderr)
+        sys.exit(1)
 
 
 def clean(in_path: os.PathLike, out_path: os.PathLike, width=5,
@@ -1085,131 +943,6 @@ def find_smart_window(dn: np.ndarray, counts: np.ndarray,
         plt.show()
 
     return (dn[min_i], dn[max_i])
-
-
-def mask_gap(in_path: Path, out_path: Path, keep=False):
-    """Attempt to mask out pixels beyond the central DNs of the median
-    based on gaps in the histogram.
-
-    This approach worked well based on 'ideal' reverse-clocked data
-    or 'dark' images, but in 'real' HiRISE images of Mars, the reality
-    is that there are 'gaps' everywhere along the DN range, and this
-    approach ends up being too 'dumb'.
-    """
-
-    hist_p = in_path.with_suffix('.hist')
-    hist = histogram(in_path, hist_p)
-
-    median = math.trunc(float(hist['Median']))
-    # std = math.trunc(float(hist['Std Deviation']))
-
-    high = find_gap(hist, median,
-                    math.trunc(float(hist['Maximum'])),
-                    findfirst=True)
-
-    low = find_gap(hist, median,
-                   math.trunc(float(hist['Minimum'])),
-                   findfirst=True)
-
-    highdist = high - median
-    lowdist = median - low
-
-    maskmax = find_gap(hist, median, (median + (2 * highdist)))
-    maskmin = find_gap(hist, median, (median - (2 * lowdist)))
-
-    util.log(isis.mask(in_path, to=out_path, minimum=maskmin,
-                       maximum=maskmax).args)
-
-    if not keep:
-        hist_p.unlink()
-
-    return
-
-
-def get_unflip_thresh(hist: list, far, near, lowlimit) -> int:
-    """Provides a robust threshhold for the unflipping process."""
-    try:
-        thresh = find_gap(hist, far, near)
-    except ValueError:
-        logging.info('No zero threshold found.')
-        # d is not defined here, and I think this was the victim of
-        # some cut'n'paste work, but would need to go analyze the
-        # repo history to track it down.  For the moment, this will
-        # just error!
-        if d >= lowlimit:
-            thresh = find_min_dn(hist, far, near)
-            logging.info(f'Found a minimum threshold: {thresh}')
-            if(thresh == far or thresh == near):
-                raise ValueError(f'Minimum, {thresh}, at edge of range.')
-        else:
-            raise ValueError(f'Below {lowlimit}, skipping.')
-    return thresh
-
-
-def unflip(in_p: Path, out_p: Path, keep=False):
-    """Attempt to indentify DNs whose bits have been flipped in the
-    ISIS cube indicated by *in_p*, and unflip them.
-
-    Only operates on image-area.
-    """
-    to_del = isis.PathSet()
-
-    # This full suite of deltas works well for the reverse-clock area
-    # and even 'dark' images, but not 'real' images.
-    # deltas = (8192, 4096, 2048, 1024, 512, 256, 128, 64)
-
-    # Restricting the number of deltas might help, but this seems
-    # arbitrary.
-    deltas = (8192, 4096, 2048, 1024)
-
-    count = 0
-    suffix = '.bf{}-{}{}.cub'
-    this_p = to_del.add(in_p.with_suffix(suffix.format(count, 0, 0)))
-    this_p.symlink_to(in_p)
-
-    median = math.trunc(float(isis.stats_k(in_p)['Median']))
-
-    for (sign, pm, extrema) in ((+1, 'm', 'Maximum'),
-                                (-1, 'p', 'Minimum')):
-        # logging.info(pm)
-        for delt in deltas:
-            d = sign * delt
-            far = median + d
-            near = median + (d / 2)
-
-            try:
-                hist_p = to_del.add(this_p.with_suffix('.hist'))
-                hist = histogram(this_p, hist_p)
-            except ValueError:
-                # Already have this .hist, don't need to remake.
-                pass
-
-            logging.info(f'bitflip position {pm}{delt}, near: {near} '
-                         f'far: {far}, extrema: {hist[extrema]}')
-            if((sign > 0 and far < float(hist[extrema])) or
-               (sign < 0 and far > float(hist[extrema]))):
-                count += 1
-                s = suffix.format(count, pm, delt)
-                next_p = to_del.add(this_p.with_suffix('').with_suffix(s))
-                try:
-                    thresh = get_unflip_thresh(hist, far, near, d)
-                except ValueError as err:
-                    logging.info(err)
-                    count -= 1
-                    break
-                subtract_over_thresh(this_p, next_p, thresh, d, keep=keep)
-                this_p = next_p
-            else:
-                logging.info("The far value was beyond the extrema. "
-                             "Didn't bother.")
-
-    shutil.move(this_p, out_p)
-
-    if not keep:
-        to_del.remove(this_p)
-        to_del.unlink()
-
-    return
 
 
 if __name__ == "__main__":
