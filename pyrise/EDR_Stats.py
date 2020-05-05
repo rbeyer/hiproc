@@ -196,12 +196,11 @@ def parse_histat(pvltext: str) -> dict:
     d['CAL_DARK_MINIMUM'] = p['CAL_DARK']['Minimum']
     d['CAL_DARK_MAXIMUM'] = p['CAL_DARK']['Maximum']
 
-    # commented out to deal with IR10
-    # # Calibration Image Buffer Area
-    # d['CAL_BUFFER_MEAN'] = p['CAL_BUFFER']['Average']
-    # d['CAL_BUFFER_STANDARD_DEVIATION'] = p['CAL_BUFFER']['StandardDeviation']
-    # d['CAL_BUFFER_MINIMUM'] = p['CAL_BUFFER']['Minimum']
-    # d['CAL_BUFFER_MAXIMUM'] = p['CAL_BUFFER']['Maximum']
+    # Calibration Image Buffer Area
+    d['CAL_BUFFER_MEAN'] = p['CAL_BUFFER']['Average']
+    d['CAL_BUFFER_STANDARD_DEVIATION'] = p['CAL_BUFFER']['StandardDeviation']
+    d['CAL_BUFFER_MINIMUM'] = p['CAL_BUFFER']['Minimum']
+    d['CAL_BUFFER_MAXIMUM'] = p['CAL_BUFFER']['Maximum']
 
     # Calibration Dark Ramp Area
     d['CAL_DARK_RAMP_MEAN'] = p['CAL_DARK_RAMP']['Average']
