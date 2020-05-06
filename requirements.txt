@@ -1,0 +1,6 @@
+gdal==3.0.1
+kalasiris==1.7.1
+matplotlib==3.2.1
+numpy==1.18.1
+pvl==0.3.0
+scipy==1.4.1

@@ -25,6 +25,7 @@ However, it does depend on the following:
 
 - pvl library (https://pvl.readthedocs.io)
 - kalasiris library (https://kalasiris.readthedocs.io)
+- gdal
 - numpy
 - scipy
 - matplotlib
