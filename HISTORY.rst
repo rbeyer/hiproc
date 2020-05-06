@@ -2,7 +2,7 @@
 History
 =======
 
-0.2.0 (2020-5-5)
+0.2.0 (2020-5-6)
 ----------------
 * Updated with bit-flip correction.
 

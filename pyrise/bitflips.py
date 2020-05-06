@@ -527,7 +527,13 @@ def clean_array(data: np.ma.array, width=5, axis=0, plot=False):
     """Returns a numpy masked array whose mask is based on applying
     the smart window bounds from find_smart_window_from_ma() applied
     to *data* with the specified *wdith* and *axis*.
+
+    If all of the values in *data* are masked, a ValueError is raised.
     """
+    if np.all(data.mask):
+        logging.info("All of the values in data are masked.")
+        return data
+
     (w_min, w_max) = find_smart_window_from_ma(data, width=width, axis=axis,
                                                plot=plot)
     return np.ma.masked_outside(data, w_min, w_max)
