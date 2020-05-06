@@ -88,6 +88,7 @@ import os
 import shutil
 import subprocess
 import sys
+import traceback
 from pathlib import Path
 
 import numpy as np
@@ -148,6 +149,7 @@ def main():
         print(err.stderr, file=sys.stderr)
         sys.exit(1)
     except Exception as err:
+        traceback.print_exc(file=sys.stderr)
         print(err, file=sys.stderr)
         sys.exit(1)
 
@@ -176,7 +178,7 @@ def clean(in_path: os.PathLike, out_path: os.PathLike, width=5,
     in_p = Path(in_path)
     out_p = Path(out_path)
 
-    label = pvl.load(in_p)
+    label = pvl.load(str(in_p))
     if 'IsisCube' in label:
         clean_cube(in_p, out_p, label, width, replacement, axis, plot,
                    dryrun, keep)
@@ -205,7 +207,7 @@ def clean_cube(in_p: Path, out_p: Path, label=None, width=5,
 
     # Now clean the image area.
     if label is None:
-        label = pvl.load(in_p)
+        label = pvl.load(str(in_p))
     specialpix = getattr(isis.specialpixels,
                          label['IsisCube']['Core']['Pixels']['Type'])
     image = np.ma.masked_outside(gdal_array.LoadFile(str(in_p)),
@@ -251,7 +253,7 @@ def clean_img(in_path: Path, out_path: Path, label=None, width=5,
     """
 
     if label is None:
-        label = pvl.load(in_path)
+        label = pvl.load(str(in_path))
     if 'PDS_VERSION_ID' not in label:
         raise ValueError(
             f"The file at {in_p} does not appear to be a PDS IMG file.")
@@ -355,7 +357,7 @@ def clean_tables_from_cube(in_path: Path, out_path: Path, width=5,
             raise NotImplementedError(
                 f"Bit-flip cleaning for {notimpl} is not yet implemented.")
 
-    label = pvl.load(in_path)
+    label = pvl.load(str(in_path))
     if 'IsisCube' not in label:
         raise ValueError(
             f"The file at {in_path} does not appear to be an ISIS Cube.")
@@ -450,7 +452,7 @@ def clean_tables_from_img(in_path: Path, out_path: Path, label=None, width=5,
                 f"Bit-flip cleaning for {notimpl} is not yet implemented.")
 
     if label is None:
-        label = pvl.load(in_path)
+        label = pvl.load(str(in_path))
     if 'PDS_VERSION_ID' not in label:
         raise ValueError(
             f"The file at {in_path} does not appear to be a PDS IMG file.")
