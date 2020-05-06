@@ -58,7 +58,7 @@ def main():
                         help="The number of medstd widths for bit-flip "
                         "cleaning.")
     parser.add_argument('-r', '--replacement', required=False,
-                        default=0, type=float_type,
+                        default=float_type(0), type=float_type,
                         help="By default, the program will replace "
                         "identified pixels with an appropriate NULL data "
                         "value, but if provided this value will be used "
