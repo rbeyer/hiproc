@@ -478,8 +478,8 @@ def clean_tables_from_img(in_path: Path, out_path: Path, label=None, width=5,
         cal_image = np.ma.masked_outside(cal_vals[rev_clock_slice],
                                          specialpix.Min, specialpix.Max)
 
-        print("cal_image:")
-        print(cal_image)
+        # print("cal_image:")
+        # print(cal_image)
 
         clean_cal = clean_cal_tables(cal_image, binning, width,
                                      rev_area, mask_area, ramp_area,

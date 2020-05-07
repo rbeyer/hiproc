@@ -26,7 +26,7 @@ class LUT_Table:
             raise ValueError(
                 "HiRISE Lookup Tables must have 1 or 256 entries.")
 
-        if len(lut) == 1 and lut == ((0, 0),):
+        if len(lut) == 1 and lut == [[0, 0]]:
             # A single-item (0, 0) LUT indicates that
             # no LUT has been applied to these data.
             self.table = False
@@ -141,7 +141,7 @@ def object_asarray(file_path: os.PathLike, name: str) -> np.ndarray:
     Data objects are found by having both a a pointer parameter (like ^*name*)
     and an object in the label with *name*.
     """
-    label = pvl.load(file_path)
+    label = pvl.load(str(file_path))
     width, b_order, b_signed = byte_info(name, label)
 
     lut = LUT_Table(
@@ -169,7 +169,7 @@ def overwrite_object(file_path: os.PathLike, name: str, arr: np.ndarray):
     """The file at *file_path* will have its *name* object overwritten
     with the data in *array*.
     """
-    label = pvl.load(file_path)
+    label = pvl.load(str(file_path))
 
     if arr.shape != (label[name]['LINES'],
                      (label[name]['LINE_PREFIX_BYTES'] +
