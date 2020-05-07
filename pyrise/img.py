@@ -140,6 +140,9 @@ def object_asarray(file_path: os.PathLike, name: str) -> np.ndarray:
 
     Data objects are found by having both a a pointer parameter (like ^*name*)
     and an object in the label with *name*.
+
+    Doesn't work for objects that have columns.  Since such objects don't
+    have SAMPLE_BITS and SAMPLE_TYPE fields, this will result in a KeyError.
     """
     label = pvl.load(str(file_path))
     width, b_order, b_signed = byte_info(name, label)
@@ -153,14 +156,16 @@ def object_asarray(file_path: os.PathLike, name: str) -> np.ndarray:
         f.seek(int(label[f'^{name}'].value) - 1)
         for line in range(label[name]['LINES']):
             row = list()
-            for samp in range(label[name]['LINE_PREFIX_BYTES'] +
-                              label[name]['LINE_SAMPLES'] +
-                              label[name]['LINE_SUFFIX_BYTES']):
+            # Skip over the prefix bytes.
+            f.seek(label[name]['LINE_PREFIX_BYTES'], os.SEEK_CUR)
+            for samp in range(label[name]['LINE_SAMPLES']):
                 dn = lut.unlut(int.from_bytes(f.read(width),
                                               byteorder=b_order,
                                               signed=b_signed))
                 row.append(dn)
             table.append(row)
+            # Skip over the suffix bytes.
+            f.seek(label[name]['LINE_SUFFIX_BYTES'], os.SEEK_CUR)
 
     return np.array(table)
 
@@ -168,17 +173,16 @@ def object_asarray(file_path: os.PathLike, name: str) -> np.ndarray:
 def overwrite_object(file_path: os.PathLike, name: str, arr: np.ndarray):
     """The file at *file_path* will have its *name* object overwritten
     with the data in *array*.
+
+    Doesn't work for objects that have columns.  Since such objects don't
+    have SAMPLE_BITS and SAMPLE_TYPE fields, this will result in a KeyError.
     """
     label = pvl.load(str(file_path))
+    width, b_order, b_signed = byte_info(name, label)
 
-    if arr.shape != (label[name]['LINES'],
-                     (label[name]['LINE_PREFIX_BYTES'] +
-                      label[name]['LINE_SAMPLES'] +
-                      label[name]['LINE_SUFFIX_BYTES'])):
+    if arr.shape != (label[name]['LINES'], label[name]['LINE_SAMPLES']):
         raise ValueError(f"The object {name} has different dimensions than "
                          f"the array ({arr.shape}).")
-
-    width, b_order, b_signed = byte_info(name, label)
 
     lut = LUT_Table(
         label['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_CONVERSION_TABLE'])
@@ -187,10 +191,14 @@ def overwrite_object(file_path: os.PathLike, name: str, arr: np.ndarray):
         # Since The first byte is location 1 (not 0) in PDS-counting.
         f.seek(int(label[f'^{name}'].value) - 1)
         for line in range(arr.shape[0]):
+            # Skip over the prefix bytes.
+            f.seek(label[name]['LINE_PREFIX_BYTES'], os.SEEK_CUR)
             for samp in range(arr.shape[1]):
                 f.write(lut.lookup(arr[line][samp]).to_bytes(width,
                                                              byteorder=b_order,
                                                              signed=b_signed))
+            # Skip over the suffix bytes.
+            f.seek(label[name]['LINE_SUFFIX_BYTES'], os.SEEK_CUR)
     return
 
 

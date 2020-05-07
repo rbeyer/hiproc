@@ -270,9 +270,10 @@ def clean_img(in_path: Path, out_path: Path, label=None, width=5,
     lut = img.LUT_Table(
         label['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_CONVERSION_TABLE'])
     specialpix = lut.specialpixels()
+    t_name = 'IMAGE'
 
     # Just doing this takes almost a minute for a 50,000 line image!
-    img_arr = img.object_asarray(in_path, 'IMAGE')
+    img_arr = img.object_asarray(in_path, t_name)
 
     # Using GDAL is better, but need to unlut.
     #   Hunh ... The results when I do this just aren't right, and I'm
@@ -294,8 +295,7 @@ def clean_img(in_path: Path, out_path: Path, label=None, width=5,
     # img_arr = unlut(from_gdal)
     # print(img_arr)
 
-    img_slice = np.s_[:, 18:-16]
-    image = np.ma.masked_outside(img_arr[img_slice],
+    image = np.ma.masked_outside(img_arr,
                                  specialpix.Min, specialpix.Max)
 
     logging.info(f"Bit-flip cleaning Image area.")
@@ -308,7 +308,7 @@ def clean_img(in_path: Path, out_path: Path, label=None, width=5,
         clean_image = np.ma.masked_outside(image, s_min, s_max)
         if replacement is not None:
             specialpix.Null = replacement
-        img_arr[img_slice] = apply_special_pixels(clean_image, specialpix)
+        img_arr = apply_special_pixels(clean_image, specialpix)
         img.overwrite_object(out_path, 'IMAGE', img_arr)
 
         if not keep:
@@ -469,7 +469,10 @@ def clean_tables_from_img(in_path: Path, out_path: Path, label=None, width=5,
         t_name = 'CALIBRATION_IMAGE'
         cal_vals = img.object_asarray(in_path, t_name)
 
-        rev_clock_slice = np.s_[:20, 18:-16]
+        # prefix = label[t_name]['LINE_PREFIX_BYTES']
+        # suffix = label[t_name]['LINE_SUFFIX_BYTES']
+        # rev_clock_slice = np.s_[:20, prefix:(-1 * suffix)]
+        rev_clock_slice = np.s_[:20, :]
 
         # print(cal_vals.shape)
         # print(cal_vals[:20, 18:-16])
@@ -480,6 +483,7 @@ def clean_tables_from_img(in_path: Path, out_path: Path, label=None, width=5,
 
         # print("cal_image:")
         # print(cal_image)
+        # print(cal_image.shape)
 
         clean_cal = clean_cal_tables(cal_image, binning, width,
                                      rev_area, mask_area, ramp_area,
