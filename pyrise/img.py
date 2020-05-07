@@ -181,7 +181,9 @@ def overwrite_object(file_path: os.PathLike, name: str, arr: np.ndarray):
     width, b_order, b_signed = byte_info(name, label)
 
     if arr.shape != (label[name]['LINES'], label[name]['LINE_SAMPLES']):
-        raise ValueError(f"The object {name} has different dimensions than "
+        raise ValueError(f"The object {name} has different dimensions "
+                         f"({label[name]['LINES']}, "
+                         f"{label[name]['LINE_SAMPLES']})than "
                          f"the array ({arr.shape}).")
 
     lut = LUT_Table(

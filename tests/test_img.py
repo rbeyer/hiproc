@@ -108,7 +108,7 @@ example_lut = ((0, 1108), (1109, 1125), (1126, 1143), (1144, 1160),
 class TestLUT_Table(unittest.TestCase):
 
     def setUp(self):
-        self.nolut = img.LUT_Table(((0, 0),))
+        self.nolut = img.LUT_Table([[0, 0]])
         self.lut = img.LUT_Table(example_lut)
 
     def test_init(self):
@@ -150,7 +150,7 @@ class TestFunctions(unittest.TestCase):
                               'SAMPLE_TYPE': 'MSB_UNSIGNED_INTEGER',
                               'LINES': 2,
                               'LINE_PREFIX_BYTES': 1,
-                              'LINE_SAMPLES': 3,
+                              'LINE_SAMPLES': 5,
                               'LINE_SUFFIX_BYTES': 1},
                       'INSTRUMENT_SETTING_PARAMETERS': {
                           'MRO:LOOKUP_CONVERSION_TABLE': example_lut}}
@@ -182,7 +182,9 @@ class TestFunctions(unittest.TestCase):
             img.overwrite_object('dummy.img', 'foo', np.array(arr))
 
         handle = m_open()
-        handle.seek.assert_called_once_with(50012)
+        self.assertEqual(handle.seek.call_args_list,
+                         [call(50012), call(1, 1), call(1, 1),
+                          call(1, 1), call(1, 1)])
 
         lutted = [1, 0, 1, 0, 1, 2, 2, 255, 0, 0]
         call_list = list()
