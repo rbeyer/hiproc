@@ -513,8 +513,12 @@ def clean_cal_tables(cal_image, binning, width=5,
 
     if rev_area:
         logging.info(f"Bit-flip cleaning Reverse-Clock area.")
+        # Apply the cleaning along the lines, rather than along
+        # the columns, since the statistics are better, and also
+        # restrict the medstd_limit down to 200, since these reverse
+        # clock pixels should not be that divergent.
         rev_clean = clean_array(
-            cal_image[:20, :], width=width, axis=1,
+            cal_image[:20, :], width=width, axis=1, medstd_limit=200,
             plot=(f"{plot} Reverse-Clock" if plot else False))
         cal_image[:20, :] = rev_clean
 
@@ -527,10 +531,12 @@ def clean_cal_tables(cal_image, binning, width=5,
     return cal_image
 
 
-def clean_array(data: np.ma.array, width=5, axis=0, plot=False):
+def clean_array(data: np.ma.array, *args, **kwargs):
     """Returns a numpy masked array whose mask is based on applying
     the smart window bounds from find_smart_window_from_ma() applied
-    to *data* with the specified *wdith* and *axis*.
+    to *data* with the specified parameters.  All of the parameters
+    provided to this function are passed along to
+    find_smart_window_from_ma(), see its documentation for details.
 
     If all of the values in *data* are masked, a ValueError is raised.
     """
@@ -538,8 +544,7 @@ def clean_array(data: np.ma.array, width=5, axis=0, plot=False):
         logging.info("All of the values in data are masked.")
         return data
 
-    (w_min, w_max) = find_smart_window_from_ma(data, width=width, axis=axis,
-                                               plot=plot)
+    (w_min, w_max) = find_smart_window_from_ma(data, *args, **kwargs)
     return np.ma.masked_outside(data, w_min, w_max)
 
 
@@ -601,19 +606,24 @@ def apply_special_pixels(array: np.ma, specialpix) -> np.ma:
     return array
 
 
-def find_smart_window_from_ma(data: np.ma.array, width=5, axis=0, plot=False):
+def find_smart_window_from_ma(data: np.ma.array, width=5, axis=0,
+                              medstd_limit=300, medstd_fallback=64,
+                              plot=False):
     """Returns a two-tuple with the result of find_smart_window().
 
     This function mostly just does set-up based on the provided
     masked array *data* and the provided *width* and *axis* value
-    to calculate the inputs for find_smart_window().
+    to calculate the inputs for find_smart_window().  The
+    value of *medstd_limit* and *medstd_fallback* are passed along
+    to min_max_ex(), please see that documentation for more information.
     """
     median = median_limit(np.ma.median(data), data)
     medstd = median_std_from_ma(data, axis=axis)
 
     unique, unique_counts = np.unique(data.compressed(), return_counts=True)
 
-    mindn, maxdn, ex = min_max_ex(median, medstd, width)
+    mindn, maxdn, ex = min_max_ex(median, medstd, width,
+                                  medstd_limit, medstd_fallback)
 
     return find_smart_window(unique, unique_counts, mindn, maxdn, median,
                              central_exclude_dn=ex, plot=plot)
@@ -677,13 +687,14 @@ def median_std(valid_points: np.ma, std_devs: np.ma):
     return medstd
 
 
-def min_max_ex(central, medstd, width) -> tuple:
+def min_max_ex(central, medstd, width, medstd_limit=300,
+               medstd_fallback=64) -> tuple:
     """Return a minimum, maximum, and exclusion value based on the
     provided *central* value, and adding and subtracting the result
     of multiplying the *medstd* by the *width*.
 
-    If the medstd is too large, the resulting values are based on
-    conservative guesses.
+    If *medstd* is larger than *medstd_limit*, then *medstd_fallback*
+    will be used instead.
     """
     # Sometimes even the medstd can be too high because the 'good' lines
     # still had too many outliers in it.  What is 'too high' and how do
@@ -695,8 +706,8 @@ def min_max_ex(central, medstd, width) -> tuple:
     # Finally, in this case, since the 'statistics' are completely broken,
     # I'm also going to set the exclusion to be arbitrary, and lower than
     # the enforced medstd.
-    if medstd > 300:
-        medstd = 64
+    if medstd > medstd_limit:
+        medstd = medstd_fallback
         ex = 16
         logging.info("The derived medstd was too big, setting the medstd "
                      f"to {medstd} and the exclusion value to {ex}.")
