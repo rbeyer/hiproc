@@ -640,7 +640,7 @@ def median_limit(median, data: np.ndarray, limit=4000):
     logging.info(f"Median: {median}")
 
     if median > limit and np.any([data < limit]):
-        median = np.median(data[data < limit])
+        median = np.ma.median(data[data < limit])
         logging.info(f"The median was too high (> {limit}), "
                      f"found a better one: {median}.")
 
