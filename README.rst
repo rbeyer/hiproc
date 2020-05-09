@@ -98,4 +98,13 @@ contributing guide for details on how to help and setup a development
 environment.
 
 
+Naming
+------
+
+I may need to change the name if I ever want to create a PyPI package
+or make it installable via conda-forge.  Turns out that 'pyrise'
+is already taken on PyPI by a now-abandoned package, but the process
+to commandeer that name is probably more trouble than it is worth.
+
+
 .. _PlanetaryPy: https://github.com/planetarypy
