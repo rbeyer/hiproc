@@ -24,8 +24,8 @@ ISIS tool hijitreg to perform a deconvolution of jittered image data."""
 #
 # This program is based on HiColor version 5.4.2 (2020/02/14),
 # This program is based on these Perl programs:
-# - HiJitReg.pm ($Revision: 1.57 $ $Date: 2020/02/14 22:46:48 $)
-# - JitStats ($Revision: 1.10 $ $Date: 2020/02/14 22:46:49 $)
+# - HiJitReg.pm ($Revision: 1.58 $ $Date: 2020/04/28 16:56:16 $)
+# - JitStats ($Revision: 1.11 $ $Date: 2020/04/28 16:56:16 $)
 # - JitStats.pm ($Revision: 1.17 $ $Date: 2020/02/14 22:46:49 $)
 # by Guy McArthur as an employee of the University of Arizona.
 

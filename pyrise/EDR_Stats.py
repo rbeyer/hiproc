@@ -34,10 +34,12 @@ reproduced here:
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This Python program is based on EDR_Stats version 2.16.2 (2020/02/14)
-# and on the Perl EDR_Stats program ($Revision: 1.39 $
-#                                    $Date: 2020/02/14 17:36:39$)
-# by Eric Eliason and Audrie Fennema as employees of the University of Arizona.
+# This Python program is based on EDR_Stats version 2.16.3 (2020/04/28)
+# and on the Perl EDR_Stats program ($Revision: 1.40 $
+#                                    $Date: 2020/04/28 17:43:18 $)
+# and on the check_lut.pm program (2.4, 2020/04/28)
+# by Eric Eliason, Audrie Fennema, and R. King as employees of the University
+# of Arizona.
 
 import argparse
 import hashlib

@@ -22,8 +22,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on HiColor version 5.4.2 (2020/02/14),
-# the SlitherStats Perl program ($Revision: 1.7 $ $Date: 2020/02/14 22:46:49 $)
+# This program is based on HiColor version 5.4.3 (2020/04/28),
+# the SlitherStats Perl program ($Revision: 1.8 $ $Date: 2020/04/28 16:56:17 $)
 # and on the Octave program
 # readSlitherPolyfit_octave.m ($Id: v 1.5 2020/02/14 23:35:23 $)
 # by Sarah Sutton and Audrie Fennema as employees of the University of Arizona.

@@ -22,9 +22,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on HiColor version 5.4.2 (2020/02/14),
-# and on the Perl HiSlither program ($Revision: 1.42 $
-#                                    $Date: 2020/02/14 22:46:48 $)
+# This program is based on HiColor version 5.4.3 (2020/04/28),
+# and on the Perl HiSlither program ($Revision: 1.43 $
+#                                    $Date: 2020/04/28 16:56:16 $)
 # by Guy McArthur as an employee of the University of Arizona.
 
 import argparse

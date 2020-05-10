@@ -22,9 +22,9 @@ create a single mosaicked image file."""
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on HiccdStitch version 2.4.5 (2020/02/14),
-# and on the Perl HiccdStitch program ($Revision: 1.42
-#                                      $Date: 2020/02/14 22:04:43 $)
+# This program is based on HiccdStitch version 2.4.6 (2020/04/28),
+# and on the Perl HiccdStitch program ($Revision: 1.43 $
+#                                      $Date: 2020/04/28 18:00:04 $)
 # by Eric Eliason as an employee of the University of Arizona.
 
 import argparse
