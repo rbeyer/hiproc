@@ -75,6 +75,7 @@ reproduced here:
 
 import argparse
 import collections
+import copy
 import csv
 import json
 import logging
@@ -265,6 +266,8 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
     # existing files and also allow for easy clean-up if keep=True
     temp_token = datetime.now().strftime('HiCal-%y%m%d%H%M%S')
 
+    logging.info(f"destripe: {destripe}")
+
     flags = set_flags(hconf, db, ccdchan, b.index(int(db['BINNING'])))
     logging.info(flags)
 
@@ -282,6 +285,7 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
         next_cube = to_delete.add(in_cube.with_suffix(f'.{temp_token}.cub'))
         logging.info(f'Symlink {in_cube} to {next_cube}')
         next_cube.symlink_to(in_cube.resolve())
+    logging.info(f"Furrow Fix application: {furrows_found}")
 
     # Run hical
     lis_per = (int(db['LOW_SATURATED_PIXELS']) /
@@ -303,6 +307,8 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
     # # Perform gain-drift correction
     # if(db['BINNING'] != '8'):  # There is no gain fix for bin8 imaging
     #     higain_file = to_delete.add(next_cube.with_suffix('.fx.cub'))
+    #     hgf_path = util.get_path(Path('HiGainFx.conf'), Path(conf_path).parent)
+    #     conf['HiGainFx'] = pvl.load(str(hgf_path))['HiGainFx']
     #     HiGainFx(next_cube, higain_file,
     #              conf['HiGainFx']['HiGainFx_Coefficient_Path'],
     #              conf['HiGainFx']['HiGainFx_Version'])
@@ -350,7 +356,7 @@ def HiCal(in_cube: os.PathLike, out_cube: os.PathLike, ccdchan: tuple,
                     conf=conf['NoiseFilter'],
                     minimum=hconf['HiCal_Normalization_Minimum'],
                     maximum=hconf['HiCal_Normalization_Maximum'],
-                    zapc=flags.zapcols)
+                    zapc=flags.zapcols, keep=keep)
         next_cube = noisefilter_file
 
     # Hidestripe() - isis.[hidestripe,hipass,lowpass,algebra]
@@ -836,7 +842,13 @@ def HiGainFx(cube: os.PathLike, outcube: os.PathLike,
         for row in reader:
             if hirise.get_ccdchannel(row['CCD CH']) == (ccd, chan):
                 max_line = row['Max line']
-                a_coef = (row['R(0)'], row['R(1)'], row['R(2)'])
+                a_coef = list()
+                for r in (row['R(0)'], row['R(1)'], row['R(2)']):
+                    if r.startswith('-'):
+                        # add another '-' for fx syntax
+                        a_coef.append(f"-{r}")
+                    else:
+                        a_coef.append(r)
 
     eqn = (r"\((F1/({0}+({1}*line)+({2}*line*line)))*".format(*a_coef) +
            r"(line<{0}) + (F1*(line>={0})))".format(max_line))
@@ -923,34 +935,40 @@ def cut_size(chan: int, length: int) -> collections.namedtuple:
     return Cut(left, right)
 
 
-def Cubenorm_Filter_filter_boxfilter(inlist: list, origlist: list,
-                                     boxfilter: int,
+def Cubenorm_Filter_filter_boxfilter(inlist: list, boxfilter: int,
                                      iterations=50) -> list:
-    x = inlist.copy()
+    x = copy.deepcopy(inlist)
+    ori = copy.deepcopy(inlist)
     hwidth = int(boxfilter / 2)
-    frac = 0.25
+    frac = [0.25, 0.125]
     for step in range(3):
         for it in range(iterations):
-            xflt = x.copy()
+            xflt = copy.deepcopy(x)
             for i, _ in enumerate(x):
-                if x[i] != 0.0:
-                    start = i - hwidth
-                    if start < 0:
-                        start = 0
-                    xflt[i] = statistics.mean(filter(lambda y: y > 0,
-                                                     x[start:i + hwidth]))
-                    # print('Range: {}:{}, Values: {}, Mean: {}'.format(start,
-                    #                               i + hwidth,
-                    #                               x[start:i + hwidth],
-                    #                               xflt[i]))
-            x = xflt.copy()
+                start = i - hwidth
+                if start < 0:
+                    start = 0
+                try:
+                    xflt[i] = statistics.mean(filter(lambda y: y != 0,
+                                                     x[start:i + hwidth + 1]))
+                except statistics.StatisticsError:
+                    xflt[i] = 0
+            x = copy.deepcopy(xflt)
         # Zap any columns that are different from the average by more then 25%
-        if step == 1:
-            frac = 0.125
-        for i, (orig, new) in enumerate(zip(origlist, x)):
-            if orig != 0 and new != 0 and abs(orig - new) / new > frac:
-                # print(f'orig: {orig}, new: {new}, setting to zero')
-                x[i] = 0
+        if step < 2:
+            for i, (orig, new) in enumerate(zip(ori, x)):
+                if(
+                    orig != 0
+                    and new != 0
+                    and (abs(orig - new) / new) > frac[step]
+                ):
+                    # print(f'orig: {orig}, new: {new}, setting to zero')
+                    ori[i] = x[i] = 0
+                else:
+                    x[i] = orig
+                # logging.info(
+                #     f"frac: {frac[step]}, index: {i}, orig: {orig}, new: {new}, "
+                #     f"stored: {x[i]}")
     return x
 
 
@@ -960,7 +978,7 @@ def Cubenorm_Filter_filter(inlist: list, boxfilter: int, iterations: int,
     """This performs highpass filtering on the passed list."""
     logging.info(Cubenorm_Filter_filter.__doc__)
 
-    x = inlist.copy()
+    x = copy.deepcopy(inlist)
     cut = cut_size(chan, len(x))
 
     # zap the left edge
@@ -970,19 +988,19 @@ def Cubenorm_Filter_filter(inlist: list, boxfilter: int, iterations: int,
     x[(len(x) - cut.right):] = [0] * cut.right
 
     # zap the pause point pixels
-    if pause and 1023 == len(x):
+    if pause and 1024 == len(x):
         # 1st pixel = index 1
-        ch_pause[0] = 252, 515, 778  # Channel 0 pause point sample locations
-        ch_pause[1] = 247, 510, 773  # Channel 1 pause point sample locations
-        ch_width[0] = 17, 17, 17  # Number of pixels to cut from pause point
-        ch_width[1] = -17, -17, -17
+        ch_pause = [(252, 515, 778),  # Channel 0 pause point sample locations
+                    (247, 510, 773)]  # Channel 1 pause point sample locations
+        ch_width = [(17, 17, 17),   # Number of pixels to cut from pause point
+                    (-17, -17, -17)]
 
         for samp, width in zip(ch_pause[chan], ch_width[chan]):
             zap_slice = pause_slicer(samp, width)
             x[zap_slice] = [0] * abs(width)
 
     # boxfilter
-    x = Cubenorm_Filter_filter_boxfilter(x, inlist, boxfilter, iterations)
+    x = Cubenorm_Filter_filter_boxfilter(x, boxfilter, iterations)
 
     # Perform the highpass difference of divide the original from lowpass
     maxvp = max(vpoints)
@@ -1039,14 +1057,15 @@ def pause_slicer(samp: int, width: int) -> slice:
     return slice(s_start, s_stop)
 
 
-def highlow_destripe(in_cube: os.PathLike, out_cube: os.PathLike,
+def highlow_destripe(high_cube: os.PathLike, low_cube: os.PathLike,
+                     out_cube: os.PathLike,
                      conf: dict, isisnorm='',
                      lnull=True, lhrs=True, lhis=True, llrs=True, llis=True,
                      keep=False) -> None:
     # Perform highpass/lowpass filter vertical destripping
     to_delete = isis.PathSet()
     lpf_cub = to_delete.add(out_cube.with_suffix('.lpf.cub'))
-    util.log(isis.lowpass(in_cube, to=lpf_cub,
+    util.log(isis.lowpass(low_cube, to=lpf_cub,
                           line=conf['NoiseFilter_LPF_Line'],
                           samp=conf['NoiseFilter_LPF_Samp'],
                           minopt='PERCENT', replace='NULL',
@@ -1055,7 +1074,7 @@ def highlow_destripe(in_cube: os.PathLike, out_cube: os.PathLike,
                           lis=llis).args)
 
     hpf_cub = to_delete.add(out_cube.with_suffix('.hpf.cub'))
-    util.log(isis.highpass(in_cube, to=hpf_cub, minopt='PERCENT',
+    util.log(isis.highpass(high_cube, to=hpf_cub, minopt='PERCENT',
                            line=conf['NoiseFilter_HPF_Line'],
                            samp=conf['NoiseFilter_HPF_Samp'],
                            minimum=conf['NoiseFilter_HPF_Minper']).args)
@@ -1114,6 +1133,7 @@ def NoiseFilter_noisefilter(from_cube: os.PathLike, to_cube: os.PathLike,
 
 
 def NoiseFilter_cubenorm_edit(in_tab: os.PathLike, out_tab: os.PathLike,
+                              out_tab2: os.PathLike,
                               chan: int, binning: int, conf: dict,
                               zapc=False) -> None:
     """This function zaps the relevent pixels in the cubenorm output and
@@ -1147,23 +1167,47 @@ def NoiseFilter_cubenorm_edit(in_tab: os.PathLike, out_tab: os.PathLike,
     if max_vpnts <= 0:
         max_vpnts = 1
 
-    # Create a 'unity array' (original code has two, but they're identical).
+    # Create a 'unity array'
     # Zap any columns with less then NoiseFilter_Zap_Fraction
     norm = [1] * len(vpnts)
     for i, v in enumerate(vpnts):
         if(zapc and v / max_vpnts < float(conf['NoiseFilter_Zap_Fraction'])):
             norm[i] = 0
 
+    # Copy it.
+    norm2 = copy.deepcopy(norm)
+
     # Determine if the pause point pixels need to be zapped
     if binning == 1:
+        trigger = False
         for samp, width in zip(ch_pause[chan], ch_width[chan]):
             zap_slice = pause_slicer(samp, width)
             for i in range(zap_slice.start, zap_slice.stop):
                 if(vpnts[i] / max_vpnts <
                    float(conf['NoiseFilter_Nonvalid_Fraction'])):
-                    norm[i] = 0
+                    trigger = True
 
-    with open(out_tab, 'w') as csvfile:
+        if trigger:
+            logging.info("Fraction of non-valid pixels > {}".format(
+                conf['NoiseFilter_Nonvalid_Fraction']))
+            logging.info("Pause point pixels will be zapped.")
+
+        for samp, width in zip(ch_pause[chan], ch_width[chan]):
+            zap_slice = pause_slicer(samp, width)
+            for i in range(zap_slice.start, zap_slice.stop):
+                if trigger:
+                    norm[i] = 0
+                norm2[i] = 0
+
+    NoiseFilter_cubenorm_writer(out_tab, other_cols, vpnts, norm)
+    NoiseFilter_cubenorm_writer(out_tab2, other_cols, vpnts, norm2)
+
+    return
+
+
+def NoiseFilter_cubenorm_writer(file_path: os.PathLike, other_cols: list,
+                                vpnts: list, norm: list):
+    with open(file_path, 'w') as csvfile:
         writer = isis.cubenormfile.DictWriter(csvfile)
         writer.writeheader()
         for (d, vp, n) in zip(other_cols, vpnts, norm):
@@ -1174,14 +1218,13 @@ def NoiseFilter_cubenorm_edit(in_tab: os.PathLike, out_tab: os.PathLike,
             d['Minimum'] = n
             d['Maximum'] = n
             writer.writerow(d)
-    return
 
 
 def NoiseFilter(in_cube: os.PathLike, output: os.PathLike, conf: dict,
                 minimum=None, maximum=None, zapc=False, keep=False) -> None:
-    """Perform salt/pepper noise removal."""
+    """NoiseFilter: Perform salt/pepper noise removal."""
     logging.info(NoiseFilter.__doc__)
-    binning = isis.getkey_k(in_cube, 'Instrument', 'Summing')
+    binning = int(isis.getkey_k(in_cube, 'Instrument', 'Summing'))
     (ccd, chan) = hirise.get_ccdchannel(isis.getkey_k(in_cube, 'Archive',
                                                       'ProductId'))
     isisnorm = ''
@@ -1198,17 +1241,26 @@ def NoiseFilter(in_cube: os.PathLike, output: os.PathLike, conf: dict,
                            direction='COLUMN').args)
 
     cn2_tab = to_delete.add(output.with_suffix('.cn2.tab'))
-    NoiseFilter_cubenorm_edit(cn_tab, cn2_tab, chan, binning, conf, zapc)
+    cn3_tab = to_delete.add(output.with_suffix('.cn3.tab'))
+    NoiseFilter_cubenorm_edit(cn_tab, cn2_tab, cn3_tab, int(chan), binning,
+                              conf, zapc)
 
-    # Zap the bad columns for the highpass and lowpass filter
+    # Zap the bad columns for the highpass filter
     zap_cub = to_delete.add(output.with_suffix('.zap.cub'))
     util.log(isis.cubenorm(in_cube, to=zap_cub, fromstats=cn2_tab,
                            statsource='TABLE', mode='DIVIDE', norm='AVE',
                            preserve='FALSE').args)
 
+    # Zap the bad columns for the lowpass filter
+    zap2_cub = to_delete.add(output.with_suffix('.zap2.cub'))
+    util.log(isis.cubenorm(in_cube, to=zap2_cub, fromstats=cn3_tab,
+                           statsource='TABLE', mode='DIVIDE', norm='AVE',
+                           preserve='FALSE').args)
+
     # Perform highpass/lowpass filter vertical destripping
     add_cub = to_delete.add(output.with_suffix('.add.cub'))
-    highlow_destripe(zap_cub, add_cub, conf, isisnorm, llis=False, keep=keep)
+    highlow_destripe(zap_cub, zap2_cub, add_cub, conf, isisnorm, llis=False,
+                     keep=keep)
 
     # Perform the 1st noise filter
     tolmin = float(conf['NoiseFilter_Tolmin'])
@@ -1237,7 +1289,7 @@ def NoiseFilter(in_cube: os.PathLike, output: os.PathLike, conf: dict,
     # Perform another highpass/lowpass filter now that the
     # data are much cleaner
     add2_cub = to_delete.add(output.with_suffix('.add2.cub'))
-    highlow_destripe(nf3_cub, add2_cub, conf, isisnorm,
+    highlow_destripe(nf3_cub, nf3_cub, add2_cub, conf, isisnorm,
                      lnull=False, lhrs=False, lhis=False, llrs=False,
                      llis=False, keep=keep)
 

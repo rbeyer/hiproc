@@ -161,14 +161,20 @@ DN,Pixels,CumulativePixels,Percent,CumulativePercent
         self.assertFalse(hc.FurrowCheck(vpnts1, 0))
 
     def test_Cubenorm_Filter_filter_boxfilter(self):
-        orig = [4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000]
         mylist = [4000, 4000, 0, 4000, 4000, 3800, 4000, 4000]
 
-        truthlist = [4000, 4000, 0, 4000, 4000, 4000, 4000, 4000]
+        truthlist = [
+            3974.1882476041565,
+            3974.0124192049366,
+            3973.604595524187,
+            3973.0384085658607,
+            3972.4160735379446,
+            3971.849930095303,
+            3971.442163554957,
+            3971.266366671061]
 
         self.assertEqual(truthlist,
-                         hc.Cubenorm_Filter_filter_boxfilter(mylist, orig,
-                                                             2, 50))
+                         hc.Cubenorm_Filter_filter_boxfilter(mylist, 2, 50))
 
 
 class TestMock(unittest.TestCase):
@@ -224,13 +230,15 @@ class TestNeedCubenormStatsFile(unittest.TestCase):
         self.assertEqual((3349.2, 9486.4),
                          hc.analyze_cubenorm_stats(self.statsfile, 2))
 
-    def test_NoiseFilter_cubenorm_edit(self):
+    @patch('pyrise.HiCal.isis.cubenormfile.DictWriter')
+    @patch('pyrise.HiCal.NoiseFilter_cubenorm_writer')
+    def test_NoiseFilter_cubenorm_edit(self, m_writer, m_DictWriter):
         conf = dict(NoiseFilter_Zap_Fraction=0.4,
                     NoiseFilter_Nonvalid_Fraction=0.90)
 
-        with patch('pyrise.HiCal.csv.DictWriter'):
-            hc.NoiseFilter_cubenorm_edit(self.statsfile, self.output,
-                                         0, 2, conf, True)
+        hc.NoiseFilter_cubenorm_edit(self.statsfile, self.output,
+                                     0, 2, conf, True)
+        # print(m_writer.call_args_list)
 
     def test_Cubenorm_Filter_filter(self):
         vpnts = list()
@@ -241,14 +249,16 @@ class TestNeedCubenormStatsFile(unittest.TestCase):
                 vpnts.append(int(row.pop('ValidPoints')))
                 averages.append(float(row.pop('Average')))
 
-        self.assertEqual(1, hc.Cubenorm_Filter_filter(averages, 5, 50, 0,
-                                                      True, vpnts, True)[-1])
+        self.assertAlmostEqual(1.0036515,
+                               hc.Cubenorm_Filter_filter(averages, 5, 50, 0,
+                                                         True, vpnts, True)[-1],
+                               6)
 
     def test_Cubenorm_Filter(self):
         with patch('pyrise.HiCal.csv.DictWriter'):
             t = hc.Cubenorm_Filter(self.statsfile, self.output,
                                    False, 5, False, 0)
-            self.assertAlmostEqual(34.309424, t[0], 6)
+            self.assertAlmostEqual(15.4995326, t[0], 6)
             self.assertFalse(t[1])
 
 
@@ -308,7 +318,8 @@ class TestNeedISISCube(unittest.TestCase):
                       NoiseFilter_HPF_Samp=1,
                       NoiseFilter_HPF_Minper=5)
         outcube = Path('test_highlow_destripe-out.cub')
-        self.assertIsNone(hc.highlow_destripe(self.cube, outcube, myconf,
+        self.assertIsNone(hc.highlow_destripe(self.cube, self.cube,
+                                              outcube, myconf,
                                               isisnorm='', lnull=True,
                                               lhrs=True, lhis=True,
                                               llrs=True, llis=True,
@@ -398,5 +409,5 @@ class TestHiCal(unittest.TestCase):
         self.assertEqual((None, False, 'Standard'), hical[1:])
         # This stddev was with HiGainFx in the mix:
         # self.assertAlmostEqual(0.006452488, hical[0])
-        self.assertAlmostEqual(0.00645841, hical[0])
+        self.assertAlmostEqual(0.00204738, hical[0])
         outcube.unlink()

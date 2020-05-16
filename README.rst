@@ -14,7 +14,7 @@ A library to help process HiRISE EDRs with ISIS.
 Features
 --------
 
-* TODO
+* Complete testing against Perl Pipelines.
 
 
 External Dependencies
@@ -47,6 +47,17 @@ Pipelines, and this warning will remain until I have done so.  As
 a result, I would not particularly 'trust' anything produced by
 these programs at this time, and consider these algorithms a
 work-in-progress.
+
+These programs have been tested against their upstream Perl counterparts:
+
+- EDR_Stats: Verified!
+    Really just runs ``hi2isis`` so no surprise here.
+
+- HiCal: Verified. (if ``HiGainFx()`` enabled)
+    Upstream is undergoing change.  HiGainFx really shouldn't be
+    applied, so it is commented out here.  We're also working
+    to integrate the bitflip cleaning into the upstream Perl,
+    so this is in flux.
 
 
 Details
