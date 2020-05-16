@@ -55,6 +55,6 @@ setup(
     packages=find_packages(include=['pyrise', 'pyrise.*']),
     test_suite='tests',
     url='https://github.com/rbeyer/pyrise',
-    version='0.3.0',
+    version='0.4.0-dev',
     zip_safe=False,
 )
