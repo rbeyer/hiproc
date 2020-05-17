@@ -24,31 +24,45 @@ from pathlib import Path
 
 import kalasiris as isis
 
-phase_names = ('INT', 'CAL', 'ATL', 'KSC', 'LAU', 'CRU', 'APR', 'AEB',
-               'TRA', 'PSP',  # 'REL'
-               'ESP')
+phase_names = (
+    "INT",
+    "CAL",
+    "ATL",
+    "KSC",
+    "LAU",
+    "CRU",
+    "APR",
+    "AEB",
+    "TRA",
+    "PSP",  # 'REL'
+    "ESP",
+)
 
-phase_max_orbit = dict(zip(phase_names, repeat(0)),
-                       TRA=1000, PSP=11248, ESP=None)
+phase_max_orbit = dict(
+    zip(phase_names, repeat(0)), TRA=1000, PSP=11248, ESP=None
+)
 
-ccd_numbers = dict(RED=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
-                   IR=(10, 11),
-                   BG=(12, 13))
+ccd_numbers = dict(
+    RED=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), IR=(10, 11), BG=(12, 13)
+)
 
 # Create some compiled regex Patterns to use in this module.
 phase_re = re.compile("|".join(phase_names))
 orbit_re = re.compile(r"\d{1,6}")
 lat_re = re.compile(r"[0-3]?\d?\d?[05]")
 
-obsid_core_re = re.compile(fr"(?P<phase>{phase_re.pattern})?_?"
-                           fr"(?P<orbit>{orbit_re.pattern})_"
-                           fr"(?P<latesque>{lat_re.pattern})")
+obsid_core_re = re.compile(
+    fr"(?P<phase>{phase_re.pattern})?_?"
+    fr"(?P<orbit>{orbit_re.pattern})_"
+    fr"(?P<latesque>{lat_re.pattern})"
+)
 obsid_re = re.compile(fr"(?<!\w){obsid_core_re.pattern}(?!\d)")
 
 ccd_name_re = re.compile(r"RED|IR|BG")
 ccd_re = re.compile(r"RED\d|IR1[0-1]|BG1[2-3]")
 ccdid_core_re = re.compile(
-    fr"{obsid_core_re.pattern}_(?P<ccd>{ccd_re.pattern})")
+    fr"{obsid_core_re.pattern}_(?P<ccd>{ccd_re.pattern})"
+)
 ccdid_re = re.compile(fr"(?<!\w){ccdid_core_re.pattern}(?!\d)")
 
 chan_re = re.compile(r"(?P<channel>[01])")
@@ -56,9 +70,11 @@ ccdchan_re = re.compile(fr"(?P<ccd>{ccd_re.pattern})_(?P<channel>[0-1])")
 chanid_core_re = re.compile(fr"{ccdid_core_re.pattern}_(?P<channel>[0-1])")
 chanid_re = re.compile(fr"(?<!\w){chanid_core_re.pattern}(?!\d)")
 
-prodid_re = re.compile(fr"(?<!\w){obsid_core_re.pattern}_?"
-                       fr"(?P<ccd>{ccd_re.pattern})?_?"
-                       fr"(?P<channel>[0-1])?(?!\d)")
+prodid_re = re.compile(
+    fr"(?<!\w){obsid_core_re.pattern}_?"
+    fr"(?P<ccd>{ccd_re.pattern})?_?"
+    fr"(?P<channel>[0-1])?(?!\d)"
+)
 
 
 class ObservationID:
@@ -82,18 +98,19 @@ class ObservationID:
                 match = obsid_re.search(str(args[0]))
                 if match:
                     parsed = match.groupdict()
-                    phase = parsed['phase']
-                    orbit = parsed['orbit']
-                    lat = parsed['latesque']
+                    phase = parsed["phase"]
+                    orbit = parsed["orbit"]
+                    lat = parsed["latesque"]
                 else:
-                    raise ValueError(f'{args[0]} did not match regex: '
-                                     f'{obsid_re.pattern}')
+                    raise ValueError(
+                        f"{args[0]} did not match regex: {obsid_re.pattern}"
+                    )
         elif len(args) == 2:
             (phase, orbit, lat) = None, *args
         elif len(args) == 3:
             (phase, orbit, lat) = args
         else:
-            raise IndexError('accepts 1 to 3 arguments')
+            raise IndexError("accepts 1 to 3 arguments")
 
         self.orbit_number = self.format_orbit(orbit)
         self.latesque = self.format_latesque(lat)
@@ -103,40 +120,53 @@ class ObservationID:
                 if is_orbit_in_phase(self.orbit_number, phase):
                     self.phase = phase
                 else:
-                    raise ValueError('The orbit, {}, is outside the allowed '
-                                     'range ({}, {}) in HiRISE mission phase '
-                                     '{}'.format(self.orbit_number,
-                                                 phase_max_orbit[
-                                                     prev_phase(phase)],
-                                                 phase_max_orbit[phase],
-                                                 phase))
+                    raise ValueError(
+                        "The orbit, {}, is outside the allowed "
+                        "range ({}, {}) in HiRISE mission phase "
+                        "{}".format(
+                            self.orbit_number,
+                            phase_max_orbit[prev_phase(phase)],
+                            phase_max_orbit[phase],
+                            phase,
+                        )
+                    )
             else:
-                raise ValueError(f'phase argument, {phase}, did not match '
-                                 'any known HiRISE phase:' + str(phase_names))
+                raise ValueError(
+                    f"phase argument, {phase}, did not match "
+                    f"any known HiRISE phase: {phase_names}"
+                )
         else:
             self.phase = get_phase(orbit)
 
     def __str__(self):
-        return f'{self.phase}_{self.orbit_number}_{self.latesque}'
+        return f"{self.phase}_{self.orbit_number}_{self.latesque}"
 
     def __repr__(self):
-        return (f'{self.__class__.__name__}('
-                f'\'{self.phase}_{self.orbit_number}_{self.latesque}\')')
+        return (
+            f"{self.__class__.__name__}("
+            f"'{self.phase}_{self.orbit_number}_{self.latesque}')"
+        )
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return (self.phase == other.phase and
-                    self.orbit_number == other.orbit_number and
-                    self.latesque == other.latesque)
+            return (
+                self.phase == other.phase
+                and self.orbit_number == other.orbit_number
+                and self.latesque == other.latesque
+            )
         return False
 
     def __lt__(self, other):
         if isinstance(other, self.__class__):
-            return (phase_names.index(self.phase),
-                    int(self.orbit_number),
-                    int(self.latesque)) < (phase_names.index(other.phase),
-                                           int(other.orbit_number),
-                                           int(other.latesque))
+            return (
+                phase_names.index(self.phase),
+                int(self.orbit_number),
+                int(self.latesque),
+            ) < (
+                phase_names.index(other.phase),
+                int(other.orbit_number),
+                int(other.latesque),
+            )
         else:
             return NotImplemented
 
@@ -146,18 +176,22 @@ class ObservationID:
     @staticmethod
     def format_orbit(orbit) -> str:
         if orbit_re.fullmatch(str(orbit)):
-            return '{:0>6}'.format(orbit)
+            return "{:0>6}".format(orbit)
         else:
-            raise ValueError(f'orbit argument, {orbit}, did not match '
-                             'regex: {orbit_re.pattern}')
+            raise ValueError(
+                f"orbit argument, {orbit}, did not match "
+                f"regex: {orbit_re.pattern}"
+            )
 
     @staticmethod
     def format_latesque(lat) -> str:
         if lat_re.fullmatch(str(lat)):
-            return '{:0>4}'.format(lat)
+            return "{:0>4}".format(lat)
         else:
-            raise ValueError(f'latitude argument, {lat}, did not match '
-                             'regex: {lat_re.pattern}')
+            raise ValueError(
+                f"latitude argument, {lat}, did not match "
+                f"regex: {lat_re.pattern}"
+            )
 
 
 class CCDID(ObservationID):
@@ -179,19 +213,24 @@ class CCDID(ObservationID):
                 match = ccdid_re.search(str(items[0]))
                 if match:
                     parsed = match.groupdict()
-                    items = (parsed['phase'], parsed['orbit'],
-                             parsed['latesque'])
-                    (ccdname, ccdnumber) = get_ccdnamenumber(parsed['ccd'])
+                    items = (
+                        parsed["phase"],
+                        parsed["orbit"],
+                        parsed["latesque"],
+                    )
+                    (ccdname, ccdnumber) = get_ccdnamenumber(parsed["ccd"])
                 else:
-                    raise ValueError('Could not construct a CCDID. '
-                                     f'{args[0]} did not match regex: '
-                                     f'{ccdid_re.pattern}')
+                    raise ValueError(
+                        f"Could not construct a CCDID. {args[0]} did not match "
+                        f"regex: {ccdid_re.pattern}"
+                    )
         elif len(items) == 3:
             try:
                 (ccdname, ccdnumber) = get_ccdnamenumber(items.pop())
             except ValueError as err:
                 raise ValueError(
-                    'Could not construct a CCDID. ' + str(err)) from err
+                    "Could not construct a CCDID. " + str(err)
+                ) from err
         elif len(items) == 4:
             if items[0] in phase_names:
                 (ccdname, ccdnumber) = get_ccdnamenumber(items.pop())
@@ -202,30 +241,34 @@ class CCDID(ObservationID):
             ccdnumber = _match_num(items.pop())
             ccdname = get_ccdname(items.pop())
         else:
-            raise IndexError('CCDID accepts 1, 3, 4, or 5 arguments, '
-                             f'{len(items)} were provided.')
+            raise IndexError(
+                "CCDID accepts 1, 3, 4, or 5 arguments, "
+                f"{len(items)} were provided."
+            )
         super().__init__(*items)
 
         self.ccdname = ccdname
         self.ccdnumber = ccdnumber
 
     def __str__(self):
-        return '_'.join([super().__str__(), self.get_ccd()])
+        return "_".join([super().__str__(), self.get_ccd()])
 
     def __repr__(self):
-        return (f'{self.__class__.__name__}(\'{self.__str__()}\')')
+        return f"{self.__class__.__name__}('{self.__str__()}')"
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return (super().__eq__(other) and
-                    self.ccdname == other.ccdname and
-                    self.ccdnumber == other.ccdnumber)
+            return (
+                super().__eq__(other)
+                and self.ccdname == other.ccdname
+                and self.ccdnumber == other.ccdnumber
+            )
         return False
 
     def __lt__(self, other):
         if isinstance(other, self.__class__):
-            if(super().__eq__(other)):
-                return (int(self.ccdnumber) < int(other.ccdnumber))
+            if super().__eq__(other):
+                return int(self.ccdnumber) < int(other.ccdnumber)
             else:
                 return super().__lt__(other)
         else:
@@ -254,64 +297,71 @@ class ChannelID(CCDID):
             match = chanid_re.search(str(items[0]))
             if match:
                 parsed = match.groupdict()
-                items = (parsed['phase'], parsed['orbit'], parsed['latesque'])
-                items += get_ccdnamenumber(parsed['ccd'])
-                chan = parsed['channel']
+                items = (parsed["phase"], parsed["orbit"], parsed["latesque"])
+                items += get_ccdnamenumber(parsed["ccd"])
+                chan = parsed["channel"]
             else:
-                raise ValueError('{} did not match regex: '
-                                 '{}'.format(args[0], chanid_re.pattern))
-        elif len(items) >= 2 and len(items) <= 6:
+                raise ValueError(
+                    "{} did not match regex: "
+                    "{}".format(args[0], chanid_re.pattern)
+                )
+        elif 2 <= len(items) <= 6:
             maybechan = items.pop()
             try:
                 chan = self.format_chan(maybechan)
             except ValueError as err:
-                raise ValueError(f'The last item, ' + str(err))
+                raise ValueError(f"The last item, " + str(err))
 
             if len(items) == 1:
                 if isinstance(items[0], CCDID):
-                    items = [items[0].phase,
-                             items[0].orbit_number,
-                             items[0].latesque,
-                             items[0].ccdname,
-                             items[0].ccdnumber]
+                    items = [
+                        items[0].phase,
+                        items[0].orbit_number,
+                        items[0].latesque,
+                        items[0].ccdname,
+                        items[0].ccdnumber,
+                    ]
                 else:
                     raise ValueError(
-                        '{} was not a CCDID object'.format(items[0]))
+                        "{} was not a CCDID object".format(items[0])
+                    )
 
             elif len(items) == 2:
                 (ccdname, ccdnumber) = get_ccdnamenumber(items.pop())
                 if isinstance(items[0], ObservationID):
-                    items = [items[0].phase,
-                             items[0].orbit_number,
-                             items[0].latesque,
-                             ccdname,
-                             ccdnumber]
+                    items = [
+                        items[0].phase,
+                        items[0].orbit_number,
+                        items[0].latesque,
+                        ccdname,
+                        ccdnumber,
+                    ]
                 else:
                     raise ValueError(
-                        '{} was not a ObservationID object'.format(items[0]))
+                        "{} was not a ObservationID object".format(items[0])
+                    )
 
         else:
-            raise IndexError('accepts 1 to 6 arguments')
+            raise IndexError("accepts 1 to 6 arguments")
         super().__init__(*items)
 
         self.channel = str(chan)
 
     def __str__(self):
-        return '_'.join([super().__str__(), self.channel])
+        return "_".join([super().__str__(), self.channel])
 
     def __repr__(self):
-        return (f'{self.__class__.__name__}(\'{self.__str__()}\')')
+        return f"{self.__class__.__name__}('{self.__str__()}')"
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return (super().__eq__(other) and
-                    self.channel == other.channel)
+            return super().__eq__(other) and self.channel == other.channel
         return False
 
     def __lt__(self, other):
         if isinstance(other, self.__class__):
-            if(super().__eq__(other)):
-                return (int(self.channel) < int(other.channel))
+            if super().__eq__(other):
+                return int(self.channel) < int(other.channel)
             else:
                 return super().__lt__(other)
         else:
@@ -326,14 +376,15 @@ class ChannelID(CCDID):
             if chan == 0 or chan == 1:
                 return chan
             else:
-                raise ValueError(f'{chan}, is not zero or one.')
+                raise ValueError(f"{chan}, is not zero or one.")
         else:
             matched = chan_re.fullmatch(chan)
             if matched:
                 return matched.group()
             else:
-                raise ValueError(f'{chan}, did not match a '
-                                 'channel {chan_re.pattern}')
+                raise ValueError(
+                    f"{chan}, did not match a " "channel {chan_re.pattern}"
+                )
 
 
 # def _match_chan(s: str):
@@ -371,19 +422,22 @@ def parseObsID(s: str) -> tuple:
     Returns a tuple of strings that were matched.
     """
     match = obsid_re.search(str(s))
-    if(match):
+    if match:
         return match.groups()
     else:
         raise ValueError(
-            '{} did not match regex: {}'.format(s, obsid_re.pattern))
+            "{} did not match regex: {}".format(s, obsid_re.pattern)
+        )
 
 
 def prev_phase(s: str) -> str:
     """Returns the name of the previous HiRISE mission phase."""
     prev_index = phase_names.index(s) - 1
     if prev_index < 0:
-        raise IndexError(f'HiRISE mission phase, {s}, is the first one, '
-                         'it has no previous phase.')
+        raise IndexError(
+            f"HiRISE mission phase, {s}, is the first one, "
+            "it has no previous phase."
+        )
     else:
         return phase_names[prev_index]
 
@@ -393,13 +447,17 @@ def is_orbit_in_phase(orbit, phase: str):
     mission phase."""
     previous = prev_phase(phase)
     if int(orbit) <= phase_max_orbit[previous]:
-        if(phase_max_orbit[phase] is not None and
-           phase_max_orbit[phase] == phase_max_orbit[previous] and
-           phase_max_orbit[phase] == int(orbit)):
+        if (
+            phase_max_orbit[phase] is not None
+            and phase_max_orbit[phase] == phase_max_orbit[previous]
+            and phase_max_orbit[phase] == int(orbit)
+        ):
             return True
         return False
-    if(phase_max_orbit[phase] is not None
-       and int(orbit) > phase_max_orbit[phase]):
+    if (
+        phase_max_orbit[phase] is not None
+        and int(orbit) > phase_max_orbit[phase]
+    ):
         return False
     return True
 
@@ -422,12 +480,15 @@ def get_phase(orbit) -> str:
             if last_phase is not None:
                 return last_phase
             else:
-                raise IndexError(f'The orbit number {orbit} is greater than '
-                                 'the last HiRISE orbit.')
+                raise IndexError(
+                    f"The orbit number {orbit} is greater than "
+                    "the last HiRISE orbit."
+                )
         last_phase = k
     else:
-        raise IndexError(f'The orbit number {orbit} is not a HiRISE orbit '
-                         'number.')
+        raise IndexError(
+            f"The orbit number {orbit} is not a HiRISE orbit " "number."
+        )
 
 
 def get_ccd(s: str) -> str:
@@ -437,7 +498,7 @@ def get_ccd(s: str) -> str:
     if match:
         return match.group()
     else:
-        raise ValueError(f'{s} did not match regex: {ccd_re.pattern}')
+        raise ValueError(f"{s} did not match regex: {ccd_re.pattern}")
 
 
 def _getccdname_fromint(ccdnum: int) -> str:
@@ -445,7 +506,7 @@ def _getccdname_fromint(ccdnum: int) -> str:
         if ccdnum in v:
             return k
     else:
-        raise ValueError(f'The value {ccdnum} must be a value from 0 to 13.')
+        raise ValueError(f"The value {ccdnum} must be a value from 0 to 13.")
 
 
 def get_ccdname(item) -> str:
@@ -460,16 +521,17 @@ def get_ccdname(item) -> str:
         else:
             try:
                 return _getccdname_fromint(int(item))
-            except:
+            except ValueError:
                 raise ValueError(
-                    f'{item} did not match regex: {ccd_name_re.pattern}')
+                    f"{item} did not match regex: {ccd_name_re.pattern}"
+                )
     except TypeError:
         try:
             if isinstance(item, int):
                 return _getccdname_fromint(int(item))
             else:
-                raise TypeError('Expected string or integer object.')
-        except:
+                raise TypeError("Expected string or integer object.")
+        except ValueError:
             raise
 
 
@@ -480,7 +542,7 @@ def get_ccdnumber(s: str) -> str:
     if match:
         return re.search(r"\d{1,2}", match.group()).group()
     else:
-        raise ValueError(f'{s} did not match regex: {ccd_re.pattern}')
+        raise ValueError(f"{s} did not match regex: {ccd_re.pattern}")
 
 
 def get_ccdnamenumber(item) -> tuple:
@@ -488,14 +550,11 @@ def get_ccdnamenumber(item) -> tuple:
     '('RED', '5')' from 'PSP_010502_2090_RED5_0.EDR_Stats.cub')."""
     try:
         nn = get_ccd(item)
-        return(get_ccdname(nn), get_ccdnumber(nn))
+        return get_ccdname(nn), get_ccdnumber(nn)
     except TypeError:
-        try:
-            return(get_ccdname(item), str(item))
-        except:
-            raise
+        return get_ccdname(item), str(item)
     except ValueError:
-            return(get_ccdname(int(item)), item)
+        return get_ccdname(int(item)), item
 
 
 def get_ccdchannel(s: str) -> tuple:
@@ -505,7 +564,7 @@ def get_ccdchannel(s: str) -> tuple:
     if match:
         return match.groups()
     else:
-        raise ValueError(f'{s} did not match regex: {ccdchan_re.pattern}')
+        raise ValueError(f"{s} did not match regex: {ccdchan_re.pattern}")
 
 
 def _reverse_recurse(path: os.PathLike, IDclass, name):
@@ -515,14 +574,14 @@ def _reverse_recurse(path: os.PathLike, IDclass, name):
             return IDclass(part)
         except ValueError:
             continue
-    raise ValueError(f'Could not extract a {name} from {path}')
+    raise ValueError(f"Could not extract a {name} from {path}")
 
 
 def _get_fromfile(path: os.PathLike, IDclass, name, archivekey):
     p = Path(path)
 
     try:
-        return IDclass(isis.getkey_k(p, 'Archive', archivekey))
+        return IDclass(isis.getkey_k(p, "Archive", archivekey))
     except (subprocess.CalledProcessError, ValueError):
         # The CalledProcessError is if there is some problem with running
         # getkey, the ValueError is if a CCDID can't be extracted from
@@ -536,24 +595,20 @@ def get_ObsID_fromfile(path: os.PathLike) -> ObservationID:
     """Reads the file to get the ObservationID, if an ISIS cube,
        otherwise parses the filepath."""
 
-    return _get_fromfile(path, ObservationID,
-                         'HiRISE Observation ID',
-                         'ObservationId')
+    return _get_fromfile(
+        path, ObservationID, "HiRISE Observation ID", "ObservationId"
+    )
 
 
 def get_CCDID_fromfile(path: os.PathLike) -> CCDID:
     """Reads the file to get the CCDID, if an ISIS cube,
        otherwise parses the filepath."""
 
-    return _get_fromfile(path, CCDID,
-                         'HiRISE CCD ID',
-                         'ProductId')
+    return _get_fromfile(path, CCDID, "HiRISE CCD ID", "ProductId")
 
 
 def get_ChannelID_fromfile(path: os.PathLike) -> ChannelID:
     """Reads the file to get the ChannelID, if an ISIS cube,
        otherwise parses the filepath."""
 
-    return _get_fromfile(path, ChannelID,
-                         'HiRISE Channel ID',
-                         'ProductId')
+    return _get_fromfile(path, ChannelID, "HiRISE Channel ID", "ProductId")

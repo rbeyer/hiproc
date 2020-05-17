@@ -83,7 +83,6 @@ to mitigate the bit-flip pixels once they have been identified.
 
 import argparse
 import logging
-import math
 import os
 import shutil
 import subprocess
@@ -109,27 +108,50 @@ def main():
         parser = argparse.ArgumentParser(
             description=__doc__,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            parents=[util.parent_parser()])
-        parser.add_argument('-o', '--output',
-                            required=False, default='.bitflip.cub')
-        parser.add_argument('-w', '--width', required=False, default=5,
-                            help="The number of medstd widths for bit-flip "
-                            "cleaning.")
-        parser.add_argument('--line', required=False, action='store_true',
-                            help="Performs statistics along the line "
-                            "direction instead of column for the image area.")
-        parser.add_argument('-r', '--replacement', required=False, type=int,
-                            help="By default, the program will replace "
-                            "identified pixels with an appropriate NULL data "
-                            "value, but if provided this value will be used "
-                            "instead.")
-        parser.add_argument('-p', '--plot', required=False,
-                            action='store_true',
-                            help="Displays plot for each area.")
-        parser.add_argument('-n', '--dryrun', required=False,
-                            action='store_true',
-                            help="Does not produce a cleaned output file.")
-        parser.add_argument('file', help='ISIS Cube file or PDS IMG to clean.')
+            parents=[util.parent_parser()],
+        )
+        parser.add_argument(
+            "-o", "--output", required=False, default=".bitflip.cub"
+        )
+        parser.add_argument(
+            "-w",
+            "--width",
+            required=False,
+            default=5,
+            help="The number of medstd widths for bit-flip " "cleaning.",
+        )
+        parser.add_argument(
+            "--line",
+            required=False,
+            action="store_true",
+            help="Performs statistics along the line "
+            "direction instead of column for the image area.",
+        )
+        parser.add_argument(
+            "-r",
+            "--replacement",
+            required=False,
+            type=int,
+            help="By default, the program will replace "
+            "identified pixels with an appropriate NULL data "
+            "value, but if provided this value will be used "
+            "instead.",
+        )
+        parser.add_argument(
+            "-p",
+            "--plot",
+            required=False,
+            action="store_true",
+            help="Displays plot for each area.",
+        )
+        parser.add_argument(
+            "-n",
+            "--dryrun",
+            required=False,
+            action="store_true",
+            help="Does not produce a cleaned output file.",
+        )
+        parser.add_argument("file", help="ISIS Cube file or PDS IMG to clean.")
 
         args = parser.parse_args()
 
@@ -137,14 +159,21 @@ def main():
 
         out_p = util.path_w_suffix(args.output, args.file)
 
-        clean(args.file, out_p, width=args.width,
-              axis=(1 if args.line else 0), replacement=args.replacement,
-              plot=args.plot, dryrun=args.dryrun, keep=args.keep)
+        clean(
+            args.file,
+            out_p,
+            width=args.width,
+            axis=(1 if args.line else 0),
+            replacement=args.replacement,
+            plot=args.plot,
+            dryrun=args.dryrun,
+            keep=args.keep,
+        )
 
         sys.exit(0)
     except subprocess.CalledProcessError as err:
-        print('Had an ISIS error:', file=sys.stderr)
-        print(' '.join(err.cmd), file=sys.stderr)
+        print("Had an ISIS error:", file=sys.stderr)
+        print(" ".join(err.cmd), file=sys.stderr)
         print(err.stdout, file=sys.stderr)
         print(err.stderr, file=sys.stderr)
         sys.exit(1)
@@ -154,8 +183,16 @@ def main():
         sys.exit(1)
 
 
-def clean(in_path: os.PathLike, out_path: os.PathLike, width=5,
-          replacement=None, axis=0, plot=False, dryrun=False, keep=False):
+def clean(
+    in_path: os.PathLike,
+    out_path: os.PathLike,
+    width=5,
+    replacement=None,
+    axis=0,
+    plot=False,
+    dryrun=False,
+    keep=False,
+):
     """The file at *out_path* will be the result of running bit-flip
     cleaning of the file at *in-path*.
 
@@ -179,20 +216,32 @@ def clean(in_path: os.PathLike, out_path: os.PathLike, width=5,
     out_p = Path(out_path)
 
     label = pvl.load(str(in_p))
-    if 'IsisCube' in label:
-        clean_cube(in_p, out_p, label, width, replacement, axis, plot,
-                   dryrun, keep)
-    elif 'PDS_VERSION_ID' in label:
-        clean_img(in_p, out_p, label, width, replacement, axis, plot,
-                  dryrun, keep)
+    if "IsisCube" in label:
+        clean_cube(
+            in_p, out_p, label, width, replacement, axis, plot, dryrun, keep
+        )
+    elif "PDS_VERSION_ID" in label:
+        clean_img(
+            in_p, out_p, label, width, replacement, axis, plot, dryrun, keep
+        )
     else:
-        raise ValueError(f"The file at {in_p} is not an ISIS Cube or a "
-                         "PDS IMG fie.")
+        raise ValueError(
+            f"The file at {in_p} is not an ISIS Cube or a " "PDS IMG fie."
+        )
     return
 
 
-def clean_cube(in_p: Path, out_p: Path, label=None, width=5,
-               replacement=None, axis=0, plot=False, dryrun=False, keep=False):
+def clean_cube(
+    in_p: Path,
+    out_p: Path,
+    label=None,
+    width=5,
+    replacement=None,
+    axis=0,
+    plot=False,
+    dryrun=False,
+    keep=False,
+):
     """ISIS Cube version of clean().
 
     Please see clean() for argument details.
@@ -201,17 +250,20 @@ def clean_cube(in_p: Path, out_p: Path, label=None, width=5,
     to_del = isis.PathSet()
 
     # Bit-flip correct the non-image areas.
-    tblcln_p = to_del.add(in_p.with_suffix('.tableclean.cub'))
-    clean_tables_from_cube(in_p, tblcln_p, width=width, plot=plot,
-                           dryrun=dryrun)
+    tblcln_p = to_del.add(in_p.with_suffix(".tableclean.cub"))
+    clean_tables_from_cube(
+        in_p, tblcln_p, width=width, plot=plot, dryrun=dryrun
+    )
 
     # Now clean the image area.
     if label is None:
         label = pvl.load(str(in_p))
-    specialpix = getattr(isis.specialpixels,
-                         label['IsisCube']['Core']['Pixels']['Type'])
-    image = np.ma.masked_outside(gdal_array.LoadFile(str(in_p)),
-                                 specialpix.Min, specialpix.Max)
+    specialpix = getattr(
+        isis.specialpixels, label["IsisCube"]["Core"]["Pixels"]["Type"]
+    )
+    image = np.ma.masked_outside(
+        gdal_array.LoadFile(str(in_p)), specialpix.Min, specialpix.Max
+    )
 
     logging.info(f"Bit-flip cleaning Image area.")
     # These four lines are just informational.
@@ -221,16 +273,27 @@ def clean_cube(in_p: Path, out_p: Path, label=None, width=5,
     logging.info(f"Mean: {img_mean}, Mode: {img_mode}, diff: {d}")
 
     (s_min, s_max) = find_smart_window_from_ma(
-        image, width=width, axis=axis,
-        plot=(f"{in_p.name} Image Area" if plot else False))
+        image,
+        width=width,
+        axis=axis,
+        plot=(f"{in_p.name} Image Area" if plot else False),
+    )
 
     if not dryrun:
-        util.log(isis.mask(tblcln_p, mask=tblcln_p, to=out_p,
-                 minimum=s_min, maximum=s_max,
-                 preserve='INSIDE', spixels='NONE').args)
+        util.log(
+            isis.mask(
+                tblcln_p,
+                mask=tblcln_p,
+                to=out_p,
+                minimum=s_min,
+                maximum=s_max,
+                preserve="INSIDE",
+                spixels="NONE",
+            ).args
+        )
 
         if replacement is not None:
-            null_p = to_del.add(tblcln_p.with_suffix('.null.cub'))
+            null_p = to_del.add(tblcln_p.with_suffix(".null.cub"))
             shutil.copy(out_p, null_p)
             util.log(isis.stretch(null_p, to=out_p, null=replacement))
 
@@ -240,8 +303,17 @@ def clean_cube(in_p: Path, out_p: Path, label=None, width=5,
     return
 
 
-def clean_img(in_path: Path, out_path: Path, label=None, width=5,
-              replacement=None, axis=0, plot=False, dryrun=False, keep=False):
+def clean_img(
+    in_path: Path,
+    out_path: Path,
+    label=None,
+    width=5,
+    replacement=None,
+    axis=0,
+    plot=False,
+    dryrun=False,
+    keep=False,
+):
     """PDS IMG file version of clean().
 
     This function is currently quite slow and takes almost a minute to
@@ -254,23 +326,26 @@ def clean_img(in_path: Path, out_path: Path, label=None, width=5,
 
     if label is None:
         label = pvl.load(str(in_path))
-    if 'PDS_VERSION_ID' not in label:
+    if "PDS_VERSION_ID" not in label:
         raise ValueError(
-            f"The file at {in_p} does not appear to be a PDS IMG file.")
+            f"The file at {in_path} does not appear to be a PDS IMG file."
+        )
 
     # Bit-flip correct the non-image areas.
     # This is going to diverge from cubes for the Buffer and Dark pixels.
     # In ISIS-land, they are 'tables' but in a IMG these are part of the
     # image array, and will need to be handled below.
-    tblcln_p = in_path.with_suffix('.tableclean.img')
-    clean_tables_from_img(in_path, tblcln_p, label, width, replacement,
-                          plot=plot, dryrun=dryrun)
+    tblcln_p = in_path.with_suffix(".tableclean.img")
+    clean_tables_from_img(
+        in_path, tblcln_p, label, width, replacement, plot=plot, dryrun=dryrun
+    )
 
     # Now clean the image area.
     lut = img.LUT_Table(
-        label['INSTRUMENT_SETTING_PARAMETERS']['MRO:LOOKUP_CONVERSION_TABLE'])
+        label["INSTRUMENT_SETTING_PARAMETERS"]["MRO:LOOKUP_CONVERSION_TABLE"]
+    )
     specialpix = lut.specialpixels()
-    t_name = 'IMAGE'
+    t_name = "IMAGE"
 
     # Just doing this takes almost a minute for a 50,000 line image!
     img_arr = img.object_asarray(in_path, t_name)
@@ -295,13 +370,15 @@ def clean_img(in_path: Path, out_path: Path, label=None, width=5,
     # img_arr = unlut(from_gdal)
     # print(img_arr)
 
-    image = np.ma.masked_outside(img_arr,
-                                 specialpix.Min, specialpix.Max)
+    image = np.ma.masked_outside(img_arr, specialpix.Min, specialpix.Max)
 
     logging.info(f"Bit-flip cleaning Image area.")
     (s_min, s_max) = find_smart_window_from_ma(
-        image, width=width, axis=axis,
-        plot=(f"{in_path.name} Image Area" if plot else False))
+        image,
+        width=width,
+        axis=axis,
+        plot=(f"{in_path.name} Image Area" if plot else False),
+    )
 
     if not dryrun:
         shutil.copy(tblcln_p, out_path)
@@ -309,7 +386,7 @@ def clean_img(in_path: Path, out_path: Path, label=None, width=5,
         if replacement is not None:
             specialpix.Null = replacement
         img_arr = apply_special_pixels(clean_image, specialpix)
-        img.overwrite_object(out_path, 'IMAGE', img_arr)
+        img.overwrite_object(out_path, "IMAGE", img_arr)
 
         if not keep:
             tblcln_p.unlink()
@@ -317,11 +394,19 @@ def clean_img(in_path: Path, out_path: Path, label=None, width=5,
     return
 
 
-def clean_tables_from_cube(in_path: Path, out_path: Path, width=5,
-                           replacement=None,
-                           rev_area=True, mask_area=False, ramp_area=False,
-                           buffer_area=False, dark_area=False,
-                           plot=False, dryrun=False):
+def clean_tables_from_cube(
+    in_path: Path,
+    out_path: Path,
+    width=5,
+    replacement=None,
+    rev_area=True,
+    mask_area=False,
+    ramp_area=False,
+    buffer_area=False,
+    dark_area=False,
+    plot=False,
+    dryrun=False,
+):
     """The file at *out_path* will be the result of running bit-flip
     cleaning of the specified non-image areas in table objects within
     the ISIS cube file at *in_path*.
@@ -355,37 +440,48 @@ def clean_tables_from_cube(in_path: Path, out_path: Path, width=5,
     for notimpl in (mask_area, ramp_area, buffer_area, dark_area):
         if notimpl is True:
             raise NotImplementedError(
-                f"Bit-flip cleaning for {notimpl} is not yet implemented.")
+                f"Bit-flip cleaning for {notimpl} is not yet implemented."
+            )
 
     label = pvl.load(str(in_path))
-    if 'IsisCube' not in label:
+    if "IsisCube" not in label:
         raise ValueError(
-            f"The file at {in_path} does not appear to be an ISIS Cube.")
+            f"The file at {in_path} does not appear to be an ISIS Cube."
+        )
 
-    binning = label['IsisCube']['Instrument']['Summing']
-    specialpix = getattr(isis.specialpixels,
-                         label['IsisCube']['Core']['Pixels']['Type'])
+    binning = label["IsisCube"]["Instrument"]["Summing"]
+    specialpix = getattr(
+        isis.specialpixels, label["IsisCube"]["Core"]["Pixels"]["Type"]
+    )
 
     if not dryrun:
         shutil.copy(in_path, out_path)
 
     if any((rev_area, mask_area, ramp_area)):
-        t_name = 'HiRISE Calibration Image'
+        t_name = "HiRISE Calibration Image"
         HCI_dict = isis.cube.get_table(in_path, t_name)
-        cal_vals = np.array(HCI_dict['Calibration'])
+        cal_vals = np.array(HCI_dict["Calibration"])
 
-        cal_image = np.ma.masked_outside(cal_vals,
-                                         specialpix.Min, specialpix.Max)
+        cal_image = np.ma.masked_outside(
+            cal_vals, specialpix.Min, specialpix.Max
+        )
 
-        clean_cal = clean_cal_tables(cal_image, binning, width,
-                                     rev_area, mask_area, ramp_area,
-                                     (str(in_path.name) if plot else False))
+        clean_cal = clean_cal_tables(
+            cal_image,
+            binning,
+            width,
+            rev_area,
+            mask_area,
+            ramp_area,
+            (str(in_path.name) if plot else False),
+        )
         if not dryrun:
             # write the table back out
             if replacement is not None:
                 specialpix.Null = replacement
-            HCI_dict['Calibration'] = apply_special_pixels(
-                clean_cal, specialpix).data.tolist()
+            HCI_dict["Calibration"] = apply_special_pixels(
+                clean_cal, specialpix
+            ).data.tolist()
             isis.cube.overwrite_table(out_path, t_name, HCI_dict)
 
     # if any((buffer_area, dark_area)):
@@ -408,11 +504,20 @@ def clean_tables_from_cube(in_path: Path, out_path: Path, width=5,
     return
 
 
-def clean_tables_from_img(in_path: Path, out_path: Path, label=None, width=5,
-                          replacement=None,
-                          rev_area=True, mask_area=False, ramp_area=False,
-                          buffer_area=False, dark_area=False,
-                          plot=False, dryrun=False):
+def clean_tables_from_img(
+    in_path: Path,
+    out_path: Path,
+    label=None,
+    width=5,
+    replacement=None,
+    rev_area=True,
+    mask_area=False,
+    ramp_area=False,
+    buffer_area=False,
+    dark_area=False,
+    plot=False,
+    dryrun=False,
+):
     """The file at *out_path* will be the result of running bit-flip
     cleaning of the specified non-image areas in table objects within
     the PDS IMG file at *in_path*.
@@ -449,24 +554,26 @@ def clean_tables_from_img(in_path: Path, out_path: Path, label=None, width=5,
     for notimpl in (mask_area, ramp_area, buffer_area, dark_area):
         if notimpl is True:
             raise NotImplementedError(
-                f"Bit-flip cleaning for {notimpl} is not yet implemented.")
+                f"Bit-flip cleaning for {notimpl} is not yet implemented."
+            )
 
     if label is None:
         label = pvl.load(str(in_path))
-    if 'PDS_VERSION_ID' not in label:
+    if "PDS_VERSION_ID" not in label:
         raise ValueError(
-            f"The file at {in_path} does not appear to be a PDS IMG file.")
+            f"The file at {in_path} does not appear to be a PDS IMG file."
+        )
 
-    binning = label['INSTRUMENT_SETTING_PARAMETERS']['MRO:BINNING']
+    binning = label["INSTRUMENT_SETTING_PARAMETERS"]["MRO:BINNING"]
     specialpix = img.LUT_Table(
-        label['INSTRUMENT_SETTING_PARAMETERS'][
-            'MRO:LOOKUP_CONVERSION_TABLE']).specialpixels()
+        label["INSTRUMENT_SETTING_PARAMETERS"]["MRO:LOOKUP_CONVERSION_TABLE"]
+    ).specialpixels()
 
     if not dryrun:
         shutil.copy(in_path, out_path)
 
     if any((rev_area, mask_area, ramp_area)):
-        t_name = 'CALIBRATION_IMAGE'
+        t_name = "CALIBRATION_IMAGE"
         cal_vals = img.object_asarray(in_path, t_name)
 
         # prefix = label[t_name]['LINE_PREFIX_BYTES']
@@ -478,38 +585,51 @@ def clean_tables_from_img(in_path: Path, out_path: Path, label=None, width=5,
         # print(cal_vals[:20, 18:-16])
         # print(cal_vals[:20, 18:-16].shape)
         # print(specialpix)
-        cal_image = np.ma.masked_outside(cal_vals[rev_clock_slice],
-                                         specialpix.Min, specialpix.Max)
+        cal_image = np.ma.masked_outside(
+            cal_vals[rev_clock_slice], specialpix.Min, specialpix.Max
+        )
 
         # print("cal_image:")
         # print(cal_image)
         # print(cal_image.shape)
 
-        clean_cal = clean_cal_tables(cal_image, binning, width,
-                                     rev_area, mask_area, ramp_area,
-                                     (str(in_path.name) if plot else False))
+        clean_cal = clean_cal_tables(
+            cal_image,
+            binning,
+            width,
+            rev_area,
+            mask_area,
+            ramp_area,
+            (str(in_path.name) if plot else False),
+        )
         if not dryrun:
             # write the table back out
             if replacement is not None:
                 specialpix.Null = replacement
-            cal_vals[rev_clock_slice] = apply_special_pixels(clean_cal,
-                                                             specialpix)
+            cal_vals[rev_clock_slice] = apply_special_pixels(
+                clean_cal, specialpix
+            )
             img.overwrite_object(out_path, t_name, cal_vals)
     return
 
 
-def clean_cal_tables(cal_image, binning, width=5,
-                     rev_area=True, mask_area=False, ramp_area=False,
-                     plot=False):
+def clean_cal_tables(
+    cal_image,
+    binning,
+    width=5,
+    rev_area=True,
+    mask_area=False,
+    ramp_area=False,
+    plot=False,
+):
     # Deal with the HiRISE Calibration Image first (Reverse-clock, Mask,
     # and Ramp
 
     for notimpl in (mask_area, ramp_area):
         if notimpl is True:
             raise NotImplementedError(
-                f"Bit-flip cleaning for {notimpl} is not yet implemented.")
-
-    mask_lines = int(20 / binning)
+                f"Bit-flip cleaning for {notimpl} is not yet implemented."
+            )
 
     if rev_area:
         logging.info(f"Bit-flip cleaning Reverse-Clock area.")
@@ -518,10 +638,15 @@ def clean_cal_tables(cal_image, binning, width=5,
         # restrict the medstd_limit down to 200, since these reverse
         # clock pixels should not be that divergent.
         rev_clean = clean_array(
-            cal_image[:20, :], width=width, axis=1, medstd_limit=200,
-            plot=(f"{plot} Reverse-Clock" if plot else False))
+            cal_image[:20, :],
+            width=width,
+            axis=1,
+            medstd_limit=200,
+            plot=(f"{plot} Reverse-Clock" if plot else False),
+        )
         cal_image[:20, :] = rev_clean
 
+    # mask_lines = int(20 / binning)
     # if mask_area:
     #     mask_pixels = cal_image[20:mask_lines, :]
 
@@ -562,17 +687,21 @@ def fit_array(data: np.ma.array):
     # ended up looking 'stripey' in the row direction, so it was not
     # developed further.
     if data.ndim != 2:
-        raise ValueError("The provided array does not have two dimensions, "
-                         f"it has {data.ndim}.")
+        raise ValueError(
+            "The provided array does not have two dimensions, "
+            f"it has {data.ndim}."
+        )
 
-    xx, yy = np.meshgrid(np.arange(data.shape[0]),
-                         np.arange(data.shape[1]), indexing='ij')
+    xx, yy = np.meshgrid(
+        np.arange(data.shape[0]), np.arange(data.shape[1]), indexing="ij"
+    )
     x1 = xx[~data.mask]
     y1 = yy[~data.mask]
     good = data[~data.mask]
 
-    interp = interpolate.griddata((x1, y1), good.ravel(), (xx, yy),
-                                  method='nearest')
+    interp = interpolate.griddata(
+        (x1, y1), good.ravel(), (xx, yy), method="nearest"
+    )
     return interp
 
 
@@ -591,8 +720,13 @@ def apply_special_pixels(array: np.ma, specialpix) -> np.ma:
     """
 
     def sp_pix(val):
-        if val in (specialpix.Null, specialpix.Lrs, specialpix.Lis,
-                   specialpix.His, specialpix.Hrs):
+        if val in (
+            specialpix.Null,
+            specialpix.Lrs,
+            specialpix.Lis,
+            specialpix.His,
+            specialpix.Hrs,
+        ):
             return val
         elif val < specialpix.Min:
             return specialpix.Lrs
@@ -606,9 +740,14 @@ def apply_special_pixels(array: np.ma, specialpix) -> np.ma:
     return array
 
 
-def find_smart_window_from_ma(data: np.ma.array, width=5, axis=0,
-                              medstd_limit=300, medstd_fallback=64,
-                              plot=False):
+def find_smart_window_from_ma(
+    data: np.ma.array,
+    width=5,
+    axis=0,
+    medstd_limit=300,
+    medstd_fallback=64,
+    plot=False,
+):
     """Returns a two-tuple with the result of find_smart_window().
 
     This function mostly just does set-up based on the provided
@@ -622,11 +761,19 @@ def find_smart_window_from_ma(data: np.ma.array, width=5, axis=0,
 
     unique, unique_counts = np.unique(data.compressed(), return_counts=True)
 
-    mindn, maxdn, ex = min_max_ex(median, medstd, width,
-                                  medstd_limit, medstd_fallback)
+    mindn, maxdn, ex = min_max_ex(
+        median, medstd, width, medstd_limit, medstd_fallback
+    )
 
-    return find_smart_window(unique, unique_counts, mindn, maxdn, median,
-                             central_exclude_dn=ex, plot=plot)
+    return find_smart_window(
+        unique,
+        unique_counts,
+        mindn,
+        maxdn,
+        median,
+        central_exclude_dn=ex,
+        plot=plot,
+    )
 
 
 def median_limit(median, data: np.ndarray, limit=4000):
@@ -641,8 +788,10 @@ def median_limit(median, data: np.ndarray, limit=4000):
 
     if median > limit and np.any([data < limit]):
         median = np.ma.median(data[data < limit])
-        logging.info(f"The median was too high (> {limit}), "
-                     f"found a better one: {median}.")
+        logging.info(
+            f"The median was too high (> {limit}), "
+            f"found a better one: {median}."
+        )
 
     return median
 
@@ -682,13 +831,16 @@ def median_std(valid_points: np.ma, std_devs: np.ma):
     std_w_maxvp = np.extract(valid_points == maxvp, std_devs)
     medstd = np.ma.median(std_w_maxvp)
     logging.info(f"Number of rows/columns with that count: {len(std_w_maxvp)}")
-    logging.info("Median standard deviation of elements along the axis "
-                 f"that have the maximum valid pixel count: {medstd}.")
+    logging.info(
+        "Median standard deviation of elements along the axis "
+        f"that have the maximum valid pixel count: {medstd}."
+    )
     return medstd
 
 
-def min_max_ex(central, medstd, width, medstd_limit=300,
-               medstd_fallback=64) -> tuple:
+def min_max_ex(
+    central, medstd, width, medstd_limit=300, medstd_fallback=64
+) -> tuple:
     """Return a minimum, maximum, and exclusion value based on the
     provided *central* value, and adding and subtracting the result
     of multiplying the *medstd* by the *width*.
@@ -709,8 +861,10 @@ def min_max_ex(central, medstd, width, medstd_limit=300,
     if medstd > medstd_limit:
         medstd = medstd_fallback
         ex = 16
-        logging.info("The derived medstd was too big, setting the medstd "
-                     f"to {medstd} and the exclusion value to {ex}.")
+        logging.info(
+            "The derived medstd was too big, setting the medstd "
+            f"to {medstd} and the exclusion value to {ex}."
+        )
     else:
         # We want to ignore minima that are too close to the central value.
         # Sometimes the medstd is a good choice, sometimes 16 DN (which is a
@@ -783,8 +937,9 @@ def min_max_ex(central, medstd, width, medstd_limit=300,
 #     return (mindn, maxdn)
 
 
-def find_select_idx_name(central_idx: int, limit_idx: int,
-                         close_to_limit: bool):
+def find_select_idx_name(
+    central_idx: int, limit_idx: int, close_to_limit: bool
+):
     """Returns a two-tuple which contains an int of value 0 or -1 in
     the first posiion and a string of value 'min' or 'max' in the second.
 
@@ -796,17 +951,14 @@ def find_select_idx_name(central_idx: int, limit_idx: int,
 
     This is primarily a helper function to find_minima_index().
     """
-    select_idx = None
-    idx_name = None
-
     if limit_idx < central_idx:
-        idx_name = 'min'
+        idx_name = "min"
         if close_to_limit is False:
             select_idx = -1
         else:
             select_idx = 0
     elif limit_idx > central_idx:
-        idx_name = 'max'
+        idx_name = "max"
         if close_to_limit is False:
             select_idx = 0
         else:
@@ -817,9 +969,13 @@ def find_select_idx_name(central_idx: int, limit_idx: int,
     return select_idx, idx_name
 
 
-def find_minima_index(central_idx: int, limit_idx: int,
-                      minima_idxs: np.ndarray, pixel_counts: np.ndarray,
-                      close_to_limit=True) -> int:
+def find_minima_index(
+    central_idx: int,
+    limit_idx: int,
+    minima_idxs: np.ndarray,
+    pixel_counts: np.ndarray,
+    close_to_limit=True,
+) -> int:
     """Searches the pixel_counts at the minima_idxs positions between
     central_idx and limit_idx to find the one with the lowest
     pixel_count value. If multiple lowest values, choose the closest
@@ -832,50 +988,60 @@ def find_minima_index(central_idx: int, limit_idx: int,
     """
     # print(f'central_idx: {central_idx}')
     # print(f'limit_idx: {limit_idx}')
-    info_str = 'Looking for {} {} range ...'
+    info_str = "Looking for {} {} range ..."
 
     try:
-        select_idx, idx_name = find_select_idx_name(central_idx, limit_idx,
-                                                    close_to_limit)
-        logging.info(info_str.format(idx_name, 'inside'))
+        select_idx, idx_name = find_select_idx_name(
+            central_idx, limit_idx, close_to_limit
+        )
+        logging.info(info_str.format(idx_name, "inside"))
 
         min_i = min(central_idx, limit_idx)
         max_i = max(central_idx, limit_idx)
-        inrange_i = minima_idxs[
-            (minima_idxs >= min_i) * (minima_idxs < max_i)]
-        logging.info(str(inrange_i) + ' are the indexes inside the range.')
+        inrange_i = minima_idxs[(minima_idxs >= min_i) * (minima_idxs < max_i)]
+        logging.info(str(inrange_i) + " are the indexes inside the range.")
 
         value = min(np.take(pixel_counts, inrange_i))
-        logging.info(f'{value} is the minimum Pixel count amongst those '
-                     'indexes.')
+        logging.info(
+            f"{value} is the minimum Pixel count amongst those " "indexes."
+        )
 
-        idx = inrange_i[np.asarray(pixel_counts[inrange_i] ==
-                                   value).nonzero()][select_idx]
+        idx = inrange_i[
+            np.asarray(pixel_counts[inrange_i] == value).nonzero()
+        ][select_idx]
     except ValueError:
         try:
             if limit_idx < central_idx:
-                logging.info(info_str.format('min', 'outside'))
+                logging.info(info_str.format("min", "outside"))
                 idx = max(minima_idxs[minima_idxs < limit_idx])
             elif limit_idx > central_idx:
-                logging.info(info_str.format('max', 'outside'))
+                logging.info(info_str.format("max", "outside"))
                 idx = min(minima_idxs[minima_idxs > limit_idx])
             else:
                 raise ValueError
 
-            logging.info(f'{idx} is the minimum index.')
+            logging.info(f"{idx} is the minimum index.")
         except ValueError:
-            logging.info('Could not find a valid minima, returning '
-                         f'the limit index: {limit_idx}.')
+            logging.info(
+                "Could not find a valid minima, returning "
+                f"the limit index: {limit_idx}."
+            )
             idx = limit_idx
 
     return idx
 
 
-def find_smart_window(dn: np.ndarray, counts: np.ndarray,
-                      mindn: int, maxdn: int,
-                      centraldn: int, central_exclude_dn=0,
-                      plot=False, closest=True) -> tuple:
-    '''Returns a minimum and maximum DN value from *dn* which are
+def find_smart_window(
+    dn: np.ndarray,
+    counts: np.ndarray,
+    mindn: int,
+    maxdn: int,
+    centraldn: int,
+    central_exclude_dn=0,
+    plot=False,
+    closest=True,
+) -> tuple:
+    """Returns a minimum and maximum DN value from *dn* which are
        based on using the find_minima_index() function with the
        given *mindn*, *maxdn*, and *centraldn* values.  The *dn*
        array must be a sorted list of unique values, and *counts*
@@ -894,7 +1060,7 @@ def find_smart_window(dn: np.ndarray, counts: np.ndarray,
        return.
 
        The value of *closest* is passed on to find_minima_index().
-    '''
+    """
     # hist_list = sorted(hist, key=lambda x: int(x.DN))
     # pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
     # dn = np.fromiter((int(x.DN) for x in hist_list), int)
@@ -922,12 +1088,14 @@ def find_smart_window(dn: np.ndarray, counts: np.ndarray,
     # print(f'mindn_i {mindn_i}')
     # print(f'maxdn_i {maxdn_i}')
 
-    min_i = find_minima_index(central_min_i, mindn_i, minima_i, counts,
-                              close_to_limit=closest)
-    max_i = find_minima_index(central_max_i, maxdn_i, minima_i, counts,
-                              close_to_limit=closest)
-    logging.info(f'indexes: {min_i}, {max_i}')
-    logging.info(f'DN window: {dn[min_i]}, {dn[max_i]}')
+    min_i = find_minima_index(
+        central_min_i, mindn_i, minima_i, counts, close_to_limit=closest
+    )
+    max_i = find_minima_index(
+        central_max_i, maxdn_i, minima_i, counts, close_to_limit=closest
+    )
+    logging.info(f"indexes: {min_i}, {max_i}")
+    logging.info(f"DN window: {dn[min_i]}, {dn[max_i]}")
 
     if plot:
         import matplotlib.pyplot as plt
@@ -936,36 +1104,39 @@ def find_smart_window(dn: np.ndarray, counts: np.ndarray,
         fig, (ax0, ax1) = plt.subplots(2, 1)
 
         indices = np.arange(0, len(counts))
-        dn_window = np.fromiter(map((lambda i: i >= mindn_i and i <= maxdn_i),
-                                    (x for x in range(len(counts)))),
-                                dtype=bool)
+        dn_window = np.fromiter(
+            map(
+                (lambda i: mindn_i <= i <= maxdn_i),
+                (x for x in range(len(counts))),
+            ),
+            dtype=bool,
+        )
 
         if isinstance(plot, str):
             fig.suptitle(plot)
 
-        ax0.set_ylabel('Pixel Count')
-        ax0.set_xlabel('DN Index')
-        ax0.set_yscale('log')
-        ax0.fill_between(indices, counts, where=dn_window,
-                         color='lightgray')
-        ax0.axvline(x=central_i, c='gray')
-        ax0.axvline(x=np.argmax(counts), c='lime', ls='--')
+        ax0.set_ylabel("Pixel Count")
+        ax0.set_xlabel("DN Index")
+        ax0.set_yscale("log")
+        ax0.fill_between(indices, counts, where=dn_window, color="lightgray")
+        ax0.axvline(x=central_i, c="gray")
+        ax0.axvline(x=np.argmax(counts), c="lime", ls="--")
         ax0.plot(counts)
         ax0.plot(minima_i, counts[minima_i], "x")
-        ax0.plot(min_i, counts[min_i], "o", c='red')
-        ax0.plot(max_i, counts[max_i], "o", c='red')
+        ax0.plot(min_i, counts[min_i], "o", c="red")
+        ax0.plot(max_i, counts[max_i], "o", c="red")
 
-        ax1.set_ylabel('Pixel Count')
-        ax1.set_xlabel('DN')
-        ax1.set_yscale('log')
+        ax1.set_ylabel("Pixel Count")
+        ax1.set_xlabel("DN")
+        ax1.set_yscale("log")
         ax1.set_ybound(lower=0.5)
-        ax1.scatter(dn, counts, marker='.', s=1)
-        ax1.axvline(x=dn[min_i], c='red')
-        ax1.axvline(x=dn[max_i], c='red')
+        ax1.scatter(dn, counts, marker=".", s=1)
+        ax1.axvline(x=dn[min_i], c="red")
+        ax1.axvline(x=dn[max_i], c="red")
 
         plt.show()
 
-    return (dn[min_i], dn[max_i])
+    return dn[min_i], dn[max_i]
 
 
 if __name__ == "__main__":

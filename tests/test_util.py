@@ -23,7 +23,7 @@ img = HiRISE_img
 
 
 class TestResources(unittest.TestCase):
-    '''Establishes that the test image exists.'''
+    """Establishes that the test image exists."""
 
     def test_resources(self):
         (truth, test) = rc(img)

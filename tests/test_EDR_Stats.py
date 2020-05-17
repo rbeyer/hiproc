@@ -25,13 +25,13 @@ import pyrise.EDR_Stats as edr
 from .utils import resource_check as rc
 
 # Hardcoding these, but I sure would like a better solution.
-HiRISE_img = Path('test-resources') / 'PSP_010502_2090_RED5_0.img'
+HiRISE_img = Path("test-resources") / "PSP_010502_2090_RED5_0.img"
 img = HiRISE_img
-gains = Path('data') / 'EDR_Stats_gains_config.pvl'
+gains = Path("data") / "EDR_Stats_gains_config.pvl"
 
 
 class TestResources(unittest.TestCase):
-    '''Establishes that the test image exists.'''
+    """Establishes that the test image exists."""
 
     def test_resources(self):
         files = (img, gains)
@@ -42,20 +42,18 @@ class TestResources(unittest.TestCase):
 
 
 class TestCheckLUT(unittest.TestCase):
-
     def test_check(self):
         self.assertEqual(edr.check_lut(img), 316)
 
 
 class TestEDR_Stats(unittest.TestCase):
-
     def setUp(self):
-        self.outfile = img.with_suffix('.TestEDR_Stats.cub')
+        self.outfile = img.with_suffix(".TestEDR_Stats.cub")
 
     def tearDown(self):
         with contextlib.suppress(FileNotFoundError):
             self.outfile.unlink()
-            Path('print.prt').unlink()
+            Path("print.prt").unlink()
 
     def test_EDR_stats(self):
         h = edr.EDR_Stats(img, self.outfile, gains)
@@ -63,15 +61,14 @@ class TestEDR_Stats(unittest.TestCase):
 
 
 class TestNeedHiCube(unittest.TestCase):
-
     def setUp(self):
-        self.hicube = img.with_suffix('.TestNeedHiCube.cub')
+        self.hicube = img.with_suffix(".TestNeedHiCube.cub")
         isis.hi2isis(img, to=self.hicube)
 
     def tearDown(self):
         with contextlib.suppress(FileNotFoundError):
             self.hicube.unlink()
-            Path('print.prt').unlink()
+            Path("print.prt").unlink()
 
     def test_parse_histat(self):
         h = edr.parse_histat(isis.histat(self.hicube).stdout)
@@ -83,7 +80,9 @@ class TestNeedHiCube(unittest.TestCase):
 
     def test_calc_snr(self):
         histats = edr.parse_histat(isis.histat(self.hicube).stdout)
-        histats['BINNING'] = isis.getkey_k(self.hicube, 'Instrument', 'Summing')
+        histats["BINNING"] = isis.getkey_k(
+            self.hicube, "Instrument", "Summing"
+        )
         s = edr.calc_snr(self.hicube, gains, histats)
         self.assertAlmostEqual(s, 291.80442197)
 
