@@ -135,12 +135,9 @@ def is_polar(cubes, pole_tolerance: float, temp_token: str) -> bool:
         temp_p = c.path.with_suffix(f'.{temp_token}.spice.cub')
         shutil.copyfile(c.path, temp_p)
 
-        util.log(isis.spiceinit(temp_p).args)
+        isis.spiceinit(temp_p)
 
-        cam_cp = isis.camrange(temp_p)
-        util.log(cam_cp.args)
-
-        cpvl = pvl.loads(cam_cp.stdout)
+        cpvl = pvl.loads(isis.camrange(temp_p).stdout)
 
         abs_lats.append(abs(
             float(cpvl['UniversalGroundRange']['MinimumLatitude'])))
@@ -169,8 +166,8 @@ def handmos_side(cubes, base_cube, out_p: os.PathLike, left=True):
     for c in cubes[(cubes.index(base_cube) + side)::side]:
         slm -= side * round(c.line_offset)
         ssm -= side * round(c.samp_offset)
-        util.log(isis.handmos(c.next_path, mosaic=out_p, priority=priority,
-                              outline=slm, outsample=ssm, outband=1).args)
+        isis.handmos(c.next_path, mosaic=out_p, priority=priority,
+                     outline=slm, outsample=ssm, outband=1)
     return
 
 
@@ -188,14 +185,14 @@ def copy_and_spice(inpath: os.PathLike, outpath: os.PathLike,
         else:
             spiceinit_args['model'] = conf['Shape_Model_Path']
 
-    util.log(isis.spiceinit(**spiceinit_args).args)
+    isis.spiceinit(**spiceinit_args)
 
     return
 
 
 def get_offsets(cube: os.PathLike, match: os.PathLike,
                 flat: os.PathLike) -> tuple:
-    util.log(isis.hijitreg(cube, match=match, flat=flat).args)
+    isis.hijitreg(cube, match=match, flat=flat)
 
     with open(flat, 'r') as f:
         flat_text = f.read()
@@ -238,12 +235,12 @@ def add_offsets(cubes: list, base_ccdnumber: int, temp_token: str,
 
 def fix_labels(cubes: list, path: os.PathLike, matched_cube: str,
                prodid: str) -> None:
-    util.log(isis.editlab(path, option='modkey', grpname='Archive',
-                          keyword='ProductId',
-                          value=prodid).args)
-    util.log(isis.editlab(path, option='modkey', grpname='Instrument',
-                          keyword='MatchedCube',
-                          value=str(matched_cube)).args)
+    isis.editlab(path, option='modkey', grpname='Archive',
+                 keyword='ProductId',
+                 value=prodid)
+    isis.editlab(path, option='modkey', grpname='Instrument',
+                 keyword='MatchedCube',
+                 value=str(matched_cube))
 
     # Fix ck kernel in InstrumentPointing in RED label
     # This doesn't seem to be needed, maybe it was HiROC-specific.
@@ -256,9 +253,9 @@ def fix_labels(cubes: list, path: os.PathLike, matched_cube: str,
         source_ids.append(isis.getkey_k(c.path, 'Instrument',
                                         'StitchedProductIds'))
 
-    util.log(isis.editlab(path, option='ADDKEY', grpname='Archive',
-                          keyword='SourceProductId',
-                          value='({})'.format(', '.join(source_ids))).args)
+    isis.editlab(path, option='ADDKEY', grpname='Archive',
+                 keyword='SourceProductId',
+                 value='({})'.format(', '.join(source_ids)))
     return
 
 
@@ -278,15 +275,15 @@ def HiNoProj(cubes: list, base_cube, outcub_path: os.PathLike, conf: dict,
         temp_p = to_del.add(c.path.with_suffix(f'.{temp_token}.spiced.cub'))
         copy_and_spice(c.path, temp_p, conf, polar)
 
-        util.log(isis.spicefit(temp_p).args)
+        isis.spicefit(temp_p)
 
         c.next_path = to_del.add(
             c.path.with_suffix(f'.{temp_token}.noproj.cub'))
         c.path = temp_p
 
     for c in cubes:
-        util.log(isis.noproj(c.path, match=base_cube.path, to=c.next_path,
-                             source='frommatch').args)
+        isis.noproj(c.path, match=base_cube.path, to=c.next_path,
+                    source='frommatch')
 
     # Run hijitreg on adjacent noproj'ed ccds to get average line/sample offset
     (cubes, _) = add_offsets(cubes, int(base_cube.ccdnumber), temp_token,
@@ -300,8 +297,8 @@ def HiNoProj(cubes: list, base_cube, outcub_path: os.PathLike, conf: dict,
     handmos_side(cubes, base_cube, out_p, left=True)
     handmos_side(cubes, base_cube, out_p, left=False)
 
-    util.log(isis.editlab(out_p, option='addkey', grpname='Instrument',
-                          keyword='ImageJitterCorrected', value=0).args)
+    isis.editlab(out_p, option='addkey', grpname='Instrument',
+                 keyword='ImageJitterCorrected', value=0)
     fix_labels(cubes, out_p, base_cube,
                '{}_{}'.format(str(cubes[0].get_obsid()),
                               cubes[0].ccdname))

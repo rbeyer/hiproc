@@ -74,22 +74,6 @@ def set_logging(i, filename=None) -> None:
     return
 
 
-def log(items: list) -> None:
-    """A convenience function to wrap ISIS calls.
-
-    Allows you to write::
-
-        util.log(isis.hi2isis(img, to=out_cube).args)
-
-    And have the string in the log message not be the default
-    list pretty-print, but instead with the arguments just separated
-    by spaces, which is easier for reading the ISIS commands, and
-    potentially copying and pasting to the command line.
-    """
-    logging.info(" ".join(items))
-    return
-
-
 def path_w_suffix(in_path: str, template_path: os.PathLike) -> Path:
     """If the input starts with a '.' assume it is a suffix and return the
     template with the suffix replaced, otherwise return the input."""

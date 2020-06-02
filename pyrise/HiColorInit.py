@@ -169,28 +169,30 @@ def HiColorInit(red: HiColorCube, ir: HiColorCube, bg: HiColorCube,
 
         if mag_ratio < 1:
             s = 1 / mag_ratio
-            util.log(isis.reduce(c.path, to=rescaled, sscale=s,
-                                 lscale=bin_ratio, validper=1,
-                                 algorithm='nearest',
-                                 vper_replace='nearest').args)
+            isis.reduce(
+                c.path, to=rescaled, sscale=s, lscale=bin_ratio,
+                validper=1, algorithm='nearest', vper_replace='nearest'
+            )
         else:
-            util.log(isis.enlarge(c.path, to=rescaled, sscale=mag_ratio,
-                                  lscale=bin_ratio, interp='bilinear').args)
+            isis.enlarge(
+                c.path, to=rescaled, sscale=mag_ratio,
+                lscale=bin_ratio, interp='bilinear'
+            )
 
         # The original Perl had an additional step to divide c.bin by the
         # bin_ratio, and provide that to value= below, but that's
         # mathematically just red.bin, so we'll skip a calculation:
-        util.log(isis.editlab(rescaled, options='modkey',
-                              grpname='Instrument', keyword='Summing',
-                              value=red.bin).args)
+        isis.editlab(
+            rescaled, options='modkey', grpname='Instrument',
+            keyword='Summing', value=red.bin
+        )
 
         # trim by placing in a new image
-        util.log(isis.handmos(rescaled,
-                              mosaic=c.path.with_suffix(outsuffix),
-                              create='Y',
-                              nlines=red.lines, nsamp=red.samps,
-                              nband=1, outline=offset,
-                              outsamp=1, outband=1).args)
+        isis.handmos(
+            rescaled, mosaic=c.path.with_suffix(outsuffix), create='Y',
+            nlines=red.lines, nsamp=red.samps, nband=1, outline=offset,
+            outsamp=1, outband=1
+        )
 
         if not keep:
             rescaled.unlink()

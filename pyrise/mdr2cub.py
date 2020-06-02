@@ -72,7 +72,7 @@ def main():
     # geometry similar to what comes out of ISIS hical.
 
     # Convert the EDR to a cube file
-    util.log(isis.hi2isis(edr_path, to=h2i_path).args)
+    isis.hi2isis(edr_path, to=h2i_path)
 
     # Convert Alan's MDR to a cube file
     mdr_cub_path = to_del.add(mdr_path.with_suffix('.alan.cub'))
@@ -110,10 +110,10 @@ def main():
                 crop_path = to_del.add(mdr_cub_path.with_suffix('.crop.cub'))
                 # We want to start with the next pixel (+1) after the cal
                 # pixels.
-                util.log(isis.crop(mdr_cub_path, to=crop_path,
-                                   sample=buffer_pixels + 1,
-                                   nsamples=h2i_s,
-                                   line=rev_mask_tdi_lines + 1).args)
+                isis.crop(mdr_cub_path, to=crop_path,
+                          sample=buffer_pixels + 1,
+                          nsamples=h2i_s,
+                          line=rev_mask_tdi_lines + 1)
                 mdr_cub_path = crop_path
                 mdr_l = int(isis.getkey_k(mdr_cub_path, 'Dimensions', 'Lines'))
 
@@ -131,8 +131,8 @@ def main():
 
     # Convert the EDR to the right bit type for post-HiCal Pipeline:
     h2i_16b_p = to_del.add(h2i_path.with_suffix('.16bit.cub'))
-    util.log(isis.bit2bit(h2i_path, to=h2i_16b_p, bit='16bit',
-                          clip='minmax', minval=0, maxval=1.5).args)
+    isis.bit2bit(h2i_path, to=h2i_16b_p, bit='16bit',
+                 clip='minmax', minval=0, maxval=1.5)
     shutil.copyfile(h2i_16b_p, out_path)
 
     # If it is a channel 1 file, Alan mirrored it so that he could process
@@ -142,7 +142,7 @@ def main():
     cid = hirise.get_ChannelID_fromfile(h2i_16b_p)
     if cid.channel == '1':
         mirror_path = to_del.add(mdr_cub_path.with_suffix('.mirror.cub'))
-        util.log(isis.mirror(mdr_cub_path, to=mirror_path).args)
+        isis.mirror(mdr_cub_path, to=mirror_path)
         mdr_cub_path = mirror_path
 
     # Is the MDR in DN or I/F?
@@ -151,9 +151,9 @@ def main():
     if maximum_pxl < 1.5:
         logging.info('MDR is already in I/F units.')
         mdr_16b_p = to_del.add(mdr_cub_path.with_suffix('.16bit.cub'))
-        util.log(isis.bit2bit(mdr_cub_path, to=mdr_16b_p, bit='16bit',
-                              clip='minmax', minval=0, maxval=1.5).args)
-        util.log(isis.handmos(mdr_16b_p, mosaic=out_path).args)
+        isis.bit2bit(mdr_cub_path, to=mdr_16b_p, bit='16bit',
+                     clip='minmax', minval=0, maxval=1.5)
+        isis.handmos(mdr_16b_p, mosaic=out_path)
     else:
         logging.info('MDR is in DN units and will be converted to I/F.')
 
@@ -188,9 +188,9 @@ def main():
 
         mdriof_p = to_del.add(mdr_cub_path.with_suffix('.iof.cub'))
         to_s = '{}+SignedWord+{}:{}'.format(mdriof_p, 0, 1.5)
-        util.log(isis.fx(f1=mdr_cub_path, to=to_s, equ=eqn).args)
+        isis.fx(f1=mdr_cub_path, to=to_s, equ=eqn)
 
-        util.log(isis.handmos(mdriof_p, mosaic=out_path).args)
+        isis.handmos(mdriof_p, mosaic=out_path)
 
     if not args.keep:
         to_del.unlink()

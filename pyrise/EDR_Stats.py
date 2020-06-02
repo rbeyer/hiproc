@@ -137,7 +137,7 @@ def EDR_Stats(
         raise err
 
     # Convert to .cub
-    util.log(isis.hi2isis(img, to=out_path).args)
+    isis.hi2isis(img, to=out_path)
 
     histat_complete = isis.histat(
         out_path,
@@ -153,7 +153,6 @@ def EDR_Stats(
         leftdark=3,
         rightdark=1,
     )
-    util.log(histat_complete.args)
     histats = parse_histat(histat_complete.stdout)
 
     # Get some info from the new cube:
@@ -186,7 +185,7 @@ def parse_histat(pvltext: str) -> dict:
     """Parse the output of histat into a dictionary"""
 
     p = pvl.loads(pvltext)
-    d = {}
+    d = dict()
 
     # Image Area Statistics
     d["IMAGE_MEAN"] = p["IMAGE"]["Average"]
@@ -272,7 +271,7 @@ def get_dncnt(cub: os.PathLike, hmin=0.01, hmax=99.99, keep=False) -> int:
 
     histfile = Path(cub).with_suffix(".hist")
     if not histfile.is_file():
-        util.log(isis.hist(cub, to=histfile).args)
+        isis.hist(cub, to=histfile)
 
     h = isis.Histogram(histfile)
 

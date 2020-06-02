@@ -324,9 +324,10 @@ def HiccdStitch(cubes: list, out_path: os.PathLike, conf: dict,
                  "file seems better, so this isn't implemented.")
 
     with isis.fromlist.temp([str(c.nextpath) for c in cubes]) as f:
-        util.log(isis.hiccdstitch(
+        isis.hiccdstitch(
             fromlist=f, to=out_p,
-            interp=conf['HiccdStitch']['HiccdStitch_Interpolation']).args)
+            interp=conf['HiccdStitch']['HiccdStitch_Interpolation']
+        )
 
     SNR_Check(cubes, conf['HiccdStitch']['HiccdStitch_SNR_Threshold'])
 
@@ -451,16 +452,18 @@ def CubeNormStep(cube, hconf: dict, keep=False) -> HiccdStitchCube:
 
     # crop removing the top and bottom portion of the image
     crop_p = to_del.add(cube.nextpath.with_suffix('.crop.cub'))
-    util.log(isis.crop(cube.nextpath, to=crop_p,
-                       line=cube.sl_cubenorm,
-                       nlines=cube.nl_cubenorm).args)
+    isis.crop(
+        cube.nextpath, to=crop_p, line=cube.sl_cubenorm, nlines=cube.nl_cubenorm
+    )
 
     # run cubenorm to get statistics of the cropped area
     stats_p = to_del.add(cube.nextpath.with_suffix('.cubenorm.tab'))
-    util.log(isis.cubenorm(crop_p, stats=stats_p, format_='TABLE',
-                           direction='COLUMN', normalizer='AVERAGE',
-                           MODE=hconf['HiccdStitch_Cubenorm_Method'],
-                           PRESERVE=True).args)
+    isis.cubenorm(
+        crop_p, stats=stats_p, format_='TABLE',
+        direction='COLUMN', normalizer='AVERAGE',
+        MODE=hconf['HiccdStitch_Cubenorm_Method'],
+        PRESERVE=True
+    )
 
     stats_filtered_p = to_del.add(cube.nextpath.with_suffix('.cubenorm2.tab'))
 
@@ -475,12 +478,14 @@ def CubeNormStep(cube, hconf: dict, keep=False) -> HiccdStitchCube:
     to_s = '{}+SignedWord+{}:{}'.format(
         next_path, hconf['HiccdStitch_Normalization_Minimum'],
         hconf['HiccdStitch_Normalization_Maximum'])
-    util.log(isis.cubenorm(cube.nextpath, to=to_s,
-                           fromstats=stats_filtered_p,
-                           statsource='TABLE',
-                           direction='COLUMN', normalizer='AVERAGE',
-                           MODE=hconf['HiccdStitch_Cubenorm_Method'],
-                           PRESERVE=True).args)
+    isis.cubenorm(
+        cube.nextpath, to=to_s,
+        fromstats=stats_filtered_p,
+        statsource='TABLE',
+        direction='COLUMN', normalizer='AVERAGE',
+        MODE=hconf['HiccdStitch_Cubenorm_Method'],
+        PRESERVE=True
+    )
 
     cube.nextpath = next_path
 
@@ -572,10 +577,11 @@ def BalanceStep(cubes, conf, keep=False) -> list:
             for f, m, t in zip([cubes[i].rs_path, cubes[i + 1].ls_path],
                                [cubes[i + 1].ls_path, cubes[i].rs_path],
                                [cubes[i].rm_path, cubes[i + 1].lm_path]):
-                util.log(isis.mask(
+                isis.mask(
                     f, mask=m, to=t, preserve='INSIDE',
                     min_=conf['HiccdStitch_Normalization_Minimum'],
-                    max_=conf['HiccdStitch_Normalization_Maximum']).args)
+                    max_=conf['HiccdStitch_Normalization_Maximum']
+                )
 
     # The fourth step is to get image statistics for left and right
     # overlap areas of each CCD image.
@@ -642,9 +648,10 @@ def crop_and_scale(cubes: list) -> list:
         for t, s, n in zip([lc_path, rc_path],
                            [c.ss_balance_left, c.ss_balance_right],
                            [c.ns_balance_left, c.ns_balance_right]):
-            util.log(isis.crop(c.nextpath, to=t, sample=s, nsamples=n,
-                               line=c.sl_balance,
-                               nlines=c.nl_balance).args)
+            isis.crop(
+                c.nextpath, to=t, sample=s, nsamples=n, line=c.sl_balance,
+                nlines=c.nl_balance
+            )
 
         # Second step is to scale all of the croped files to have the
         # same lines and samples, needed for mask step
@@ -658,9 +665,9 @@ def crop_and_scale(cubes: list) -> list:
                 to_del.add(c.nextpath.with_suffix('.right.scale.cub')))
             for lc, ls in zip([lc_path, rc_path],
                               [cubes[i].ls_path, cubes[i].rs_path]):
-                util.log(isis.enlarge(lc, to=ls,
-                                      sscale=c.smag, lscale=c.lmag,
-                                      interp='CUBIC').args)
+                isis.enlarge(
+                    lc, to=ls, sscale=c.smag, lscale=c.lmag, interp='CUBIC'
+                )
     return (cubes, to_del)
 
 
@@ -747,8 +754,9 @@ def make_balance(cube, conf, balance_path):
     to_s = '{}+SignedWord+{}:{}'.format(
         balance_path, conf['HiccdStitch_Normalization_Minimum'],
         conf['HiccdStitch_Normalization_Maximum'])
-    util.log(isis.algebra(cube.nextpath, to=to_s, operator='unary',
-                          a=a_param, c=c_param).args)
+    isis.algebra(
+        cube.nextpath, to=to_s, operator='unary', a=a_param, c=c_param
+    )
 
 
 def SpecialProcessingFlags(cube: HiccdStitchCube):
@@ -767,10 +775,10 @@ def SpecialProcessingFlags(cube: HiccdStitchCube):
     except subprocess.CalledProcessError:
         option = 'ADDKEY'
 
-    util.log(isis.editlab(cube.nextpath, option=option,
-                          grpname='Instrument',
-                          keyword='Special_Processing_Flag',
-                          value=status).args)
+    isis.editlab(
+        cube.nextpath, option=option, grpname='Instrument',
+        keyword='Special_Processing_Flag', value=status
+    )
 
 
 def SNR_Check(cubes: list, snr_threshold: float):

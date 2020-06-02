@@ -280,22 +280,20 @@ def clean_cube(
     )
 
     if not dryrun:
-        util.log(
-            isis.mask(
-                tblcln_p,
-                mask=tblcln_p,
-                to=out_p,
-                minimum=s_min,
-                maximum=s_max,
-                preserve="INSIDE",
-                spixels="NONE",
-            ).args
+        isis.mask(
+            tblcln_p,
+            mask=tblcln_p,
+            to=out_p,
+            minimum=s_min,
+            maximum=s_max,
+            preserve="INSIDE",
+            spixels="NONE",
         )
 
         if replacement is not None:
             null_p = to_del.add(tblcln_p.with_suffix(".null.cub"))
             shutil.copy(out_p, null_p)
-            util.log(isis.stretch(null_p, to=out_p, null=replacement))
+            isis.stretch(null_p, to=out_p, null=replacement)
 
         if not keep:
             to_del.unlink()

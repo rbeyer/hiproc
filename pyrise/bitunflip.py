@@ -178,13 +178,13 @@ def subtract_over_thresh(in_path: Path, out_path: Path,
         mask_args['min'] = thresh
     else:
         mask_args['max'] = thresh
-    util.log(isis.mask(**mask_args).args)
+    isis.mask(**mask_args)
 
     delta_p = in_path.with_suffix('.delta.cub')
-    util.log(isis.algebra(mask_p, from2=in_path, to=delta_p,
-                          op='add', a=0, c=(-1 * delta)).args)
+    isis.algebra(mask_p, from2=in_path, to=delta_p,
+                 op='add', a=0, c=(-1 * delta))
 
-    util.log(isis.handmos(delta_p, mosaic=out_path).args)
+    isis.handmos(delta_p, mosaic=out_path)
 
     if not keep:
         mask_p.unlink()
@@ -193,13 +193,7 @@ def subtract_over_thresh(in_path: Path, out_path: Path,
     return
 
 
-def histogram(in_path: Path, hist_path: Path):
-    """This is just a convenience function to facilitate logging."""
-    util.log(isis.hist(in_path, to=hist_path).args)
-    return isis.Histogram(hist_path)
-
-
-def mask_gap(in_path: Path, out_path: Path, keep=False):
+def mask_gap(in_path: Path, out_path: Path):
     """Attempt to mask out pixels beyond the central DNs of the median
     based on gaps in the histogram.
 
@@ -209,8 +203,7 @@ def mask_gap(in_path: Path, out_path: Path, keep=False):
     approach ends up being too 'dumb'.
     """
 
-    hist_p = in_path.with_suffix('.hist')
-    hist = histogram(in_path, hist_p)
+    hist = isis.Histogram(in_path)
 
     median = math.trunc(float(hist['Median']))
     # std = math.trunc(float(hist['Std Deviation']))
@@ -229,11 +222,7 @@ def mask_gap(in_path: Path, out_path: Path, keep=False):
     maskmax = find_gap(hist, median, (median + (2 * highdist)))
     maskmin = find_gap(hist, median, (median - (2 * lowdist)))
 
-    util.log(isis.mask(in_path, to=out_path, minimum=maskmin,
-                       maximum=maskmax).args)
-
-    if not keep:
-        hist_p.unlink()
+    isis.mask(in_path, to=out_path, minimum=maskmin, maximum=maskmax)
 
     return
 
@@ -251,7 +240,7 @@ def get_unflip_thresh(hist: list, far, near, lowlimit) -> int:
         if d >= lowlimit:
             thresh = find_min_dn(hist, far, near)
             logging.info(f'Found a minimum threshold: {thresh}')
-            if(thresh == far or thresh == near):
+            if thresh == far or thresh == near:
                 raise ValueError(f'Minimum, {thresh}, at edge of range.')
         else:
             raise ValueError(f'Below {lowlimit}, skipping.')
@@ -289,12 +278,7 @@ def unflip(in_p: Path, out_p: Path, keep=False):
             far = median + d
             near = median + (d / 2)
 
-            try:
-                hist_p = to_del.add(this_p.with_suffix('.hist'))
-                hist = histogram(this_p, hist_p)
-            except ValueError:
-                # Already have this .hist, don't need to remake.
-                pass
+            hist = isis.Histogram(this_p)
 
             logging.info(f'bitflip position {pm}{delt}, near: {near} '
                          f'far: {far}, extrema: {hist[extrema]}')

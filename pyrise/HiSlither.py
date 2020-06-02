@@ -121,8 +121,8 @@ def HiSlither(red: hicolor.HiColorCube, ir: hicolor.HiColorCube,
     stacked_path = red.path.parent / '{}_COLOR{}.cub'.format(
         red.get_obsid(), red.ccdnumber)
     tmp_stack = stacked_path.with_suffix(f'.{temp_token}.cub')
-    util.log(isis.hicubeit(ir=ir_slither_p, red=red.path,
-                           bg=bg_slither_p, to=tmp_stack).args)
+    isis.hicubeit(ir=ir_slither_p, red=red.path,
+                  bg=bg_slither_p, to=tmp_stack)
 
     trim_args = {'from': tmp_stack, 'to': stacked_path}
     # trim 5 px in bin 1, 3 in bin 2, 2 in bin 4
@@ -131,7 +131,7 @@ def HiSlither(red: hicolor.HiColorCube, ir: hicolor.HiColorCube,
         trim_args['right'] = trim
     else:
         trim_args['left'] = trim
-    util.log(isis.trim(**trim_args).args)
+    isis.trim(**trim_args)
 
     if not keep:
             tmp_stack.unlink()
@@ -147,8 +147,8 @@ def run_slither(cube):
     cnet_path = hjr.JitterCube.get_cnet_path(cube)
     s = get_slither_path(cube)
     t = s.with_suffix('.txt')
-    util.log(isis.slither(cube.path, to=s, control=cnet_path, results=t,
-                          dir='REVERSE', spline='CUBIC', interp='BILIN').args)
+    isis.slither(cube.path, to=s, control=cnet_path, results=t,
+                 dir='REVERSE', spline='CUBIC', interp='BILIN')
     return(s)
 
 
@@ -164,31 +164,31 @@ def make_dummy_IR(red, bg):
 
     ir_ccd = 'IR' + str(int(red.ccdnumber) + 6)
 
-    util.log(isis.mask(red, mask=red, to=ir_path, preserve='outside').args)
-    util.log(isis.editlab(ir_path, options='modkey',
-                          grpname='Instrument',
-                          keyword='CpmmNumber',
-                          value=int(red.ccdnumber) + 2).args)
-    util.log(isis.editlab(ir_path, options='modkey',
-                          grpname='Instrument',
-                          keyword='CcdId', value=ir_ccd).args)
-    util.log(isis.editlab(ir_path, options='modkey',
-                          grpname='Archive',
-                          keyword='ProductID',
-                          value='{}_{}'.format(red.get_obsid(),
-                                               ir_ccd)).args)
-    util.log(isis.editlab(ir_path, options='modkey',
-                          grpname='BandBin',
-                          keyword='Name',
-                          value='NearInfrared').args)
-    util.log(isis.editlab(ir_path, options='modkey',
-                          grpname='BandBin',
-                          keyword='Center',
-                          value=900,
-                          units='NANOMETERS').args)
-    util.log(isis.editlab(ir_path, options='modkey',
-                          grpname='BandBin',
-                          keyword='Width',
-                          value=200,
-                          units='NANOMETERS').args)
+    isis.mask(red, mask=red, to=ir_path, preserve='outside')
+    isis.editlab(ir_path, options='modkey',
+                 grpname='Instrument',
+                 keyword='CpmmNumber',
+                 value=int(red.ccdnumber) + 2)
+    isis.editlab(ir_path, options='modkey',
+                 grpname='Instrument',
+                 keyword='CcdId', value=ir_ccd)
+    isis.editlab(ir_path, options='modkey',
+                 grpname='Archive',
+                 keyword='ProductID',
+                 value='{}_{}'.format(red.get_obsid(),
+                                      ir_ccd))
+    isis.editlab(ir_path, options='modkey',
+                 grpname='BandBin',
+                 keyword='Name',
+                 value='NearInfrared')
+    isis.editlab(ir_path, options='modkey',
+                 grpname='BandBin',
+                 keyword='Center',
+                 value=900,
+                 units='NANOMETERS')
+    isis.editlab(ir_path, options='modkey',
+                 grpname='BandBin',
+                 keyword='Width',
+                 value=200,
+                 units='NANOMETERS')
     return ir_path

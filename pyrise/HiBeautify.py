@@ -40,37 +40,55 @@ import pyrise.HiColorNorm as hcn
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     parents=[util.parent_parser()],
-                                     conflict_handler='resolve')
-    parser.add_argument('-o_irb', '--output_irb', required=False,
-                        default='_IRB.cub')
-    parser.add_argument('-o_rgb', '--output_rgb', required=False,
-                        default='_RGB.cub')
-    parser.add_argument('-c', '--conf',    required=False,
-                        default=Path(__file__).resolve().parent.parent /
-                        'data' / 'HiBeautify.conf')
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        parents=[util.parent_parser()],
+        conflict_handler="resolve",
+    )
+    parser.add_argument(
+        "-o_irb", "--output_irb", required=False, default="_IRB.cub"
+    )
+    parser.add_argument(
+        "-o_rgb", "--output_rgb", required=False, default="_RGB.cub"
+    )
+    parser.add_argument(
+        "-c",
+        "--conf",
+        required=False,
+        default=Path(__file__).resolve().parent.parent
+        / "data"
+        / "HiBeautify.conf",
+    )
     # parser.add_argument('-f', '--frost', action='store_true',
     #                     help='Use the frost/ice color stretch, and disable '
     #                     'auto-detection of frost/ice.')
     # parser.add_argument('--nofrost', action='store_true',
     #        help='Do not use the frost/ice color stretch, and disable '
     #                     'auto-detection of frost/ice.')
-    parser.add_argument('cubes',
-                        metavar=("the COLOR4.HiColorNorm.cub and "
-                                 "COLOR5.HiColorNorm.cub files"),
-                        nargs=2)
+    parser.add_argument(
+        "cubes",
+        metavar=(
+            "the COLOR4.HiColorNorm.cub and " "COLOR5.HiColorNorm.cub files"
+        ),
+        nargs=2,
+    )
 
     args = parser.parse_args()
 
     util.set_logging(args.log)
 
-    start(args.cubes, args.conf, args.output_irb, args.output_rgb,
-          keep=args.keep)
+    start(
+        args.cubes, args.conf, args.output_irb, args.output_rgb, keep=args.keep
+    )
 
 
-def start(cube_paths: list, conf_path: os.PathLike, out_irb='_IRB.cub',
-          out_rgb='_RGB.cub', keep=False):
+def start(
+    cube_paths: list,
+    conf_path: os.PathLike,
+    out_irb="_IRB.cub",
+    out_rgb="_RGB.cub",
+    keep=False,
+):
 
     # GetConfigurationParameters()
     conf = pvl.load(str(conf_path))
@@ -87,7 +105,7 @@ def start(cube_paths: list, conf_path: os.PathLike, out_irb='_IRB.cub',
 
 
 def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
-    temp_token = datetime.now().strftime('HiBeautify-%y%m%d%H%M%S')
+    temp_token = datetime.now().strftime("HiBeautify-%y%m%d%H%M%S")
     irb_out_p = Path(outcub_paths[0])
     rgb_out_p = Path(outcub_paths[1])
     to_del = isis.PathSet()
@@ -100,26 +118,38 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
     # irbmerged_p = to_del.add(out_p.with_suffix(f'.{temp_token}_IRB.cub'))
     image_midpoint = int((2000 / cubes[0].red_bin) + 1)
     outsample = image_midpoint
-    if cubes[0].ccdnumber == '4':
+    if cubes[0].ccdnumber == "4":
         outsample = 1
     total_width = int(2 * cubes[0].samps - (48 / cubes[0].red_bin))
     import subprocess
+
     try:
-        util.log(isis.handmos(cubes[0].path, mosaic=irb_out_p, outline=1,
-                              outsample=outsample, outband=1, create='Y',
-                              nlines=cubes[0].lines, nsamp=total_width,
-                              nbands=3).args)
+        isis.handmos(
+            cubes[0].path,
+            mosaic=irb_out_p,
+            outline=1,
+            outsample=outsample,
+            outband=1,
+            create="Y",
+            nlines=cubes[0].lines,
+            nsamp=total_width,
+            nbands=3,
+        )
     except subprocess.CalledProcessError as err:
         print(err.stdout)
         print(err.stderr)
 
-    if(len(cubes) == 1):
-        logging.info('Warning, missing one half!')
+    if len(cubes) == 1:
+        logging.info("Warning, missing one half!")
     else:
-        logging.info('Using both halves')
-        util.log(isis.handmos(cubes[1].path, mosaic=irb_out_p,
-                              outline=1, outsample=image_midpoint,
-                              outband=1).args)
+        logging.info("Using both halves")
+        isis.handmos(
+            cubes[1].path,
+            mosaic=irb_out_p,
+            outline=1,
+            outsample=image_midpoint,
+            outband=1,
+        )
 
     # Nothing is actually done to the pixels here regarding the FrostStats, so
     # I'm just going to skip them here.
@@ -140,12 +170,16 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
 
     # Subtract the unaltered RED band from the high pass filtered BG for
     # synthetic blue.
-    logging.info('Creating synthetic B, subtracting RED from BG')
-    rgbsynthb_p = to_del.add(irb_out_p.with_suffix(f'.{temp_token}_B.cub'))
-    util.log(isis.algebra(f'{irb_out_p}+3', from2=f'{irb_out_p}+2',
-                          op='subtract', to=rgbsynthb_p,
-                          A=conf['Beautify']['Synthetic_A_Coefficient'],
-                          B=conf['Beautify']['Synthetic_B_Coefficient']).args)
+    logging.info("Creating synthetic B, subtracting RED from BG")
+    rgbsynthb_p = to_del.add(irb_out_p.with_suffix(f".{temp_token}_B.cub"))
+    isis.algebra(
+        f"{irb_out_p}+3",
+        from2=f"{irb_out_p}+2",
+        op="subtract",
+        to=rgbsynthb_p,
+        A=conf["Beautify"]["Synthetic_A_Coefficient"],
+        B=conf["Beautify"]["Synthetic_B_Coefficient"],
+    )
 
     # HiBeautify gathers and writes a bunch of statistics to PVL that is
     # important to the HiRISE GDS, but not relevant to just producing pixels
@@ -183,8 +217,9 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
 
     # Create an RGB cube using the RED from the IRB mosaic,
     # the BG from the IRB mosaic and the synthetic B that we just made.
-    util.log(isis.cubeit_k([f'{irb_out_p}+2', f'{irb_out_p}+3', rgbsynthb_p],
-                           to=rgb_out_p).args)
+    isis.cubeit_k(
+        [f"{irb_out_p}+2", f"{irb_out_p}+3", rgbsynthb_p], to=rgb_out_p
+    )
 
     if not keep:
         to_del.unlink()
