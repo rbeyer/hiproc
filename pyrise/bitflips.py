@@ -118,6 +118,7 @@ def main():
             "--width",
             required=False,
             default=5,
+            type=int,
             help="The number of medstd widths for bit-flip " "cleaning.",
         )
         parser.add_argument(
