@@ -1,0 +1,5 @@
+#!/usr/bin/env python
+
+import pyrise.resolve_jitter as rj
+
+rj.main()
