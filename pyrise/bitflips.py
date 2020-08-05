@@ -119,7 +119,8 @@ def main():
             required=False,
             default=5,
             type=int,
-            help="The number of medstd widths for bit-flip " "cleaning.",
+            help="The number of medstd widths for bit-flip " "cleaning. "
+                 "(default: %(default)s)",
         )
         parser.add_argument(
             "--line",
@@ -755,7 +756,13 @@ def find_smart_window_from_ma(
     value of *medstd_limit* and *medstd_fallback* are passed along
     to min_max_ex(), please see that documentation for more information.
     """
-    median = median_limit(np.ma.median(data), data)
+    # For some reason, I appear to have built this median_limit()
+    # function, but in practice it doesn't seem to help, as there
+    # doesn't seem to be a problem with letting the median be whatever
+    # it actually is.
+    # median = median_limit(np.ma.median(data), data)
+    median = np.ma.median(data)
+    logging.info(f"Median: {median}")
     medstd = median_std_from_ma(data, axis=axis)
 
     unique, unique_counts = np.unique(data.compressed(), return_counts=True)
