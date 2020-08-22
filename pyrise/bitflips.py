@@ -147,6 +147,12 @@ def main():
             help="Displays plot for each area.",
         )
         parser.add_argument(
+            "--saveplot",
+            required=False,
+            action="store_true",
+            help="Saves plot for each area to a file.",
+        )
+        parser.add_argument(
             "-n",
             "--dryrun",
             required=False,
@@ -168,6 +174,7 @@ def main():
             axis=(1 if args.line else 0),
             replacement=args.replacement,
             plot=args.plot,
+            saveplot=args.saveplot,
             dryrun=args.dryrun,
             keep=args.keep,
         )
@@ -192,6 +199,7 @@ def clean(
     replacement=None,
     axis=0,
     plot=False,
+    saveplot=False,
     dryrun=False,
     keep=False,
 ):
@@ -220,11 +228,13 @@ def clean(
     label = pvl.load(str(in_p))
     if "IsisCube" in label:
         clean_cube(
-            in_p, out_p, label, width, replacement, axis, plot, dryrun, keep
+            in_p, out_p, label, width, replacement, axis, plot, saveplot,
+            dryrun, keep
         )
     elif "PDS_VERSION_ID" in label:
         clean_img(
-            in_p, out_p, label, width, replacement, axis, plot, dryrun, keep
+            in_p, out_p, label, width, replacement, axis, plot, saveplot,
+            dryrun, keep
         )
     else:
         raise ValueError(
@@ -241,6 +251,7 @@ def clean_cube(
     replacement=None,
     axis=0,
     plot=False,
+    saveplot=False,
     dryrun=False,
     keep=False,
 ):
@@ -254,7 +265,7 @@ def clean_cube(
     # Bit-flip correct the non-image areas.
     tblcln_p = to_del.add(in_p.with_suffix(".tableclean.cub"))
     clean_tables_from_cube(
-        in_p, tblcln_p, width=width, plot=plot, dryrun=dryrun
+        in_p, tblcln_p, width=width, plot=plot, saveplot=saveplot, dryrun=dryrun
     )
 
     # Now clean the image area.
@@ -279,6 +290,7 @@ def clean_cube(
         width=width,
         axis=axis,
         plot=(f"{in_p.name} Image Area" if plot else False),
+        saveplot=(in_p.with_suffix(".bf-image.pdf") if saveplot else False),
     )
 
     if not dryrun:
@@ -311,6 +323,7 @@ def clean_img(
     replacement=None,
     axis=0,
     plot=False,
+    saveplot=False,
     dryrun=False,
     keep=False,
 ):
@@ -337,7 +350,8 @@ def clean_img(
     # image array, and will need to be handled below.
     tblcln_p = in_path.with_suffix(".tableclean.img")
     clean_tables_from_img(
-        in_path, tblcln_p, label, width, replacement, plot=plot, dryrun=dryrun
+        in_path, tblcln_p, label, width, replacement,
+        plot=plot, saveplot=saveplot, dryrun=dryrun
     )
 
     # Now clean the image area.
@@ -378,6 +392,7 @@ def clean_img(
         width=width,
         axis=axis,
         plot=(f"{in_path.name} Image Area" if plot else False),
+        saveplot=(in_path.with_suffix(".bf-image.pdf") if saveplot else False)
     )
 
     if not dryrun:
@@ -405,6 +420,7 @@ def clean_tables_from_cube(
     buffer_area=False,
     dark_area=False,
     plot=False,
+    saveplot=False,
     dryrun=False,
 ):
     """The file at *out_path* will be the result of running bit-flip
@@ -474,6 +490,7 @@ def clean_tables_from_cube(
             mask_area,
             ramp_area,
             (str(in_path.name) if plot else False),
+            (in_path.with_suffix(".bf-revclk.pdf") if saveplot else False),
         )
         if not dryrun:
             # write the table back out
@@ -516,6 +533,7 @@ def clean_tables_from_img(
     buffer_area=False,
     dark_area=False,
     plot=False,
+    saveplot=False,
     dryrun=False,
 ):
     """The file at *out_path* will be the result of running bit-flip
@@ -601,6 +619,7 @@ def clean_tables_from_img(
             mask_area,
             ramp_area,
             (str(in_path.name) if plot else False),
+            (in_path.with_suffix(".bf-revclk.pdf") if saveplot else False),
         )
         if not dryrun:
             # write the table back out
@@ -621,6 +640,7 @@ def clean_cal_tables(
     mask_area=False,
     ramp_area=False,
     plot=False,
+    saveplot=False,
 ):
     # Deal with the HiRISE Calibration Image first (Reverse-clock, Mask,
     # and Ramp
@@ -643,6 +663,7 @@ def clean_cal_tables(
             axis=1,
             medstd_limit=200,
             plot=(f"{plot} Reverse-Clock" if plot else False),
+            saveplot=saveplot
         )
         cal_image[:20, :] = rev_clean
 
@@ -747,6 +768,7 @@ def find_smart_window_from_ma(
     medstd_limit=300,
     medstd_fallback=64,
     plot=False,
+    saveplot=False
 ):
     """Returns a two-tuple with the result of find_smart_window().
 
@@ -779,6 +801,7 @@ def find_smart_window_from_ma(
         median,
         central_exclude_dn=ex,
         plot=plot,
+        saveplot=saveplot
     )
 
 
@@ -1046,6 +1069,7 @@ def find_smart_window(
     central_exclude_dn=0,
     plot=False,
     closest=True,
+    saveplot=False
 ) -> tuple:
     """Returns a minimum and maximum DN value from *dn* which are
        based on using the find_minima_index() function with the
@@ -1058,14 +1082,19 @@ def find_smart_window(
        away from *centraldn*.  This is useful if you don't want returned
        minimum and maximum DN to be too close to the *centraldn*.
 
-       If plot is True, this function will display a plot describing
+       If *plot* is True, this function will display a plot describing
        its work.  The curve represents the hist values, the shaded
        area marks the window between the given mindn and maxdn.  The
        'x'es mark all the detected minima, and the red dots indicate
        the minimum and maximum DN values that this function will
-       return.
+       return.  If *plot* is a string, it will be used as the title
+       of the plot.
 
        The value of *closest* is passed on to find_minima_index().
+
+       If *saveplot* is not False, it will be assumed to be a filename
+       that the plot should be saved as.  If False, the plot will not
+       be saved.
     """
     # hist_list = sorted(hist, key=lambda x: int(x.DN))
     # pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
@@ -1107,7 +1136,7 @@ def find_smart_window(
         import matplotlib.pyplot as plt
 
         plt.ioff()
-        fig, (ax0, ax1) = plt.subplots(2, 1)
+        fig, (ax0, ax1) = plt.subplots(2, 1, constrained_layout=True)
 
         indices = np.arange(0, len(counts))
         dn_window = np.fromiter(
@@ -1125,20 +1154,28 @@ def find_smart_window(
         ax0.set_xlabel("DN Index")
         ax0.set_yscale("log")
         ax0.fill_between(indices, counts, where=dn_window, color="lightgray")
-        ax0.axvline(x=central_i, c="gray")
-        ax0.axvline(x=np.argmax(counts), c="lime", ls="--")
+        ax0.axvline(x=central_i, c="gray", label=f"Central DN: {centraldn}")
+        mode = np.argmax(counts)
+        ax0.axvline(x=mode, c="lime", ls="--", label=f"Mode: {dn[mode]}")
         ax0.plot(counts)
         ax0.plot(minima_i, counts[minima_i], "x")
         ax0.plot(min_i, counts[min_i], "o", c="red")
         ax0.plot(max_i, counts[max_i], "o", c="red")
+        ax0.legend()
 
         ax1.set_ylabel("Pixel Count")
         ax1.set_xlabel("DN")
         ax1.set_yscale("log")
         ax1.set_ybound(lower=0.5)
         ax1.scatter(dn, counts, marker=".", s=1)
-        ax1.axvline(x=dn[min_i], c="red")
+        ax1.axvline(
+            x=dn[min_i], c="red", label=f"DN Limits: {dn[min_i]}, {dn[max_i]}"
+        )
         ax1.axvline(x=dn[max_i], c="red")
+        ax1.legend()
+
+        if saveplot:
+            plt.savefig(saveplot)
 
         plt.show()
 
