@@ -7,6 +7,7 @@ A library to help process HiRISE EDRs with ISIS.
 
 
 * Free software: Apache 2 License
+
 .. * Documentation: https://pyrise.readthedocs.io.
 .. * `PlanetaryPy`_ Affiliate Package (someday).
 
@@ -14,7 +15,7 @@ A library to help process HiRISE EDRs with ISIS.
 Features
 --------
 
-* Complete testing against Perl Pipelines.
+* TODO: Complete testing against Perl Pipelines.
 
 
 External Dependencies

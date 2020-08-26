@@ -1027,7 +1027,7 @@ def find_minima_index(
 
         min_i = min(central_idx, limit_idx)
         max_i = max(central_idx, limit_idx)
-        inrange_i = minima_idxs[(minima_idxs >= min_i) * (minima_idxs < max_i)]
+        inrange_i = minima_idxs[(minima_idxs >= min_i) * (minima_idxs <= max_i)]
         logging.info(str(inrange_i) + " are the indexes inside the range.")
 
         value = min(np.take(pixel_counts, inrange_i))
@@ -1123,12 +1123,17 @@ def find_smart_window(
     # print(f'mindn_i {mindn_i}')
     # print(f'maxdn_i {maxdn_i}')
 
-    min_i = find_minima_index(
-        central_min_i, mindn_i, minima_i, counts, close_to_limit=closest
-    )
-    max_i = find_minima_index(
-        central_max_i, maxdn_i, minima_i, counts, close_to_limit=closest
-    )
+    if len(minima_i) == 0:
+        logging.info("No minima found.")
+        min_i = 0
+        max_i = len(dn) - 1
+    else:
+        min_i = find_minima_index(
+            central_min_i, mindn_i, minima_i, counts, close_to_limit=closest
+        )
+        max_i = find_minima_index(
+            central_max_i, maxdn_i, minima_i, counts, close_to_limit=closest
+        )
     logging.info(f"indexes: {min_i}, {max_i}")
     logging.info(f"DN window: {dn[min_i]}, {dn[max_i]}")
 
