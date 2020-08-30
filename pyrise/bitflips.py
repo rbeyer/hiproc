@@ -144,7 +144,7 @@ def main():
             "--plot",
             required=False,
             action="store_true",
-            help="Displays plot for each area.",
+            help="Displays interactive plot for each area.",
         )
         parser.add_argument(
             "--saveplot",
@@ -289,7 +289,8 @@ def clean_cube(
         image,
         width=width,
         axis=axis,
-        plot=(f"{in_p.name} Image Area" if plot else False),
+        plot=plot,
+        plottitle=(f"{in_p.name} Image Area" if plot else None),
         saveplot=(in_p.with_suffix(".bf-image.pdf") if saveplot else False),
     )
 
@@ -391,7 +392,8 @@ def clean_img(
         image,
         width=width,
         axis=axis,
-        plot=(f"{in_path.name} Image Area" if plot else False),
+        plot=plot,
+        plottitle=(f"{in_path.name} Image Area" if plot else None),
         saveplot=(in_path.with_suffix(".bf-image.pdf") if saveplot else False)
     )
 
@@ -489,7 +491,8 @@ def clean_tables_from_cube(
             rev_area,
             mask_area,
             ramp_area,
-            (str(in_path.name) if plot else False),
+            plot,
+            (str(in_path.name) if plot else None),
             (in_path.with_suffix(".bf-revclk.pdf") if saveplot else False),
         )
         if not dryrun:
@@ -618,7 +621,8 @@ def clean_tables_from_img(
             rev_area,
             mask_area,
             ramp_area,
-            (str(in_path.name) if plot else False),
+            plot,
+            (str(in_path.name) if plot else None),
             (in_path.with_suffix(".bf-revclk.pdf") if saveplot else False),
         )
         if not dryrun:
@@ -640,6 +644,7 @@ def clean_cal_tables(
     mask_area=False,
     ramp_area=False,
     plot=False,
+    plottitle=None,
     saveplot=False,
 ):
     # Deal with the HiRISE Calibration Image first (Reverse-clock, Mask,
@@ -662,7 +667,8 @@ def clean_cal_tables(
             width=width,
             axis=1,
             medstd_limit=200,
-            plot=(f"{plot} Reverse-Clock" if plot else False),
+            plot=plot,
+            plottitle=(f"{plot} Reverse-Clock" if plot else None),
             saveplot=saveplot
         )
         cal_image[:20, :] = rev_clean
@@ -768,6 +774,7 @@ def find_smart_window_from_ma(
     medstd_limit=300,
     medstd_fallback=64,
     plot=False,
+    plottitle=None,
     saveplot=False
 ):
     """Returns a two-tuple with the result of find_smart_window().
@@ -801,6 +808,7 @@ def find_smart_window_from_ma(
         median,
         central_exclude_dn=ex,
         plot=plot,
+        plottitle=plottitle,
         saveplot=saveplot
     )
 
@@ -970,7 +978,7 @@ def find_select_idx_name(
     central_idx: int, limit_idx: int, close_to_limit: bool
 ):
     """Returns a two-tuple which contains an int of value 0 or -1 in
-    the first posiion and a string of value 'min' or 'max' in the second.
+    the first position and a string of value 'min' or 'max' in the second.
 
     The string is determined based on the relative values of
     *central_idx* to *limit_idx*, and the value of the int is meant
@@ -1069,6 +1077,7 @@ def find_smart_window(
     central_exclude_dn=0,
     plot=False,
     closest=True,
+    plottitle=None,
     saveplot=False
 ) -> tuple:
     """Returns a minimum and maximum DN value from *dn* which are
@@ -1082,13 +1091,12 @@ def find_smart_window(
        away from *centraldn*.  This is useful if you don't want returned
        minimum and maximum DN to be too close to the *centraldn*.
 
-       If *plot* is True, this function will display a plot describing
-       its work.  The curve represents the hist values, the shaded
-       area marks the window between the given mindn and maxdn.  The
-       'x'es mark all the detected minima, and the red dots indicate
-       the minimum and maximum DN values that this function will
-       return.  If *plot* is a string, it will be used as the title
-       of the plot.
+       If *plot* is True, this function will display an interactive
+       plot describing its work.  The curve represents the hist
+       values, the shaded area marks the window between the given
+       mindn and maxdn.  The 'x'es mark all the detected minima,
+       and the red dots indicate the minimum and maximum DN values
+       that this function will return.
 
        The value of *closest* is passed on to find_minima_index().
 
@@ -1137,7 +1145,7 @@ def find_smart_window(
     logging.info(f"indexes: {min_i}, {max_i}")
     logging.info(f"DN window: {dn[min_i]}, {dn[max_i]}")
 
-    if plot:
+    if plot or saveplot:
         import matplotlib.pyplot as plt
 
         plt.ioff()
@@ -1152,8 +1160,8 @@ def find_smart_window(
             dtype=bool,
         )
 
-        if isinstance(plot, str):
-            fig.suptitle(plot)
+        if plottitle is not None:
+            fig.suptitle(plottitle)
 
         ax0.set_ylabel("Pixel Count")
         ax0.set_xlabel("DN Index")
@@ -1182,7 +1190,8 @@ def find_smart_window(
         if saveplot:
             plt.savefig(saveplot)
 
-        plt.show()
+        if plot:
+            plt.show()
 
     return dn[min_i], dn[max_i]
 
