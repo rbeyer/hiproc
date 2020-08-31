@@ -149,8 +149,12 @@ def main():
         parser.add_argument(
             "--saveplot",
             required=False,
-            action="store_true",
-            help="Saves plot for each area to a file.",
+            nargs="?",
+            default=False,
+            const=True,
+            help="Saves plot for each area to a file.  If a directory is "
+                 "provided it will be used to save the plots to, otherwise "
+                 "the directory of the input file will be used."
         )
         parser.add_argument(
             "-n",
@@ -225,6 +229,16 @@ def clean(
     in_p = Path(in_path)
     out_p = Path(out_path)
 
+    if saveplot:
+        try:
+            saveplot = Path(saveplot)
+            if not saveplot.is_dir():
+                raise NotADirectoryError(
+                    f"{saveplot} either doesn't exists or isn't a directory."
+                )
+        except TypeError:
+            saveplot = in_p.parent
+
     label = pvl.load(str(in_p))
     if "IsisCube" in label:
         clean_cube(
@@ -291,7 +305,9 @@ def clean_cube(
         axis=axis,
         plot=plot,
         plottitle=(f"{in_p.name} Image Area" if plot or saveplot else None),
-        saveplot=(in_p.with_suffix(".bf-image.pdf") if saveplot else False),
+        saveplot=(
+            saveplot / in_p.with_suffix(".bf-image.pdf").name
+        ) if saveplot else False,
     )
 
     if not dryrun:
@@ -394,7 +410,9 @@ def clean_img(
         axis=axis,
         plot=plot,
         plottitle=(f"{in_path.name} Image Area" if plot or saveplot else None),
-        saveplot=(in_path.with_suffix(".bf-image.pdf") if saveplot else False)
+        saveplot=(
+            saveplot / in_p.with_suffix(".bf-image.pdf").name
+        ) if saveplot else False
     )
 
     if not dryrun:
@@ -493,7 +511,11 @@ def clean_tables_from_cube(
             ramp_area,
             plot,
             str(in_path.name),
-            (in_path.with_suffix(".bf-revclk.pdf") if saveplot else False),
+            (
+                (
+                saveplot / in_path.with_suffix(".bf-revclk.pdf").name
+                ) if saveplot else False
+            ),
         )
         if not dryrun:
             # write the table back out
@@ -623,7 +645,11 @@ def clean_tables_from_img(
             ramp_area,
             plot,
             str(in_path.name),
-            (in_path.with_suffix(".bf-revclk.pdf") if saveplot else False),
+            (
+                (
+                    saveplot / in_p.with_suffix(".bf-revclk.pdf").name
+                ) if saveplot else False
+            ),
         )
         if not dryrun:
             # write the table back out
