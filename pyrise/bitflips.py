@@ -290,7 +290,7 @@ def clean_cube(
         width=width,
         axis=axis,
         plot=plot,
-        plottitle=(f"{in_p.name} Image Area" if plot else None),
+        plottitle=(f"{in_p.name} Image Area" if plot or saveplot else None),
         saveplot=(in_p.with_suffix(".bf-image.pdf") if saveplot else False),
     )
 
@@ -393,7 +393,7 @@ def clean_img(
         width=width,
         axis=axis,
         plot=plot,
-        plottitle=(f"{in_path.name} Image Area" if plot else None),
+        plottitle=(f"{in_path.name} Image Area" if plot or saveplot else None),
         saveplot=(in_path.with_suffix(".bf-image.pdf") if saveplot else False)
     )
 
@@ -492,7 +492,7 @@ def clean_tables_from_cube(
             mask_area,
             ramp_area,
             plot,
-            (str(in_path.name) if plot else None),
+            str(in_path.name),
             (in_path.with_suffix(".bf-revclk.pdf") if saveplot else False),
         )
         if not dryrun:
@@ -622,7 +622,7 @@ def clean_tables_from_img(
             mask_area,
             ramp_area,
             plot,
-            (str(in_path.name) if plot else None),
+            str(in_path.name),
             (in_path.with_suffix(".bf-revclk.pdf") if saveplot else False),
         )
         if not dryrun:
@@ -644,7 +644,7 @@ def clean_cal_tables(
     mask_area=False,
     ramp_area=False,
     plot=False,
-    plottitle=None,
+    imagestr=None,
     saveplot=False,
 ):
     # Deal with the HiRISE Calibration Image first (Reverse-clock, Mask,
@@ -668,7 +668,7 @@ def clean_cal_tables(
             axis=1,
             medstd_limit=200,
             plot=plot,
-            plottitle=(f"{plot} Reverse-Clock" if plot else None),
+            plottitle=(f"{imagestr} Reverse-Clock" if plot or saveplot else None),
             saveplot=saveplot
         )
         cal_image[:20, :] = rev_clean
@@ -1038,10 +1038,11 @@ def find_minima_index(
         inrange_i = minima_idxs[(minima_idxs >= min_i) * (minima_idxs <= max_i)]
         logging.info(str(inrange_i) + " are the indexes inside the range.")
 
-        value = min(np.take(pixel_counts, inrange_i))
-        logging.info(
-            f"{value} is the minimum Pixel count amongst those " "indexes."
-        )
+        try:
+            value = min(np.take(pixel_counts, inrange_i))
+            logging.info(
+                f"{value} is the minimum Pixel count amongst those indexes."
+            )
 
         idx = inrange_i[
             np.asarray(pixel_counts[inrange_i] == value).nonzero()
