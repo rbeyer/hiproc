@@ -140,7 +140,7 @@ class TestArrays(unittest.TestCase):
 
         masked = np.ma.array(data, mask=[[1, 0, 0], [0, 0, 1]])
         self.assertEqual(
-            (3, 5),
+            (3, 9),
             bf.find_smart_window_from_ma(masked, width=1, axis=0, plot=False),
         )
 

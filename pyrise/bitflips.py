@@ -83,6 +83,7 @@ to mitigate the bit-flip pixels once they have been identified.
 
 import argparse
 import logging
+import math
 import os
 import shutil
 import subprocess
@@ -1070,29 +1071,61 @@ def find_minima_index(
                 f"{value} is the minimum Pixel count amongst those indexes."
             )
 
-        idx = inrange_i[
-            np.asarray(pixel_counts[inrange_i] == value).nonzero()
-        ][select_idx]
-    except ValueError:
-        try:
+            idx = inrange_i[
+                np.asarray(pixel_counts[inrange_i] == value).nonzero()
+            ][select_idx]
+        except ValueError:
             if limit_idx < central_idx:
                 logging.info(info_str.format("min", "outside"))
                 idx = max(minima_idxs[minima_idxs < limit_idx])
             elif limit_idx > central_idx:
                 logging.info(info_str.format("max", "outside"))
                 idx = min(minima_idxs[minima_idxs > limit_idx])
-            else:
-                raise ValueError
 
-            logging.info(f"{idx} is the minimum index.")
-        except ValueError:
-            logging.info(
-                "Could not find a valid minima, returning "
-                f"the limit index: {limit_idx}."
-            )
-            idx = limit_idx
+        logging.info(f"{idx} is the minimum index.")
+    except ValueError:
+        logging.info(
+            "Could not find a valid minima."
+            # "Could not find a valid minima, returning "
+            # f"the limit index: {limit_idx}."
+        )
+        # idx = limit_idx
+        idx = None
 
     return idx
+
+
+def find_prominence_index(
+    minima_idxs, prominences, min_idx, max_idx, counts,
+    min_idx_limit=None, max_idx_limit=None
+):
+    # scaled = list()
+    # for c, p in zip(counts, prominences):
+    #     scaled.append(math.log10(c + p) - math.log10(c))
+    if min_idx_limit is None:
+        min_idx_limit = minima_idxs[0]
+
+    if max_idx_limit is None:
+        max_idx_limit = minima_idxs[-1]
+
+    scaled = np.log10(counts + prominences) - np.log10(counts)
+
+    p = list()
+    for condition in(
+        ((minima_idxs > min_idx) | (minima_idxs < min_idx_limit)),
+        ((minima_idxs < max_idx) | (minima_idxs > max_idx_limit))
+        # (minima_idxs < max_idx, len(prominences) - 1)
+
+    ):
+        # masked = np.ma.masked_where(condition, prominences)
+        masked = np.ma.masked_where(condition, scaled)
+        if masked.count() > 0:
+            prom_i = masked.argmax()
+            p.append(minima_idxs[prom_i])
+        else:
+            p.append(None)
+
+    return p[0], p[1]
 
 
 def find_smart_window(
