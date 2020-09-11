@@ -104,6 +104,89 @@ import pyrise.img as img
 import pyrise.util as util
 
 
+# This is only here for temporary testing
+goal_dn = {
+    "ESP_019461_1440_RED9_1.EDR_Stats.cub Reverse-Clock": (1349, 1409),
+    "ESP_019461_1440_RED9_1.EDR_Stats.cub Image Area": (2745, 6683),
+    "ESP_048351_2540_RED3_0.EDR_Stats.cub Reverse-Clock": (1126, 1203),
+    "ESP_048351_2540_RED3_0.EDR_Stats.cub Image Area": (2818, 2993),
+    "ESP_048351_2540_RED3_1.EDR_Stats.cub Reverse-Clock": (1007, 1251),
+    "ESP_048351_2540_RED3_1.EDR_Stats.cub Image Area": (2718, 3034),
+    "ESP_048772_1335_RED2_1.EDR_Stats.cub Reverse-Clock": (1091, 1273),
+    "ESP_048772_1335_RED2_1.EDR_Stats.cub Image Area": (2123, 3820),
+    "ESP_048772_1335_RED5_1.EDR_Stats.cub Reverse-Clock": (1438, 1575),
+    "ESP_048772_1335_RED5_1.EDR_Stats.cub Image Area": (2358, 3876),
+    "ESP_049782_0930_RED2_1.EDR_Stats.cub Reverse-Clock": (1120, 1290),
+    "ESP_049782_0930_RED2_1.EDR_Stats.cub Image Area": (1460, 6124),
+    "ESP_053988_2025_RED1_1.EDR_Stats.cub Reverse-Clock": (1010, 1280),
+    "ESP_053988_2025_RED1_1.EDR_Stats.cub Image Area": (1533, 2939),
+    "ESP_054589_1755_RED1_1.EDR_Stats.cub Reverse-Clock": (1010, 3139),
+    "ESP_054589_1755_RED1_1.EDR_Stats.cub Image Area": (1460, 3437),
+    "ESP_058386_1645_RED1_1.EDR_Stats.cub Reverse-Clock": (1015, 1258),
+    "ESP_058386_1645_RED1_1.EDR_Stats.cub Image Area": (3684, 4227),
+    "ESP_061572_1725_RED1_1.EDR_Stats.cub Reverse-Clock": (1045, 1269),
+    "ESP_061572_1725_RED1_1.EDR_Stats.cub Image Area": (1508, 2579),
+    "ESP_061573_1695_RED1_1.EDR_Stats.cub Reverse-Clock": (1070, 1300),
+    "ESP_061573_1695_RED1_1.EDR_Stats.cub Image Area": (1693, 2337),
+    "ESP_061575_1545_RED3_1.EDR_Stats.cub Reverse-Clock": (1105, 1380),
+    "ESP_061575_1545_RED3_1.EDR_Stats.cub Image Area": (1418, 2545),
+    "ESP_061580_2390_RED3_1.EDR_Stats.cub Reverse-Clock": (1060, 1320),
+    "ESP_061580_2390_RED3_1.EDR_Stats.cub Image Area": (1470, 2703),
+    "ESP_061633_2350_RED3_1.EDR_Stats.cub Reverse-Clock": (1080, 1350),
+    "ESP_061633_2350_RED3_1.EDR_Stats.cub Image Area": (1812, 2887),
+    "ESP_061686_1725_RED3_1.EDR_Stats.cub Reverse-Clock": (1067, 1329),
+    "ESP_061686_1725_RED3_1.EDR_Stats.cub Image Area": (1657, 2223),
+    "ESP_061772_2600_RED1_1.EDR_Stats.cub Reverse-Clock": (1090, 1320),
+    "ESP_061772_2600_RED1_1.EDR_Stats.cub Image Area": (2219, 2900),
+    "ESP_061827_1390_RED7_1.EDR_Stats.cub Reverse-Clock": (5387, 7926),
+    "ESP_061827_1390_RED7_1.EDR_Stats.cub Image Area": (1430, 3586),
+    "ESP_062161_1985_RED1_1.EDR_Stats.cub Reverse-Clock": (1020, 1290),
+    "ESP_062161_1985_RED1_1.EDR_Stats.cub Image Area": (1533, 3922),
+    "ESP_062295_3255_RED3_1.EDR_Stats.cub Reverse-Clock": (1084, 1230),
+    "ESP_062295_3255_RED3_1.EDR_Stats.cub Image Area": (1284, 1493),
+    "ESP_062295_3315_RED1_1.EDR_Stats.cub Reverse-Clock": (990, 1090),
+    "ESP_062295_3315_RED1_1.EDR_Stats.cub Image Area": (1, 1119),
+    "ESP_062295_3315_RED3_1.EDR_Stats.cub Reverse-Clock": (1069, 1222),
+    "ESP_062295_3315_RED3_1.EDR_Stats.cub Image Area": (1096, 1258),
+    "ESP_062300_3205_RED3_0.EDR_Stats.cub Reverse-Clock": (1133, 1250),
+    "ESP_062300_3205_RED3_0.EDR_Stats.cub Image Area": (1334, 1866),
+    "ESP_062300_3205_RED3_1.EDR_Stats.cub Reverse-Clock": (1143, 1292),
+    "ESP_062300_3205_RED3_1.EDR_Stats.cub Image Area": (1337, 1852),
+    "ESP_062300_3315_RED1_1.EDR_Stats.cub Reverse-Clock": (1006, 1187),
+    "ESP_062300_3315_RED1_1.EDR_Stats.cub Image Area": (2454, 2688),
+    "ESP_062300_3315_RED3_1.EDR_Stats.cub Reverse-Clock": (1079, 1363),
+    "ESP_062300_3315_RED3_1.EDR_Stats.cub Image Area": (2795, 3004),
+    "ESP_062451_2800_RED1_1.EDR_Stats.cub Reverse-Clock": (1015, 1284),
+    "ESP_062451_2800_RED1_1.EDR_Stats.cub Image Area": (1366, 1926),
+    "ESP_062451_2800_RED3_1.EDR_Stats.cub Reverse-Clock": (1090, 1381),
+    "ESP_062451_2800_RED3_1.EDR_Stats.cub Image Area": (1532, 2223),
+    "ESP_062592_2015_RED1_1.EDR_Stats.cub Reverse-Clock": (461, 529),
+    "ESP_062592_2015_RED1_1.EDR_Stats.cub Image Area": (37, 1105),
+    "ESP_062592_2505_RED1_1.EDR_Stats.cub Reverse-Clock": (1082, 1294),
+    "ESP_062592_2505_RED1_1.EDR_Stats.cub Image Area": (2272, 3228),
+    "ESP_062761_3290_RED1_1.EDR_Stats.cub Reverse-Clock": (1056, 1288),
+    "ESP_062761_3290_RED1_1.EDR_Stats.cub Image Area": (1085, 1324),
+    "ESP_062778_3285_RED1_1.EDR_Stats.cub Reverse-Clock": (1052, 1278),
+    "ESP_062778_3285_RED1_1.EDR_Stats.cub Image Area": (2450, 2683),
+    "ESP_064114_1975_RED1_1.EDR_Stats.cub Reverse-Clock": (760, 1031),
+    "ESP_064114_1975_RED1_1.EDR_Stats.cub Image Area": (2644, 3089),
+    "ESP_048772_1335_IR10_1.EDR_Stats.cub Reverse-Clock": (917, 1107),
+    "ESP_048772_1335_IR10_1.EDR_Stats.cub Image Area": (2862, 5207),
+    "ESP_049782_0930_IR10_1.EDR_Stats.cub Reverse-Clock": (961, 1127),
+    "ESP_049782_0930_IR10_1.EDR_Stats.cub Image Area": (1631, 8570),
+    "ESP_049854_1535_IR10_1.EDR_Stats.cub Reverse-Clock": (915, 1127),
+    "ESP_049854_1535_IR10_1.EDR_Stats.cub Image Area": (3627, 5155),
+    "ESP_049897_1980_IR10_1.EDR_Stats.cub Reverse-Clock": (946, 1127),
+    "ESP_049897_1980_IR10_1.EDR_Stats.cub Image Area": (3463, 5551),
+    "ESP_049928_1710_IR10_1.EDR_Stats.cub Reverse-Clock": (930, 1142),
+    "ESP_049928_1710_IR10_1.EDR_Stats.cub Image Area": (2324, 3408),
+    "ESP_049941_1500_IR10_1.EDR_Stats.cub Reverse-Clock": (915, 1112),
+    "ESP_049941_1500_IR10_1.EDR_Stats.cub Image Area": (3518, 4559),
+    "ESP_054589_2655_IR10_1.EDR_Stats.cub Reverse-Clock": (930, 1477),
+    "ESP_054589_2655_IR10_1.EDR_Stats.cub Image Area": (3654, 5669),
+}
+
+
 def main():
     try:
         parser = argparse.ArgumentParser(
@@ -1183,7 +1266,26 @@ def find_smart_window(
     # print(tobemin)
     central_max_i = (np.abs(dn - (centraldn + central_exclude_dn))).argmin()
 
-    minima_i, _ = find_peaks(np.negative(counts))
+    minima_i, minprops = find_peaks(
+        np.negative(counts),
+        threshold=(None, None),
+        distance=1,
+        prominence=(None, None),
+        width=(None, None),
+        rel_height=1
+    )
+    # print("minprops: ")
+    # print(minprops)
+    maxima_i, maxprops = find_peaks(
+        counts,
+        threshold=(None, None),
+        distance=1,
+        prominence=(None, None),
+        width=(None, None),
+        rel_height=1,
+    )
+    # print("maxprops: ")
+    # print(maxprops)
 
     # print(f'central_i {central_i}')
     # print(f'central_min_i {central_min_i}')
@@ -1195,6 +1297,9 @@ def find_smart_window(
         logging.info("No minima found.")
         min_i = 0
         max_i = len(dn) - 1
+        min_i_ips = min_in = min_prom = min_i
+        max_i_ips = max_in = max_prom = max_i
+        max_prom_idx = None
     else:
         min_i = find_minima_index(
             central_min_i, mindn_i, minima_i, counts, close_to_limit=closest
@@ -1202,8 +1307,50 @@ def find_smart_window(
         max_i = find_minima_index(
             central_max_i, maxdn_i, minima_i, counts, close_to_limit=closest
         )
+
+        min_prom, max_prom = find_prominence_index(
+            minima_i, minprops["prominences"], central_min_i, central_max_i,
+            counts[minima_i]
+        )
+        min_in, max_in = find_prominence_index(
+            minima_i, minprops["prominences"], central_min_i, central_max_i,
+            counts[minima_i], min_i, max_i
+        )
+
+        max_prom_idx = np.argmax(maxprops["prominences"])
+        min_i_ips = find_minima_index(
+            central_min_i, maxprops["left_ips"][max_prom_idx],
+            minima_i, counts, close_to_limit=closest
+        )
+        max_i_ips = find_minima_index(
+            central_max_i, maxprops["right_ips"][max_prom_idx],
+            minima_i, counts, close_to_limit=closest
+        )
+
+    print(f"min_prom, max_prom: {min_prom}, {max_prom}")
+    print(f"min_in, max_in: {min_in}, {max_in}")
+    min_prom = 0 if min_prom is None else min_prom
+    max_prom = len(dn) - 1 if max_prom is None else max_prom
+    min_in = 0 if min_in is None else min_in
+    max_in = len(dn) - 1 if max_in is None else max_in
+    min_i = 0 if min_i is None else min_i
+    max_i = len(dn) - 1 if max_i is None else max_i
+    min_i_ips = 0 if min_i_ips is None else min_i_ips
+    max_i_ips = len(dn) - 1 if max_i_ips is None else max_i_ips
+
+    new_min_i, new_max_i = pick_index(
+        min_i, min_i_ips, max_i, max_i_ips,
+        maxima_i[max_prom_idx],
+        maxprops['left_ips'][max_prom_idx], maxprops['right_ips'][max_prom_idx],
+        minprops["prominences"],
+        counts, minima_i, dn, centraldn, mindn, maxdn
+    )
+
     logging.info(f"indexes: {min_i}, {max_i}")
     logging.info(f"DN window: {dn[min_i]}, {dn[max_i]}")
+
+    print(f"new_indexes: {new_min_i}, {new_max_i}")
+    print(f"new DN window: {dn[new_min_i]}, {dn[new_max_i]}")
 
     if plot or saveplot:
         import matplotlib.pyplot as plt
@@ -1222,6 +1369,10 @@ def find_smart_window(
 
         if plottitle is not None:
             fig.suptitle(plottitle)
+            eval_bounds(
+                plottitle, dn[min_i], dn[max_i], dn[min_prom], dn[max_prom],
+                dn[min_in], dn[max_in]
+            )
 
         ax0.set_ylabel("Pixel Count")
         ax0.set_xlabel("DN Index")
@@ -1232,28 +1383,247 @@ def find_smart_window(
         ax0.axvline(x=mode, c="lime", ls="--", label=f"Mode: {dn[mode]}")
         ax0.plot(counts)
         ax0.plot(minima_i, counts[minima_i], "x")
+        ax0.vlines(
+            x=minima_i, ymin=counts[minima_i] + minprops["prominences"],
+            ymax=counts[minima_i], color="C1"
+        )
+        ax0.hlines(
+            y=(-1 * minprops["width_heights"]), xmin=minprops["left_ips"],
+            xmax=minprops["right_ips"], color="C1"
+        )
+        # ax0.hlines(
+        #     y=range(1, len(minprops["left_bases"])+1),
+        #     xmin=minprops["left_bases"],
+        #     xmax=minprops["right_bases"],
+        #     color="C1",
+        # )
+        ax0.plot(maxima_i, counts[maxima_i], "^")
+        ax0.vlines(
+            x=maxima_i, ymin=counts[maxima_i] - maxprops["prominences"],
+            ymax=counts[maxima_i], color="C2"
+        )
+        ax0.hlines(
+            y=maxprops["width_heights"], xmin=maxprops["left_ips"],
+            xmax=maxprops["right_ips"], color="C2"
+        )
+        # ax0.hlines(
+        #     # y=range(10, (len(maxprops["left_bases"])+1) * 10, 10),
+        #     y=counts[maxima_i],
+        #     xmin=maxprops["left_bases"],
+        #     xmax=maxprops["right_bases"],
+        #     color="C2",
+        # )
+
         ax0.plot(min_i, counts[min_i], "o", c="red")
         ax0.plot(max_i, counts[max_i], "o", c="red")
-        ax0.legend()
+        ax0.plot(min_prom, counts[min_prom], ">", c="purple")
+        ax0.plot(max_prom, counts[max_prom], "<", c="purple")
+        ax0.plot(min_in, counts[min_in], "|", c="purple")
+        ax0.plot(max_in, counts[max_in], "|", c="purple")
+        ax0.plot(min_i_ips, counts[min_i_ips], "x", c="teal")
+        ax0.plot(max_i_ips, counts[max_i_ips], "x", c="teal")
+        ax0.plot(new_min_i, counts[new_min_i], "+", c="cyan")
+        ax0.plot(new_max_i, counts[new_max_i], "+", c="cyan")
 
+        ax0.legend()
         ax1.set_ylabel("Pixel Count")
         ax1.set_xlabel("DN")
         ax1.set_yscale("log")
         ax1.set_ybound(lower=0.5)
-        ax1.scatter(dn, counts, marker=".", s=1)
+        if plottitle in goal_dn:
+            ax1.axvline(
+                x=goal_dn[plottitle][0],
+                c="blue",
+                label=f"Ideal DN: {goal_dn[plottitle]}"
+            )
+            ax1.axvline(
+                x=goal_dn[plottitle][1],
+                c="blue",
+            )
         ax1.axvline(
-            x=dn[min_i], c="red", label=f"DN Limits: {dn[min_i]}, {dn[max_i]}"
+            x=dn[min_i], c="red", ls="--",
+            label=f"DN Limits: {dn[min_i]}, {dn[max_i]}"
         )
-        ax1.axvline(x=dn[max_i], c="red")
+        ax1.axvline(x=dn[max_i], c="red", ls="--" )
+        ax1.axvline(
+            x=dn[new_min_i], c="cyan", ls="dotted",
+            label=f"New DN Limits: {dn[new_min_i]}, {dn[new_max_i]}"
+        )
+        ax1.axvline(x=dn[new_max_i], c="cyan", ls="dotted")
+
+        ax1.scatter(dn, counts, marker=".", s=1)
         ax1.legend()
 
         if saveplot:
+            eval_bounds(
+                plottitle, dn[min_i], dn[max_i], dn[min_prom], dn[max_prom],
+                dn[min_in], dn[max_in], log_path= saveplot.with_name('bounds.log')
+            )
             plt.savefig(saveplot)
 
         if plot:
             plt.show()
 
     return dn[min_i], dn[max_i]
+    # return dn[new_min_i], dn[new_max_i]
+
+
+def pick_index(
+    min_i, min_i_ips, max_i, max_i_ips,
+    max_prom_i, max_prom_left, max_prom_right,
+    prominences,
+    counts, minima_i, dn, centraldn, mindn, maxdn
+):
+    scaled = np.log10(
+        counts[minima_i] + prominences
+    ) - np.log10(counts[minima_i])
+
+    span_factor = 2
+    count_thresh = counts[max_prom_i] / 100
+    print(f"count_thresh: {count_thresh}")
+    print(f"count min/max i: {counts[min_i]} {counts[max_i]}")
+    print(f"count min/max ips: {counts[min_i_ips]} {counts[max_i_ips]}")
+
+    print(f"{max_prom_left}, {max_prom_right}")
+    print(
+        f"DN edges of prominence envelope: {dn[int(max_prom_left)]}, "
+        f"{dn[int(max_prom_right)]}"
+    )
+
+    new_i = [None, None]
+    span_left = (centraldn - ((centraldn - mindn) * span_factor))
+    span_right = (centraldn + ((maxdn - centraldn) * span_factor))
+    print(f"DN edges of {span_factor} span envelope: {span_left}, {span_right}")
+    for m, i, ips, dnlim, message in (
+        (0, min_i, min_i_ips, mindn, "min"),
+        (1, max_i, max_i_ips, maxdn, "max")
+    ):
+        print(f"Picking the index for {message}")
+        if i == ips:
+            print("i == ips")
+            new_i[m] = i
+        elif counts[i] > count_thresh:
+            print("count i above thresh")
+            new_i[m] = ips
+        elif counts[ips] > count_thresh:
+            print("count ips above thresh")
+            new_i[m] = i
+        else:
+            # if max_prom_left < i < max_prom_right:
+            #     print(f"{m} _i inside prominence envelope")
+            #     new_i[m] = best_index(scaled, minima_i, i, ips)
+            if not span_left < dn[ips] < span_right:
+                print(f"DN of {m} ips is outside span, revert to red dot")
+                new_i[m] = i
+            else:
+                print("best_index")
+                # print(f"scaled: {scaled}")
+                new_i[m] = best_index(scaled, counts, minima_i, i, ips, m)
+
+    return new_i[0], new_i[1]
+
+
+def best_index(scaled, counts, minima_i, i1, i2, maximum=True):
+    # looks at all minima between i1 and i2, and
+    # and returns the one with the deepest scaled minima
+
+    # print(scaled)
+    # print(minima_i)
+    # print(i1)
+    # print(i2)
+    minima_idx_i1 = np.where(minima_i == i1)[0]
+    minima_idx_i2 = np.where(minima_i == i2)[0]
+    # print(minima_idx_i1)
+    # print(minima_idx_i2)
+    if minima_idx_i1.size == 0:
+        if i1 < i2:
+            s_min_i = 0
+            s_max_i = minima_idx_i2[0]
+        else:
+            s_min_i = minima_idx_i2[0]
+            s_max_i = len(minima_i)
+    elif minima_idx_i2.size == 0:
+        if i1 < i2:
+            s_min_i = minima_idx_i1[0]
+            s_max_i = len(minima_i)
+        else:
+            s_min_i = 0
+            s_max_i = minima_idx_i1[0]
+    else:
+        s_min_i = min(minima_idx_i1[0], minima_idx_i2[0])
+        s_max_i = max(minima_idx_i1[0], minima_idx_i2[0])
+    # print(s_min_i)
+    # print(s_max_i)
+    # print(scaled[s_min_i:s_max_i + 1])
+    # print(np.where(scaled[s_min_i:s_max_i + 1] == np.amax(scaled[s_min_i:s_max_i + 1])))
+    deepest_idxs = np.where(
+        scaled[s_min_i:s_max_i + 1] == np.amax(scaled[s_min_i:s_max_i + 1])
+    )[0] + s_min_i
+    # print(deepest_idxs)
+    if deepest_idxs.size == 1:
+        idx = minima_i[deepest_idxs]
+    else:
+        print("Multiple deepest minima")
+        low_i = minima_i[deepest_idxs[0]]
+        high_i = minima_i[deepest_idxs[-1]]
+
+        print(f"{low_i}, {high_i}")
+        pixels = np.sum(counts[low_i:high_i])
+        frac = pixels / np.sum(counts)
+        print(frac)
+        if frac > 0.1:
+            print("greater than frac, keep?")
+            # lots of pixels, pick outermost
+            if maximum:
+                idx = high_i
+            else:
+                idx = low_i
+        else:
+            print("less than frac, noise?")
+            # not may pixels, probably noise?
+            if maximum:
+                idx = low_i
+            else:
+                idx = high_i
+
+    # best_idx = np.argmax(scaled[s_min_i:s_max_i + 1])
+    # # print(best_idx)
+    # print(scaled[s_min_i])
+    # print(scaled[s_max_i])
+    # idx = minima_i[s_min_i + best_idx]
+    # # print(idx)
+    return idx
+
+
+def eval_bounds(
+    name, min_i, max_i, min_p, max_p, min_pin, max_pin, log_path=None
+):
+    # This is only here for temporary testing
+
+    goal_limits = goal_dn.get(name, None)
+    lines = list()
+    if goal_limits is not None:
+        lines.append(f"Goal DN: {goal_limits}")
+        lines.append("Min Index | Prominence | Prominence in limits")
+        lines.append(f"{min_i} {max_i} | {min_p} {max_p} | {min_pin} {max_pin}")
+        min_i_g = min_i == goal_limits[0]
+        max_i_g = max_i == goal_limits[1]
+        min_p_g = min_p == goal_limits[0]
+        max_p_g = max_p == goal_limits[1]
+        min_pin_g = min_pin == goal_limits[0]
+        max_pin_g = max_pin == goal_limits[1]
+        lines.append(f"{min_i_g} {max_i_g} | {min_p_g} {max_p_g} | {min_pin_g} {max_pin_g}")
+
+    else:
+        lines.append(f"{name} isn't in list of known bounds")
+
+    if log_path is None:
+        print("\n".join(lines))
+    else:
+        lines.insert(0, name)
+        with open(log_path, 'a+t') as f:
+            f.write("\n".join(lines))
+            f.write("\n\n")
 
 
 if __name__ == "__main__":
