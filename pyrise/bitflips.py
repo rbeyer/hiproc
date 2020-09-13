@@ -1318,17 +1318,88 @@ def find_smart_window(
         )
 
         max_prom_idx = np.argmax(maxprops["prominences"])
+        max_prom_left = maxprops["left_ips"][max_prom_idx]
+        max_prom_right = maxprops["right_ips"][max_prom_idx]
+        print(f"initial max_prom_left/right: {max_prom_left}, {max_prom_right}")
+
+        # If the image is very noisy (in some sense it is not clear that
+        # it is worth fixing if it is this bad, but we will try our best),
+        # the mode (which is what max_prom_idx really is giving above) might be
+        # garbage.  If it is outside the mindn / maxdn range, reject it,
+        # and pick the next best.
+        print(f"mode index: {maxima_i[max_prom_idx]}")
+        if not mindn_i <= maxima_i[max_prom_idx] <= maxdn_i:
+            # scaled_maxima = np.log10(
+            #     counts[maxima_i] + maxprops["prominences"]
+            # ) - np.log10(counts[maxima_i])
+            # sorted_prom_idxs = np.argsort(scaled_maxima)
+            sorted_prom_idxs = np.argsort(maxprops["prominences"])
+            print(f"sorted_prom_idxs: {sorted_prom_idxs}")
+            print(f"maxima_i[sorted_prom_idxs]: {maxima_i[sorted_prom_idxs]}")
+
+            max_prom_idx_i = -2  # -1 we already know isn't good.
+            max_prom_idx = sorted_prom_idxs[max_prom_idx_i]
+            while not maxprops["left_ips"][max_prom_idx] <= central_i[0][0] <= maxprops["right_ips"][max_prom_idx]:
+                print(
+                    f"while not {maxprops['left_ips'][max_prom_idx]} <= {central_i[0][0]} <= {maxprops['right_ips'][max_prom_idx]}"
+                )
+                max_prom_idx_i -= 1
+                max_prom_idx = sorted_prom_idxs[max_prom_idx_i]
+
+            # This is the original, so -1 idx is right:
+            if maxima_i[sorted_prom_idxs[-1]] > maxdn_i:
+                max_prom_right = maxprops["right_ips"][max_prom_idx]
+                if max_prom_left > max_prom_right:
+                    max_prom_left = maxprops["left_ips"][max_prom_idx]
+            else:
+                print("less than max")
+                max_prom_left = maxprops["left_ips"][max_prom_idx]
+                if max_prom_right < max_prom_left:
+                    max_prom_right = maxprops["right_ips"][max_prom_idx]
+
+        # Again, if the image is noisy, and central and mode are separate,
+        # but not outside the mindn/maxdn bounds, you could get major prominences
+        # between them, which shouldn't be allowed, so this adjusts that.
+        if not max_prom_left <= central_i[0][0] <= max_prom_right:
+            sorted_prom_idxs = np.argsort(maxprops["prominences"])
+            max_prom_idx_i = -2  # -1 we already know isn't good.
+            max_prom_idx = sorted_prom_idxs[max_prom_idx_i]
+            while not maxprops["left_ips"][max_prom_idx] <= central_i[0][0] <= maxprops["right_ips"][max_prom_idx]:
+                max_prom_idx_i -= 1
+                max_prom_idx = sorted_prom_idxs[max_prom_idx_i]
+
+            # Adjust the prominences:
+            if maxima_i[sorted_prom_idxs[-1]] > central_i[0][0]:
+                max_prom_left = maxprops["left_ips"][max_prom_idx]
+            else:
+                print("less than max")
+                max_prom_right = maxprops["right_ips"][max_prom_idx]
+
+            # Don't allow searching between the central DN and the mode.
+            if central_min_i > min(central_i[0][0], maxima_i[sorted_prom_idxs[-1]]):
+                    central_min_i = min(central_i[0][0], maxima_i[sorted_prom_idxs[-1]])
+
+            if central_max_i < max(central_i[0][0], maxima_i[sorted_prom_idxs[-1]]):
+                central_max_i = max(central_i[0][0], maxima_i[sorted_prom_idxs[-1]])
+
+        print(f"max_prom_left/right: {max_prom_left}, {max_prom_right}")
+        print(
+            f"DN edges of prominence envelope: {dn[int(max_prom_left)]}, "
+            f"{dn[int(max_prom_right)]}"
+        )
+
         min_i_ips = find_minima_index(
-            central_min_i, maxprops["left_ips"][max_prom_idx],
+            central_min_i, max_prom_left,
             minima_i, counts, close_to_limit=closest
         )
         max_i_ips = find_minima_index(
-            central_max_i, maxprops["right_ips"][max_prom_idx],
+            central_max_i, max_prom_right,
             minima_i, counts, close_to_limit=closest
         )
 
     print(f"min_prom, max_prom: {min_prom}, {max_prom}")
     print(f"min_in, max_in: {min_in}, {max_in}")
+    print(f"min_i_ips, max_i_ips: {min_i_ips}, {max_i_ips}")
     min_prom = 0 if min_prom is None else min_prom
     max_prom = len(dn) - 1 if max_prom is None else max_prom
     min_in = 0 if min_in is None else min_in
@@ -1341,7 +1412,7 @@ def find_smart_window(
     new_min_i, new_max_i = pick_index(
         min_i, min_i_ips, max_i, max_i_ips,
         maxima_i[max_prom_idx],
-        maxprops['left_ips'][max_prom_idx], maxprops['right_ips'][max_prom_idx],
+        # maxprops['left_ips'][max_prom_idx], maxprops['right_ips'][max_prom_idx],
         minprops["prominences"],
         counts, minima_i, dn, centraldn, mindn, maxdn
     )
@@ -1464,13 +1535,13 @@ def find_smart_window(
         if plot:
             plt.show()
 
-    return dn[min_i], dn[max_i]
-    # return dn[new_min_i], dn[new_max_i]
+    # return dn[min_i], dn[max_i]
+    return dn[new_min_i], dn[new_max_i]
 
 
 def pick_index(
     min_i, min_i_ips, max_i, max_i_ips,
-    max_prom_i, max_prom_left, max_prom_right,
+    max_prom_i, # max_prom_left, max_prom_right,
     prominences,
     counts, minima_i, dn, centraldn, mindn, maxdn
 ):
@@ -1480,15 +1551,17 @@ def pick_index(
 
     span_factor = 2
     count_thresh = counts[max_prom_i] / 100
+    print(f"min/max i: {min_i}, {max_i}")
+    print(f"min/max ips: {min_i_ips}, {max_i_ips}")
     print(f"count_thresh: {count_thresh}")
     print(f"count min/max i: {counts[min_i]} {counts[max_i]}")
     print(f"count min/max ips: {counts[min_i_ips]} {counts[max_i_ips]}")
 
-    print(f"{max_prom_left}, {max_prom_right}")
-    print(
-        f"DN edges of prominence envelope: {dn[int(max_prom_left)]}, "
-        f"{dn[int(max_prom_right)]}"
-    )
+    # print(f"{max_prom_left}, {max_prom_right}")
+    # print(
+    #     f"DN edges of prominence envelope: {dn[int(max_prom_left)]}, "
+    #     f"{dn[int(max_prom_right)]}"
+    # )
 
     new_i = [None, None]
     span_left = (centraldn - ((centraldn - mindn) * span_factor))
@@ -1520,12 +1593,14 @@ def pick_index(
                 # print(f"scaled: {scaled}")
                 new_i[m] = best_index(scaled, counts, minima_i, i, ips, m)
 
+    # print(f"--in pick_index new are: {new_i}")
     return new_i[0], new_i[1]
 
 
 def best_index(scaled, counts, minima_i, i1, i2, maximum=True):
     # looks at all minima between i1 and i2, and
     # and returns the one with the deepest scaled minima
+    # print(f"--in best_index")
 
     # print(scaled)
     # print(minima_i)
@@ -1561,7 +1636,8 @@ def best_index(scaled, counts, minima_i, i1, i2, maximum=True):
     )[0] + s_min_i
     # print(deepest_idxs)
     if deepest_idxs.size == 1:
-        idx = minima_i[deepest_idxs]
+        print("Only one deepest idx")
+        idx = minima_i[deepest_idxs[0]]
     else:
         print("Multiple deepest minima")
         low_i = minima_i[deepest_idxs[0]]
@@ -1587,11 +1663,12 @@ def best_index(scaled, counts, minima_i, i1, i2, maximum=True):
                 idx = high_i
 
     # best_idx = np.argmax(scaled[s_min_i:s_max_i + 1])
-    # # print(best_idx)
+    # print(best_idx)
     # print(scaled[s_min_i])
     # print(scaled[s_max_i])
     # idx = minima_i[s_min_i + best_idx]
-    # # print(idx)
+    # print(f"--in best_index, idx is: {idx}")
+
     return idx
 
 
