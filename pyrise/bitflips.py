@@ -1320,6 +1320,16 @@ def find_smart_window(
         max_prom_idx = np.argmax(maxprops["prominences"])
         max_prom_left = maxprops["left_ips"][max_prom_idx]
         max_prom_right = maxprops["right_ips"][max_prom_idx]
+        # This reaches out to the "next" minima beyond the ips boundaries
+        # # print(minima_i)
+        # if max_prom_left not in minima_i and np.size(np.where(minima_i < max_prom_left)):
+        #     # find the minima to the immediate left of max_prom_left
+        #     max_prom_left = minima_i[np.where(minima_i < max_prom_left)[0][-1]]
+        #     # print(f"!!! max_prom_left diff {np.where(minima_i < max_prom_left)[0][-1]}")
+        # if max_prom_right not in minima_i and np.size(np.where(minima_i > max_prom_right)):
+        #     # find the minima to the immediate left of max_prom_left
+        #     max_prom_right = minima_i[np.where(minima_i > max_prom_right)[0][0]]
+        #     # print(f"!!! max_prom_right diff {minima_i[np.where(minima_i > max_prom_right)[0][0]]}")
         print(f"initial max_prom_left/right: {max_prom_left}, {max_prom_right}")
 
         # If the image is very noisy (in some sense it is not clear that
