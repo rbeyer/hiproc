@@ -1558,9 +1558,11 @@ def pick_index(
     scaled = np.log10(
         counts[minima_i] + prominences
     ) - np.log10(counts[minima_i])
+    # print(f"scaled: {scaled}")
 
     span_factor = 2
-    count_thresh = counts[max_prom_i] / 100
+    count_thresh = counts[max_prom_i] / 200
+    scaled_depth_thresh = 0.3
     print(f"min/max i: {min_i}, {max_i}")
     print(f"min/max ips: {min_i_ips}, {max_i_ips}")
     print(f"count_thresh: {count_thresh}")
@@ -1585,6 +1587,64 @@ def pick_index(
         if i == ips:
             print("i == ips")
             new_i[m] = i
+        # else:
+        #     # left = min(i, ips)
+        #     right = max(i, ips)
+        #     # print(f"minima_i: {minima_i}")
+        #     # print(f"{left} LR {right}")
+        #     if m == 0:
+        #         potential_idxs = minima_i[(minima_i <= right)]
+        #     else:
+        #         # print(minima_i >= left)
+        #         potential_idxs = minima_i[(minima_i >= left)]
+        #     print(f"potential_idxs: {potential_idxs}")
+
+        #     below_thresh = potential_idxs[counts[potential_idxs] < count_thresh]
+        #     # print(f"below_thresh: {below_thresh}")
+        #     if np.size(below_thresh) == 0:
+        #         below_thresh = potential_idxs
+        #         # print(f"fixed below_thresh: {below_thresh}")
+
+        #     if m == 0:
+        #         in_span = below_thresh[dn[below_thresh] >= span_left]
+        #     else:
+        #         in_span = below_thresh[dn[below_thresh] <= span_right]
+        #     # print(f"in_span: {in_span}")
+        #     if np.size(in_span) == 0:
+        #         in_span = below_thresh
+        #         # print(f"fixed in_span: {in_span}")
+
+        #     print("sorting deep enough:")
+        #     scaled_idxs = list()
+        #     for span_i in in_span:
+        #         scaled_idxs.append(np.where(minima_i == span_i)[0].item())
+        #     print(scaled[scaled_idxs])
+        #     deep_enough = np.argwhere(scaled[scaled_idxs] >= scaled_depth_thresh)
+        #     if np.size(deep_enough) > 0:
+        #         print(f"deep_enough: {deep_enough}")
+        #         print(f"deep index: {in_span[deep_enough]}")
+        #         good_idxs = in_span[deep_enough]
+        #     else:
+        #         scaled_idxs = list()
+        #         for below_i in below_thresh:
+        #             scaled_idxs.append(np.where(minima_i == below_i)[0].item())
+        #         deep_enough = np.argwhere(scaled[scaled_idxs] >= scaled_depth_thresh)
+        #         if np.size(deep_enough) > 0:
+        #             print(f"fixed deep_enough: {deep_enough}")
+        #             print(f"fixed deep_enough index: {below_thresh[deep_enough]}")
+        #             good_idxs = below_thresh[deep_enough]
+        #         else:
+        #             print(f"depth thresh yielded no minima")
+        #             good_idxs = in_span
+
+
+        #     print(good_idxs)
+        #     # print(good_idxs.min())
+        #     # print(good_idxs.max())
+
+        #     new_i[m] = best_index(scaled, counts, minima_i, good_idxs.min(), good_idxs.max(), m)
+        #     # new_i[m] = best_index(scaled, counts, minima_i, in_span[0], in_span[-1], m)
+
         elif counts[i] > count_thresh:
             print("count i above thresh")
             new_i[m] = ips
