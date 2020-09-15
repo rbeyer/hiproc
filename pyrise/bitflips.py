@@ -1561,7 +1561,7 @@ def pick_index(
     # print(f"scaled: {scaled}")
 
     span_factor = 2
-    count_thresh = counts[max_prom_i] / 200
+    count_thresh = counts[max_prom_i] / 100
     scaled_depth_thresh = 0.3
     print(f"min/max i: {min_i}, {max_i}")
     print(f"min/max ips: {min_i_ips}, {max_i_ips}")
@@ -1587,32 +1587,32 @@ def pick_index(
         if i == ips:
             print("i == ips")
             new_i[m] = i
-        # else:
-        #     # left = min(i, ips)
-        #     right = max(i, ips)
-        #     # print(f"minima_i: {minima_i}")
-        #     # print(f"{left} LR {right}")
-        #     if m == 0:
-        #         potential_idxs = minima_i[(minima_i <= right)]
-        #     else:
-        #         # print(minima_i >= left)
-        #         potential_idxs = minima_i[(minima_i >= left)]
-        #     print(f"potential_idxs: {potential_idxs}")
+        else:
+            left = min(i, ips)
+            right = max(i, ips)
+            # print(f"minima_i: {minima_i}")
+            # print(f"{left} LR {right}")
+            if m == 0:
+                potential_idxs = minima_i[(minima_i <= right)]
+            else:
+                # print(minima_i >= left)
+                potential_idxs = minima_i[(minima_i >= left)]
+            print(f"potential_idxs: {potential_idxs}")
 
-        #     below_thresh = potential_idxs[counts[potential_idxs] < count_thresh]
-        #     # print(f"below_thresh: {below_thresh}")
-        #     if np.size(below_thresh) == 0:
-        #         below_thresh = potential_idxs
-        #         # print(f"fixed below_thresh: {below_thresh}")
+            below_thresh = potential_idxs[counts[potential_idxs] < count_thresh]
+            # print(f"below_thresh: {below_thresh}")
+            if np.size(below_thresh) == 0:
+                below_thresh = potential_idxs
+                # print(f"fixed below_thresh: {below_thresh}")
 
-        #     if m == 0:
-        #         in_span = below_thresh[dn[below_thresh] >= span_left]
-        #     else:
-        #         in_span = below_thresh[dn[below_thresh] <= span_right]
-        #     # print(f"in_span: {in_span}")
-        #     if np.size(in_span) == 0:
-        #         in_span = below_thresh
-        #         # print(f"fixed in_span: {in_span}")
+            if m == 0:
+                in_span = below_thresh[dn[below_thresh] >= span_left]
+            else:
+                in_span = below_thresh[dn[below_thresh] <= span_right]
+            # print(f"in_span: {in_span}")
+            if np.size(in_span) == 0:
+                in_span = below_thresh
+                # print(f"fixed in_span: {in_span}")
 
         #     print("sorting deep enough:")
         #     scaled_idxs = list()
@@ -1643,25 +1643,25 @@ def pick_index(
         #     # print(good_idxs.max())
 
         #     new_i[m] = best_index(scaled, counts, minima_i, good_idxs.min(), good_idxs.max(), m)
-        #     # new_i[m] = best_index(scaled, counts, minima_i, in_span[0], in_span[-1], m)
+            new_i[m] = best_index(scaled, counts, minima_i, in_span[0], in_span[-1], m)
 
-        elif counts[i] > count_thresh:
-            print("count i above thresh")
-            new_i[m] = ips
-        elif counts[ips] > count_thresh:
-            print("count ips above thresh")
-            new_i[m] = i
-        else:
-            # if max_prom_left < i < max_prom_right:
-            #     print(f"{m} _i inside prominence envelope")
-            #     new_i[m] = best_index(scaled, minima_i, i, ips)
-            if not span_left < dn[ips] < span_right:
-                print(f"DN of {m} ips is outside span, revert to red dot")
-                new_i[m] = i
-            else:
-                print("best_index")
-                # print(f"scaled: {scaled}")
-                new_i[m] = best_index(scaled, counts, minima_i, i, ips, m)
+        # elif counts[i] > count_thresh:
+        #     print("count i above thresh")
+        #     new_i[m] = ips
+        # elif counts[ips] > count_thresh:
+        #     print("count ips above thresh")
+        #     new_i[m] = i
+        # else:
+        #     # if max_prom_left < i < max_prom_right:
+        #     #     print(f"{m} _i inside prominence envelope")
+        #     #     new_i[m] = best_index(scaled, minima_i, i, ips)
+        #     if not span_left < dn[ips] < span_right:
+        #         print(f"DN of {m} ips is outside span, revert to red dot")
+        #         new_i[m] = i
+        #     else:
+        #         print("best_index")
+        #         # print(f"scaled: {scaled}")
+        #         new_i[m] = best_index(scaled, counts, minima_i, i, ips, m)
 
     # print(f"--in pick_index new are: {new_i}")
     return new_i[0], new_i[1]
