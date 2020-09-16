@@ -1644,6 +1644,7 @@ def pick_index(
 
         #     new_i[m] = best_index(scaled, counts, minima_i, good_idxs.min(), good_idxs.max(), m)
             new_i[m] = best_index(scaled, counts, minima_i, in_span[0], in_span[-1], m)
+            # new_i[m] = best_index_frac(counts, in_span, m)
 
         # elif counts[i] > count_thresh:
         #     print("count i above thresh")
@@ -1665,6 +1666,56 @@ def pick_index(
 
     # print(f"--in pick_index new are: {new_i}")
     return new_i[0], new_i[1]
+
+
+def best_index_frac(counts, idxs, maximum=True):
+    # Examines all of the minima in idxs, and selects the minima
+    # that excludes noisy pixels based on the area under the curve
+    # between idxs.
+
+    if np.size(idxs) == 1:
+        return idxs[0]
+
+    frac = 0.0001
+    pixel_count = 0
+    total = np.sum(counts)
+    print(f"total: {total}")
+    idxs.sort()
+    if not maximum:
+        idxs = np.flip(idxs)
+    last_idx = idxs[0]
+    mi = min(idxs[0], idxs[1])
+    ma = max(idxs[0], idxs[1])
+    last_count = np.sum(counts[mi:ma])
+    best_idx = idxs[0]
+    for i in idxs[1:]:
+        print(f"indexes: {last_idx, i}")
+        # print(f"counts: {counts[last_idx:i]}")
+        mi = min(last_idx, i)
+        ma = max(last_idx, i)
+        c = np.sum(counts[mi:ma])
+        print(f"counts: {c}")
+        print(f"last_count: {last_count}")
+        # print(f"count between idxs: {c}")
+        # print(f"fraction: {c / total}")
+        pixel_count += c
+        # print(f"cumulative count: {pixel_count}")
+        # print(f"cumulative fraction: {pixel_count / total}")
+        count_ratio = c / last_count
+        print(f"last_count / total: {last_count / total}")
+        print(f"count_ratio: {count_ratio}")
+        if last_count / total > frac and count_ratio < 0.1:
+            # if (pixel_count / total) > frac:
+            # if pixel_count > 5000:
+            best_idx = last_idx
+            pixel_count = 0
+            # break
+        print(f"best_idx: {best_idx}")
+        last_idx = i
+        last_count = c
+
+    print(f"picked {best_idx}")
+    return best_idx
 
 
 def best_index(scaled, counts, minima_i, i1, i2, maximum=True):
