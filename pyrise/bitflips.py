@@ -1599,6 +1599,14 @@ def pick_index(
         #         # print(f"scaled: {scaled}")
         #         new_i[m] = best_index(scaled, counts, minima_i, i, ips, m)
 
+        # If there's only a single pixel at a particular DN level, probably
+        # best to exclude it.
+        if counts[new_i[m]] == 1:
+            if m:
+                new_i[m] -= 1
+            else:
+                new_i[m] += 1
+
     # print(f"--in pick_index new are: {new_i}")
     return new_i[0], new_i[1]
 
