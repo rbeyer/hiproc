@@ -83,6 +83,7 @@ to mitigate the bit-flip pixels once they have been identified.
 
 import argparse
 import logging
+import json
 import math
 import os
 import shutil
@@ -1490,7 +1491,7 @@ def pick_index(
     # print(f"scaled: {scaled}")
 
     span_factor = 2
-    count_thresh = counts[max_prom_i] / 100
+    count_thresh = min(5000, counts[max_prom_i] / 100)
     scaled_depth_thresh = 0.3
     print(f"min/max i: {min_i}, {max_i}")
     print(f"min/max ips: {min_i_ips}, {max_i_ips}")
@@ -1529,19 +1530,24 @@ def pick_index(
             print(f"potential_idxs: {potential_idxs}")
 
             below_thresh = potential_idxs[counts[potential_idxs] < count_thresh]
-            # print(f"below_thresh: {below_thresh}")
+            print(f"below_thresh: {below_thresh}")
             if np.size(below_thresh) == 0:
                 below_thresh = potential_idxs
-                # print(f"fixed below_thresh: {below_thresh}")
+                print(f"fixed below_thresh: {below_thresh}")
+                if np.size(below_thresh) == 0:
+                    # Whoa, no potentials, either, so just fall back to the pair
+                    below_thresh = np.array([i, ips])
+            print(f"below_thresh: {below_thresh}")
 
             if m == 0:
                 in_span = below_thresh[dn[below_thresh] >= span_left]
             else:
                 in_span = below_thresh[dn[below_thresh] <= span_right]
-            # print(f"in_span: {in_span}")
+            print(f"in_span: {in_span}")
             if np.size(in_span) == 0:
                 in_span = below_thresh
-                # print(f"fixed in_span: {in_span}")
+                print(f"fixed in_span: {in_span}")
+
 
         #     print("sorting deep enough:")
         #     scaled_idxs = list()
@@ -1651,6 +1657,9 @@ def best_index(scaled, counts, minima_i, i1, i2, maximum=True):
     # looks at all minima between i1 and i2, and
     # and returns the one with the deepest scaled minima
     # print(f"--in best_index")
+
+    if i1 == i2:
+        return i1
 
     # print(scaled)
     # print(minima_i)
