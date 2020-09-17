@@ -1491,7 +1491,7 @@ def pick_index(
     # print(f"scaled: {scaled}")
 
     span_factor = 2
-    count_thresh = min(5000, counts[max_prom_i] / 100)
+    count_thresh = min(5000, counts[max_prom_i] / 80)
     scaled_depth_thresh = 0.3
     print(f"min/max i: {min_i}, {max_i}")
     print(f"min/max ips: {min_i_ips}, {max_i_ips}")
@@ -1514,7 +1514,7 @@ def pick_index(
         (1, max_i, max_i_ips, maxdn, "max")
     ):
         print(f"Picking the index for {message}")
-        if i == ips:
+        if i == ips and counts[i] < count_thresh:
             print("i == ips")
             new_i[m] = i
         else:
