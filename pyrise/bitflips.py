@@ -1599,13 +1599,21 @@ def pick_index(
         #         # print(f"scaled: {scaled}")
         #         new_i[m] = best_index(scaled, counts, minima_i, i, ips, m)
 
+        if m:
+            increment = -1
+        else:
+            increment = 1
+
+        # If we are in a flat-bottomed minima, select the central-most
+        # index, not the middle index, as find_peaks does.
+        count_level = counts[new_i[m]]
+        while count_level == counts[new_i[m] + increment]:
+            new_i[m] += increment
+
         # If there's only a single pixel at a particular DN level, probably
         # best to exclude it.
         if counts[new_i[m]] == 1:
-            if m:
-                new_i[m] -= 1
-            else:
-                new_i[m] += 1
+                new_i[m] += increment
 
     # print(f"--in pick_index new are: {new_i}")
     return new_i[0], new_i[1]
