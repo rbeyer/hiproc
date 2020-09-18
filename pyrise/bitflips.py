@@ -1578,6 +1578,7 @@ def pick_index(
         #     # print(good_idxs.max())
 
         #     new_i[m] = best_index(scaled, counts, minima_i, good_idxs.min(), good_idxs.max(), m)
+            # new_i[m] = best_index_depth(counts, minima_i, in_span, scaled, m)
             new_i[m] = best_index(scaled, counts, minima_i, in_span[0], in_span[-1], m)
             # new_i[m] = best_index_frac(counts, in_span, m)
 
@@ -1667,6 +1668,59 @@ def best_index_frac(counts, idxs, maximum=True):
 
     print(f"picked {best_idx}")
     return best_idx
+
+
+# def best_index_depth(counts, minima_i, idxs, scaled, maximum=True):
+#     # get deepest indexes, based on deepest, and those within
+#     # some fraction
+#
+#     unique = np.unique(idxs)
+#     if np.size(unique) == 1:
+#         return idxs[0]
+#
+#     scaled_idxs = list()
+#     for i in idxs:
+#         scaled_idxs.append(np.where(minima_i == i)[0].item())
+#
+#     deepest_value = np.amax(scaled[scaled_idxs])
+#     print(f"deepest_value: {deepest_value}")
+#     print(f"depths: {scaled[scaled_idxs]}")
+#     depth_thresh = deepest_value * 0.3
+#     print(f"depth thresh: {depth_thresh}")
+#     deepest_idxs = np.where(scaled[scaled_idxs] > depth_thresh)
+#     print(f"deepest_idxs: {idxs[deepest_idxs]}")
+#
+#     frac = 0.0001
+#     pixel_count = 0
+#     total = np.sum(counts)
+#     deep_i = idxs[deepest_idxs]
+#     deep_i.sort()
+#     if not maximum:
+#         deep_i = np.flip(deep_i)
+#
+#     last_idx = deep_i[0]
+#     best_idx = deep_i[0]
+#     print(deep_i)
+#     for i in deep_i[1:]:
+#         print(f"i: {i}")
+#         mi = min(last_idx, i)
+#         ma = max(last_idx, i)
+#         print(f"indices: {mi}, {ma}")
+#         c = np.sum(counts[mi:ma])
+#         print(f"counts: {c}")
+#         pixel_count += c
+#         print(f"cumulative counts: {pixel_count}")
+#         print(f"cumulative fraction: {pixel_count / total}")
+#         if pixel_count / total > frac:
+#             best_idx = last_idx
+#             pixel_count = 0
+#             # break
+#         print(f"best_idx: {best_idx}")
+#         last_idx = i
+#
+#     # print(f"would pick: {best_idx}")
+#
+#     return best_idx
 
 
 def best_index(scaled, counts, minima_i, i1, i2, maximum=True):
