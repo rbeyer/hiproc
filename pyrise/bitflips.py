@@ -1445,7 +1445,7 @@ def find_smart_window(
             ax1.axvline(
                 x=goal_dn[plottitle][0],
                 c="blue",
-                label=f"Ideal DN: {goal_dn[plottitle]}"
+                label=f"Ideal DN: {goal_dn[plottitle][0]}, {goal_dn[plottitle][1]}"
             )
             ax1.axvline(
                 x=goal_dn[plottitle][1],
