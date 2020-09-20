@@ -509,8 +509,8 @@ def clean_tables_from_cube(
 
     if any((rev_area, mask_area, ramp_area)):
         t_name = "HiRISE Calibration Image"
-        HCI_dict = isis.cube.get_table(in_path, t_name)
-        cal_vals = np.array(HCI_dict["Calibration"])
+        hci_dict = isis.cube.get_table(in_path, t_name)
+        cal_vals = np.array(hci_dict["Calibration"])
 
         cal_image = np.ma.masked_outside(
             cal_vals, specialpix.Min, specialpix.Max
@@ -535,10 +535,10 @@ def clean_tables_from_cube(
             # write the table back out
             if replacement is not None:
                 specialpix.Null = replacement
-            HCI_dict["Calibration"] = apply_special_pixels(
+            hci_dict["Calibration"] = apply_special_pixels(
                 clean_cal, specialpix
             ).data.tolist()
-            isis.cube.overwrite_table(out_path, t_name, HCI_dict)
+            isis.cube.overwrite_table(out_path, t_name, hci_dict)
 
     # if any((buffer_area, dark_area)):
     #     t_name = 'HiRISE Ancillary'
