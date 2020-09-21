@@ -4,6 +4,8 @@ History
 
 0.4.0 (2020-??-??)
 ------------------
+* Tremendous amount of re-working in bitflips to improve
+  performance.
 * Format cleanup
 
 0.3.0 (2020-05-16)

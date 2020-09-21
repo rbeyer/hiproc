@@ -83,13 +83,12 @@ to mitigate the bit-flip pixels once they have been identified.
 
 import argparse
 import logging
-import json
-import math
 import os
 import shutil
 import subprocess
 import sys
 import traceback
+from collections import abc
 from pathlib import Path
 
 import numpy as np
@@ -103,18 +102,6 @@ import kalasiris as isis
 
 import pyrise.img as img
 import pyrise.util as util
-
-
-# This is only here for temporary testing
-goal_dn = dict()
-with open(Path("/Users/rbeyer/projects/HiRISE/bitflip/dn_ideal.json"), 'r') as f:
-    dn_ideal = json.load(f)
-
-for k, v in dn_ideal.items():
-    p = Path(v['path']).name
-    for key, title in (("img", "Image Area"), ("rev", "Reverse-Clock")):
-        if key in v:
-            goal_dn[f"{p} {title}"] = v[key]
 
 
 def main():
@@ -133,8 +120,8 @@ def main():
             required=False,
             default=5,
             type=int,
-            help="The number of medstd widths for bit-flip " "cleaning. "
-                 "(default: %(default)s)",
+            help="The number of medstd widths for bit-flip "
+            "cleaning. (default: %(default)s)",
         )
         parser.add_argument(
             "--line",
@@ -167,8 +154,8 @@ def main():
             default=False,
             const=True,
             help="Saves plot for each area to a file.  If a directory is "
-                 "provided it will be used to save the plots to, otherwise "
-                 "the directory of the input file will be used."
+            "provided it will be used to save the plots to, otherwise "
+            "the directory of the input file will be used.",
         )
         parser.add_argument(
             "-n",
@@ -256,13 +243,29 @@ def clean(
     label = pvl.load(str(in_p))
     if "IsisCube" in label:
         clean_cube(
-            in_p, out_p, label, width, replacement, axis, plot, saveplot,
-            dryrun, keep
+            in_p,
+            out_p,
+            label,
+            width,
+            replacement,
+            axis,
+            plot,
+            saveplot,
+            dryrun,
+            keep,
         )
     elif "PDS_VERSION_ID" in label:
         clean_img(
-            in_p, out_p, label, width, replacement, axis, plot, saveplot,
-            dryrun, keep
+            in_p,
+            out_p,
+            label,
+            width,
+            replacement,
+            axis,
+            plot,
+            saveplot,
+            dryrun,
+            keep,
         )
     else:
         raise ValueError(
@@ -293,7 +296,12 @@ def clean_cube(
     # Bit-flip correct the non-image areas.
     tblcln_p = to_del.add(in_p.with_suffix(".tableclean.cub"))
     clean_tables_from_cube(
-        in_p, tblcln_p, width=width, plot=plot, saveplot=saveplot, dryrun=dryrun
+        in_p,
+        tblcln_p,
+        width=width,
+        plot=plot,
+        saveplot=saveplot,
+        dryrun=dryrun,
     )
 
     # Now clean the image area.
@@ -319,9 +327,9 @@ def clean_cube(
         axis=axis,
         plot=plot,
         plottitle=(f"{in_p.name} Image Area" if plot or saveplot else None),
-        saveplot=(
-            saveplot / in_p.with_suffix(".bf-image.pdf").name
-        ) if saveplot else False,
+        saveplot=(saveplot / in_p.with_suffix(".bf-image.pdf").name)
+        if saveplot
+        else False,
     )
 
     if not dryrun:
@@ -381,8 +389,14 @@ def clean_img(
     # image array, and will need to be handled below.
     tblcln_p = in_path.with_suffix(".tableclean.img")
     clean_tables_from_img(
-        in_path, tblcln_p, label, width, replacement,
-        plot=plot, saveplot=saveplot, dryrun=dryrun
+        in_path,
+        tblcln_p,
+        label,
+        width,
+        replacement,
+        plot=plot,
+        saveplot=saveplot,
+        dryrun=dryrun,
     )
 
     # Now clean the image area.
@@ -424,9 +438,9 @@ def clean_img(
         axis=axis,
         plot=plot,
         plottitle=(f"{in_path.name} Image Area" if plot or saveplot else None),
-        saveplot=(
-            saveplot / in_p.with_suffix(".bf-image.pdf").name
-        ) if saveplot else False
+        saveplot=(saveplot / in_path.with_suffix(".bf-image.pdf").name)
+        if saveplot
+        else False,
     )
 
     if not dryrun:
@@ -526,9 +540,9 @@ def clean_tables_from_cube(
             plot,
             str(in_path.name),
             (
-                (
-                saveplot / in_path.with_suffix(".bf-revclk.pdf").name
-                ) if saveplot else False
+                (saveplot / in_path.with_suffix(".bf-revclk.pdf").name)
+                if saveplot
+                else False
             ),
         )
         if not dryrun:
@@ -660,9 +674,9 @@ def clean_tables_from_img(
             plot,
             str(in_path.name),
             (
-                (
-                    saveplot / in_p.with_suffix(".bf-revclk.pdf").name
-                ) if saveplot else False
+                (saveplot / in_path.with_suffix(".bf-revclk.pdf").name)
+                if saveplot
+                else False
             ),
         )
         if not dryrun:
@@ -708,8 +722,10 @@ def clean_cal_tables(
             axis=1,
             medstd_limit=200,
             plot=plot,
-            plottitle=(f"{imagestr} Reverse-Clock" if plot or saveplot else None),
-            saveplot=saveplot
+            plottitle=(
+                f"{imagestr} Reverse-Clock" if plot or saveplot else None
+            ),
+            saveplot=saveplot,
         )
         cal_image[:20, :] = rev_clean
 
@@ -815,7 +831,7 @@ def find_smart_window_from_ma(
     medstd_fallback=64,
     plot=False,
     plottitle=None,
-    saveplot=False
+    saveplot=False,
 ):
     """Returns a two-tuple with the result of find_smart_window().
 
@@ -830,7 +846,7 @@ def find_smart_window_from_ma(
     # doesn't seem to be a problem with letting the median be whatever
     # it actually is.
     # median = median_limit(np.ma.median(data), data)
-    median = np.ma.median(data)
+    median = np.ma.median(data).item()
     logging.info(f"Median: {median}")
     medstd = median_std_from_ma(data, axis=axis)
 
@@ -849,7 +865,7 @@ def find_smart_window_from_ma(
         central_exclude_dn=ex,
         plot=plot,
         plottitle=plottitle,
-        saveplot=saveplot
+        saveplot=saveplot,
     )
 
 
@@ -1052,6 +1068,7 @@ def find_minima_index(
     minima_idxs: np.ndarray,
     pixel_counts: np.ndarray,
     close_to_limit=True,
+    default=None,
 ) -> int:
     """Searches the pixel_counts at the minima_idxs positions between
     central_idx and limit_idx to find the one with the lowest
@@ -1075,7 +1092,9 @@ def find_minima_index(
 
         min_i = min(central_idx, limit_idx)
         max_i = max(central_idx, limit_idx)
-        inrange_i = minima_idxs[(minima_idxs >= min_i) * (minima_idxs <= max_i)]
+        inrange_i = minima_idxs[
+            (minima_idxs >= min_i) * (minima_idxs <= max_i)
+        ]
         logging.info(str(inrange_i) + " are the indexes inside the range.")
 
         try:
@@ -1094,23 +1113,31 @@ def find_minima_index(
             elif limit_idx > central_idx:
                 logging.info(info_str.format("max", "outside"))
                 idx = min(minima_idxs[minima_idxs > limit_idx])
+            else:
+                # So limit_idx == central_idx, not good.
+                raise ValueError
 
         logging.info(f"{idx} is the minimum index.")
     except ValueError:
         logging.info(
-            "Could not find a valid minima."
+            f"Could not find a valid minima, defaulting to {default}."
             # "Could not find a valid minima, returning "
             # f"the limit index: {limit_idx}."
         )
         # idx = limit_idx
-        idx = None
+        idx = default
 
     return idx
 
 
 def find_prominence_index(
-    minima_idxs, prominences, min_idx, max_idx, counts,
-    min_idx_limit=None, max_idx_limit=None
+    minima_idxs,
+    prominences,
+    min_idx,
+    max_idx,
+    counts,
+    min_idx_limit=None,
+    max_idx_limit=None,
 ):
     # scaled = list()
     # for c, p in zip(counts, prominences):
@@ -1124,11 +1151,10 @@ def find_prominence_index(
     scaled = np.log10(counts + prominences) - np.log10(counts)
 
     p = list()
-    for condition in(
+    for condition in (
         ((minima_idxs > min_idx) | (minima_idxs < min_idx_limit)),
         ((minima_idxs < max_idx) | (minima_idxs > max_idx_limit))
         # (minima_idxs < max_idx, len(prominences) - 1)
-
     ):
         # masked = np.ma.masked_where(condition, prominences)
         masked = np.ma.masked_where(condition, scaled)
@@ -1141,6 +1167,115 @@ def find_prominence_index(
     return p[0], p[1]
 
 
+def get_largest_prominence_with(idx: int, prominences, left_ips, right_ips):
+    """Returns the index of the largest prominence which encloses the
+    idx.
+
+    :param idx:
+    :param prominences: from the result of find_peaks(), expected to be sorted.
+    :param left_ips: from the result of find_peaks()
+    :param right_ips: from the result of find_peaks()
+    :return: index of the selected prominence.
+    """
+    # sorted_prom_idxs = np.argsort(prominences)
+    # print(f"sorted_prom_idxs: {sorted_prom_idxs}")
+    # print(f"maxima_i[sorted_prom_idxs]: {maxima_i[sorted_prom_idxs]}")
+
+    max_prom_idx_i = -1  # Start at the biggest prominence
+    max_prom_idx = prominences[max_prom_idx_i]
+    while not left_ips[max_prom_idx] <= idx <= right_ips[max_prom_idx]:
+        max_prom_idx_i -= 1
+        max_prom_idx = prominences[max_prom_idx_i]
+
+    return max_prom_idx
+
+
+def find_prominence_boundaries(
+    maxima_i,
+    maxprops,
+    mindn_i,
+    maxdn_i,
+    central_i,
+    central_min_i,
+    central_max_i,
+):
+    # The second guess is based on the width of the largest prominence
+    # in the data, and we need to do some pre-conditioning.
+
+    max_prom_idx = np.argmax(maxprops["prominences"])
+    max_prom_left = maxprops["left_ips"][max_prom_idx]
+    max_prom_right = maxprops["right_ips"][max_prom_idx]
+    # print(
+    #   f"initial max_prom_left/right: {max_prom_left}, {max_prom_right}"
+    # )
+
+    # If the image is very noisy (in some sense it is not clear that
+    # it is worth fixing if it is this bad, but we will try our best),
+    # the mode (which is what max_prom_idx really is giving above) might be
+    # garbage.  If it is outside the mindn / maxdn range, reject it,
+    # and pick the next best.
+    # print(f"mode index: {maxima_i[max_prom_idx]}")
+    if not mindn_i <= maxima_i[max_prom_idx] <= maxdn_i:
+        sorted_prom_idxs = np.argsort(maxprops["prominences"])
+        max_prom_idx = get_largest_prominence_with(
+            central_i,
+            sorted_prom_idxs[:-1],
+            maxprops["left_ips"],
+            maxprops["right_ips"],
+        )
+        # This is the original, so -1 idx is the right index to use:
+        if maxima_i[sorted_prom_idxs[-1]] > maxdn_i:
+            max_prom_right = maxprops["right_ips"][max_prom_idx]
+            if max_prom_left > max_prom_right:
+                max_prom_left = maxprops["left_ips"][max_prom_idx]
+        else:
+            # print("less than max")
+            max_prom_left = maxprops["left_ips"][max_prom_idx]
+            if max_prom_right < max_prom_left:
+                max_prom_right = maxprops["right_ips"][max_prom_idx]
+
+    # Again, if the image is noisy, and central and mode are separate,
+    # but not outside the mindn/maxdn bounds, you could get major
+    # prominences between them, which shouldn't be allowed,
+    # so this adjusts that.
+    if not max_prom_left <= central_i <= max_prom_right:
+        sorted_prom_idxs = np.argsort(maxprops["prominences"])
+        max_prom_idx = get_largest_prominence_with(
+            central_i,
+            sorted_prom_idxs[:-1],
+            maxprops["left_ips"],
+            maxprops["right_ips"],
+        )
+
+        # Adjust the prominences:
+        if maxima_i[sorted_prom_idxs[-1]] > central_i:
+            max_prom_left = maxprops["left_ips"][max_prom_idx]
+        else:
+            # print("less than max")
+            max_prom_right = maxprops["right_ips"][max_prom_idx]
+
+        # Don't allow searching between the central DN and the mode.
+        if central_min_i > min(central_i, maxima_i[sorted_prom_idxs[-1]]):
+            central_min_i = min(central_i, maxima_i[sorted_prom_idxs[-1]])
+
+        if central_max_i < max(central_i, maxima_i[sorted_prom_idxs[-1]]):
+            central_max_i = max(central_i, maxima_i[sorted_prom_idxs[-1]])
+
+    # print(f"max_prom_left/right: {max_prom_left}, {max_prom_right}")
+    # print(
+    #     f"DN edges of prominence envelope: {dn[int(max_prom_left)]}, "
+    #     f"{dn[int(max_prom_right)]}"
+    # )
+
+    return (
+        max_prom_idx,
+        max_prom_left,
+        max_prom_right,
+        central_min_i,
+        central_max_i,
+    )
+
+
 def find_smart_window(
     dn: np.ndarray,
     counts: np.ndarray,
@@ -1151,7 +1286,7 @@ def find_smart_window(
     plot=False,
     closest=True,
     plottitle=None,
-    saveplot=False
+    saveplot=False,
 ) -> tuple:
     """Returns a minimum and maximum DN value from *dn* which are
        based on using the find_minima_index() function with the
@@ -1177,24 +1312,29 @@ def find_smart_window(
        that the plot should be saved as.  If False, the plot will not
        be saved.
     """
-    # hist_list = sorted(hist, key=lambda x: int(x.DN))
-    # pixel_counts = np.fromiter((int(x.Pixels) for x in hist_list), int)
-    # dn = np.fromiter((int(x.DN) for x in hist_list), int)
+    # Apologies, there are a lot of commented out lines here.  This is
+    # because there was a lot of noodling with this function, and
+    # the commented lines are mostly reporting and extra plotting features.
+    # I didn't want to eliminate all of it, as it might be needed
+    # again.
 
     # print(dn)
-
     # print(f'mindn {mindn}')
     # print(f'maxdn {maxdn}')
 
     mindn_i = (np.abs(dn - mindn)).argmin()
     maxdn_i = (np.abs(dn - maxdn)).argmin()
-    central_i = np.where(dn == centraldn)
+    central_i = np.where(dn == centraldn)[0].item(0)
+    # print(f'mindn_i {mindn_i}')
+    # print(f'maxdn_i {maxdn_i}')
     # print(f'centraldn: {centraldn}')
     # print(f'central_exclude_dn: {central_exclude_dn}')
+    # print(f'central_i {central_i}')
+
     central_min_i = (np.abs(dn - (centraldn - central_exclude_dn))).argmin()
-    # tobemin = np.abs(dn - (centraldn + central_exclude_dn))
-    # print(tobemin)
     central_max_i = (np.abs(dn - (centraldn + central_exclude_dn))).argmin()
+    # print(f'central_min_i {central_min_i}')
+    # print(f'central_max_i {central_max_i}')
 
     minima_i, minprops = find_peaks(
         np.negative(counts),
@@ -1202,10 +1342,11 @@ def find_smart_window(
         distance=1,
         prominence=(None, None),
         width=(None, None),
-        rel_height=1
+        rel_height=1,
     )
     # print("minprops: ")
     # print(minprops)
+
     maxima_i, maxprops = find_peaks(
         counts,
         threshold=(None, None),
@@ -1217,151 +1358,120 @@ def find_smart_window(
     # print("maxprops: ")
     # print(maxprops)
 
-    # print(f'central_i {central_i}')
-    # print(f'central_min_i {central_min_i}')
-    # print(f'central_max_i {central_max_i}')
-    # print(f'mindn_i {mindn_i}')
-    # print(f'maxdn_i {maxdn_i}')
+    # We will now generate some "guesses" for the min and max indices
+    min_indices = list()
+    max_indices = list()
 
     if len(minima_i) == 0:
         logging.info("No minima found.")
-        min_i = 0
-        max_i = len(dn) - 1
-        min_i_ips = min_in = min_prom = min_i
-        max_i_ips = max_in = max_prom = max_i
+        min_indices.append(0)
+        max_indices.append(len(dn) - 1)
         max_prom_idx = None
     else:
-        min_i = find_minima_index(
-            central_min_i, mindn_i, minima_i, counts, close_to_limit=closest
+        # The first guess is based on the mindn and maxdn values
+        logging.info(
+            "Finding minima based on provided mindn and maxdn values."
         )
-        max_i = find_minima_index(
-            central_max_i, maxdn_i, minima_i, counts, close_to_limit=closest
+        min_indices.append(
+            find_minima_index(
+                central_min_i,
+                mindn_i,
+                minima_i,
+                counts,
+                close_to_limit=closest,
+                default=0,
+            )
         )
-
-        min_prom, max_prom = find_prominence_index(
-            minima_i, minprops["prominences"], central_min_i, central_max_i,
-            counts[minima_i]
-        )
-        min_in, max_in = find_prominence_index(
-            minima_i, minprops["prominences"], central_min_i, central_max_i,
-            counts[minima_i], min_i, max_i
-        )
-
-        max_prom_idx = np.argmax(maxprops["prominences"])
-        max_prom_left = maxprops["left_ips"][max_prom_idx]
-        max_prom_right = maxprops["right_ips"][max_prom_idx]
-        # This reaches out to the "next" minima beyond the ips boundaries
-        # # print(minima_i)
-        # if max_prom_left not in minima_i and np.size(np.where(minima_i < max_prom_left)):
-        #     # find the minima to the immediate left of max_prom_left
-        #     max_prom_left = minima_i[np.where(minima_i < max_prom_left)[0][-1]]
-        #     # print(f"!!! max_prom_left diff {np.where(minima_i < max_prom_left)[0][-1]}")
-        # if max_prom_right not in minima_i and np.size(np.where(minima_i > max_prom_right)):
-        #     # find the minima to the immediate left of max_prom_left
-        #     max_prom_right = minima_i[np.where(minima_i > max_prom_right)[0][0]]
-        #     # print(f"!!! max_prom_right diff {minima_i[np.where(minima_i > max_prom_right)[0][0]]}")
-        print(f"initial max_prom_left/right: {max_prom_left}, {max_prom_right}")
-
-        # If the image is very noisy (in some sense it is not clear that
-        # it is worth fixing if it is this bad, but we will try our best),
-        # the mode (which is what max_prom_idx really is giving above) might be
-        # garbage.  If it is outside the mindn / maxdn range, reject it,
-        # and pick the next best.
-        print(f"mode index: {maxima_i[max_prom_idx]}")
-        if not mindn_i <= maxima_i[max_prom_idx] <= maxdn_i:
-            # scaled_maxima = np.log10(
-            #     counts[maxima_i] + maxprops["prominences"]
-            # ) - np.log10(counts[maxima_i])
-            # sorted_prom_idxs = np.argsort(scaled_maxima)
-            sorted_prom_idxs = np.argsort(maxprops["prominences"])
-            print(f"sorted_prom_idxs: {sorted_prom_idxs}")
-            print(f"maxima_i[sorted_prom_idxs]: {maxima_i[sorted_prom_idxs]}")
-
-            max_prom_idx_i = -2  # -1 we already know isn't good.
-            max_prom_idx = sorted_prom_idxs[max_prom_idx_i]
-            while not maxprops["left_ips"][max_prom_idx] <= central_i[0][0] <= maxprops["right_ips"][max_prom_idx]:
-                print(
-                    f"while not {maxprops['left_ips'][max_prom_idx]} <= {central_i[0][0]} <= {maxprops['right_ips'][max_prom_idx]}"
-                )
-                max_prom_idx_i -= 1
-                max_prom_idx = sorted_prom_idxs[max_prom_idx_i]
-
-            # This is the original, so -1 idx is right:
-            if maxima_i[sorted_prom_idxs[-1]] > maxdn_i:
-                max_prom_right = maxprops["right_ips"][max_prom_idx]
-                if max_prom_left > max_prom_right:
-                    max_prom_left = maxprops["left_ips"][max_prom_idx]
-            else:
-                print("less than max")
-                max_prom_left = maxprops["left_ips"][max_prom_idx]
-                if max_prom_right < max_prom_left:
-                    max_prom_right = maxprops["right_ips"][max_prom_idx]
-
-        # Again, if the image is noisy, and central and mode are separate,
-        # but not outside the mindn/maxdn bounds, you could get major prominences
-        # between them, which shouldn't be allowed, so this adjusts that.
-        if not max_prom_left <= central_i[0][0] <= max_prom_right:
-            sorted_prom_idxs = np.argsort(maxprops["prominences"])
-            max_prom_idx_i = -2  # -1 we already know isn't good.
-            max_prom_idx = sorted_prom_idxs[max_prom_idx_i]
-            while not maxprops["left_ips"][max_prom_idx] <= central_i[0][0] <= maxprops["right_ips"][max_prom_idx]:
-                max_prom_idx_i -= 1
-                max_prom_idx = sorted_prom_idxs[max_prom_idx_i]
-
-            # Adjust the prominences:
-            if maxima_i[sorted_prom_idxs[-1]] > central_i[0][0]:
-                max_prom_left = maxprops["left_ips"][max_prom_idx]
-            else:
-                print("less than max")
-                max_prom_right = maxprops["right_ips"][max_prom_idx]
-
-            # Don't allow searching between the central DN and the mode.
-            if central_min_i > min(central_i[0][0], maxima_i[sorted_prom_idxs[-1]]):
-                    central_min_i = min(central_i[0][0], maxima_i[sorted_prom_idxs[-1]])
-
-            if central_max_i < max(central_i[0][0], maxima_i[sorted_prom_idxs[-1]]):
-                central_max_i = max(central_i[0][0], maxima_i[sorted_prom_idxs[-1]])
-
-        print(f"max_prom_left/right: {max_prom_left}, {max_prom_right}")
-        print(
-            f"DN edges of prominence envelope: {dn[int(max_prom_left)]}, "
-            f"{dn[int(max_prom_right)]}"
+        max_indices.append(
+            find_minima_index(
+                central_max_i,
+                maxdn_i,
+                minima_i,
+                counts,
+                close_to_limit=closest,
+                default=len(dn) - 1,
+            )
         )
 
-        min_i_ips = find_minima_index(
-            central_min_i, max_prom_left,
-            minima_i, counts, close_to_limit=closest
-        )
-        max_i_ips = find_minima_index(
-            central_max_i, max_prom_right,
-            minima_i, counts, close_to_limit=closest
+        # min_prom, max_prom = find_prominence_index(
+        #     minima_i, minprops["prominences"], central_min_i, central_max_i,
+        #     counts[minima_i]
+        # )
+        # min_in, max_in = find_prominence_index(
+        #     minima_i, minprops["prominences"], central_min_i, central_max_i,
+        #     counts[minima_i], min_i, max_i
+        # )
+
+        # The second guess is based on the width of the largest prominence
+        # in the data, and we need to do some pre-conditioning.
+        logging.info("Finding minima based on the largest prominence.")
+
+        (
+            max_prom_idx,
+            max_prom_left,
+            max_prom_right,
+            central_min_i,
+            central_max_i,
+        ) = find_prominence_boundaries(
+            maxima_i,
+            maxprops,
+            mindn_i,
+            maxdn_i,
+            central_i,
+            central_min_i,
+            central_max_i,
         )
 
-    print(f"min_prom, max_prom: {min_prom}, {max_prom}")
-    print(f"min_in, max_in: {min_in}, {max_in}")
-    print(f"min_i_ips, max_i_ips: {min_i_ips}, {max_i_ips}")
-    min_prom = 0 if min_prom is None else min_prom
-    max_prom = len(dn) - 1 if max_prom is None else max_prom
-    min_in = 0 if min_in is None else min_in
-    max_in = len(dn) - 1 if max_in is None else max_in
-    min_i = 0 if min_i is None else min_i
-    max_i = len(dn) - 1 if max_i is None else max_i
-    min_i_ips = 0 if min_i_ips is None else min_i_ips
-    max_i_ips = len(dn) - 1 if max_i_ips is None else max_i_ips
+        # print(f"max_prom_left/right: {max_prom_left}, {max_prom_right}")
+        # print(
+        #     f"DN edges of prominence envelope: {dn[int(max_prom_left)]}, "
+        #     f"{dn[int(max_prom_right)]}"
+        # )
 
-    new_min_i, new_max_i = pick_index(
-        min_i, min_i_ips, max_i, max_i_ips,
+        min_indices.append(
+            find_minima_index(
+                central_min_i,
+                max_prom_left,
+                minima_i,
+                counts,
+                close_to_limit=closest,
+                default=0,
+            )
+        )
+        max_indices.append(
+            find_minima_index(
+                central_max_i,
+                max_prom_right,
+                minima_i,
+                counts,
+                close_to_limit=closest,
+                default=len(dn) - 1,
+            )
+        )
+
+    # print(f"min_prom, max_prom: {min_prom}, {max_prom}")
+    # print(f"min_in, max_in: {min_in}, {max_in}")
+    # print(f"min_i_ips, max_i_ips: {min_i_ips}, {max_i_ips}")
+
+    # new_min_i, new_max_i = pick_index(
+    min_i, max_i = pick_index(
+        min_indices,
+        max_indices,
         maxima_i[max_prom_idx],
-        # maxprops['left_ips'][max_prom_idx], maxprops['right_ips'][max_prom_idx],
         minprops["prominences"],
-        counts, minima_i, dn, centraldn, mindn, maxdn
+        counts,
+        minima_i,
+        dn,
+        centraldn,
+        mindn,
+        maxdn,
     )
 
     logging.info(f"indexes: {min_i}, {max_i}")
     logging.info(f"DN window: {dn[min_i]}, {dn[max_i]}")
 
-    print(f"new_indexes: {new_min_i}, {new_max_i}")
-    print(f"new DN window: {dn[new_min_i]}, {dn[new_max_i]}")
+    # print(f"new_indexes: {new_min_i}, {new_max_i}")
+    # print(f"new DN window: {dn[new_min_i]}, {dn[new_max_i]}")
 
     if plot or saveplot:
         import matplotlib.pyplot as plt
@@ -1380,10 +1490,10 @@ def find_smart_window(
 
         if plottitle is not None:
             fig.suptitle(plottitle)
-            eval_bounds(
-                plottitle, dn[min_i], dn[max_i], dn[min_prom], dn[max_prom],
-                dn[min_in], dn[max_in]
-            )
+            # eval_bounds(
+            #     plottitle, dn[min_i], dn[max_i], dn[min_prom], dn[max_prom],
+            #     dn[min_in], dn[max_in]
+            # )
 
         ax0.set_ylabel("Pixel Count")
         ax0.set_xlabel("DN Index")
@@ -1394,29 +1504,29 @@ def find_smart_window(
         ax0.axvline(x=mode, c="lime", ls="--", label=f"Mode: {dn[mode]}")
         ax0.plot(counts)
         ax0.plot(minima_i, counts[minima_i], "x")
-        ax0.vlines(
-            x=minima_i, ymin=counts[minima_i] + minprops["prominences"],
-            ymax=counts[minima_i], color="C1"
-        )
-        ax0.hlines(
-            y=(-1 * minprops["width_heights"]), xmin=minprops["left_ips"],
-            xmax=minprops["right_ips"], color="C1"
-        )
+        # ax0.vlines(
+        #     x=minima_i, ymin=counts[minima_i] + minprops["prominences"],
+        #     ymax=counts[minima_i], color="C1"
+        # )
+        # ax0.hlines(
+        #     y=(-1 * minprops["width_heights"]), xmin=minprops["left_ips"],
+        #     xmax=minprops["right_ips"], color="C1"
+        # )
         # ax0.hlines(
         #     y=range(1, len(minprops["left_bases"])+1),
         #     xmin=minprops["left_bases"],
         #     xmax=minprops["right_bases"],
         #     color="C1",
         # )
-        ax0.plot(maxima_i, counts[maxima_i], "^")
-        ax0.vlines(
-            x=maxima_i, ymin=counts[maxima_i] - maxprops["prominences"],
-            ymax=counts[maxima_i], color="C2"
-        )
-        ax0.hlines(
-            y=maxprops["width_heights"], xmin=maxprops["left_ips"],
-            xmax=maxprops["right_ips"], color="C2"
-        )
+        # ax0.plot(maxima_i, counts[maxima_i], "^")
+        # ax0.vlines(
+        #     x=maxima_i, ymin=counts[maxima_i] - maxprops["prominences"],
+        #     ymax=counts[maxima_i], color="C2"
+        # )
+        # ax0.hlines(
+        #     y=maxprops["width_heights"], xmin=maxprops["left_ips"],
+        #     xmax=maxprops["right_ips"], color="C2"
+        # )
         # ax0.hlines(
         #     # y=range(10, (len(maxprops["left_bases"])+1) * 10, 10),
         #     y=counts[maxima_i],
@@ -1427,77 +1537,129 @@ def find_smart_window(
 
         ax0.plot(min_i, counts[min_i], "o", c="red")
         ax0.plot(max_i, counts[max_i], "o", c="red")
-        ax0.plot(min_prom, counts[min_prom], ">", c="purple")
-        ax0.plot(max_prom, counts[max_prom], "<", c="purple")
-        ax0.plot(min_in, counts[min_in], "|", c="purple")
-        ax0.plot(max_in, counts[max_in], "|", c="purple")
-        ax0.plot(min_i_ips, counts[min_i_ips], "x", c="teal")
-        ax0.plot(max_i_ips, counts[max_i_ips], "x", c="teal")
-        ax0.plot(new_min_i, counts[new_min_i], "+", c="cyan")
-        ax0.plot(new_max_i, counts[new_max_i], "+", c="cyan")
+        # ax0.plot(min_prom, counts[min_prom], ">", c="purple")
+        # ax0.plot(max_prom, counts[max_prom], "<", c="purple")
+        # ax0.plot(min_in, counts[min_in], "|", c="purple")
+        # ax0.plot(max_in, counts[max_in], "|", c="purple")
+        # ax0.plot(min_i_ips, counts[min_i_ips], "x", c="teal")
+        # ax0.plot(max_i_ips, counts[max_i_ips], "x", c="teal")
+        # ax0.plot(new_min_i, counts[new_min_i], "+", c="cyan")
+        # ax0.plot(new_max_i, counts[new_max_i], "+", c="cyan")
 
         ax0.legend()
         ax1.set_ylabel("Pixel Count")
         ax1.set_xlabel("DN")
         ax1.set_yscale("log")
         ax1.set_ybound(lower=0.5)
-        if plottitle in goal_dn:
-            ax1.axvline(
-                x=goal_dn[plottitle][0],
-                c="blue",
-                label=f"Ideal DN: {goal_dn[plottitle][0]}, {goal_dn[plottitle][1]}"
-            )
-            ax1.axvline(
-                x=goal_dn[plottitle][1],
-                c="blue",
-            )
+        # # This is for temporary testing, not production
+        # goal_dn = dict()
+        # with open(
+        #   Path("/Users/rbeyer/projects/HiRISE/bitflip/dn_ideal.json"), 'r'
+        # ) as f:
+        #     dn_ideal = json.load(f)
+        #
+        # for k, v in dn_ideal.items():
+        #     p = Path(v['path']).name
+        #     for key, title in (
+        #       ("img", "Image Area"), ("rev", "Reverse-Clock")
+        #     ):
+        #         if key in v:
+        #             goal_dn[f"{p} {title}"] = v[key]
+        #
+        # if plottitle in goal_dn:
+        #     ax1.axvline(
+        #         x=goal_dn[plottitle][0],
+        #         c="blue",
+        #         label=f"Ideal DN: {goal_dn[plottitle][0]}, "
+        #         f"{goal_dn[plottitle][1]}"
+        #     )
+        #     ax1.axvline(
+        #         x=goal_dn[plottitle][1],
+        #         c="blue",
+        #     )
         ax1.axvline(
-            x=dn[min_i], c="red", ls="--",
-            label=f"DN Limits: {dn[min_i]}, {dn[max_i]}"
+            x=dn[min_i],
+            c="red",
+            ls="--",
+            label=f"DN Limits: {dn[min_i]}, {dn[max_i]}",
         )
-        ax1.axvline(x=dn[max_i], c="red", ls="--" )
-        ax1.axvline(
-            x=dn[new_min_i], c="cyan", ls="dotted",
-            label=f"New DN Limits: {dn[new_min_i]}, {dn[new_max_i]}"
-        )
-        ax1.axvline(x=dn[new_max_i], c="cyan", ls="dotted")
+        ax1.axvline(x=dn[max_i], c="red", ls="--")
+        # ax1.axvline(
+        #     x=dn[new_min_i], c="cyan", ls="dotted",
+        #     label=f"New DN Limits: {dn[new_min_i]}, {dn[new_max_i]}"
+        # )
+        # ax1.axvline(x=dn[new_max_i], c="cyan", ls="dotted")
 
         ax1.scatter(dn, counts, marker=".", s=1)
         ax1.legend()
 
         if saveplot:
-            eval_bounds(
-                plottitle, dn[min_i], dn[max_i], dn[min_prom], dn[max_prom],
-                dn[min_in], dn[max_in], log_path= saveplot.with_name('bounds.log')
-            )
+            # eval_bounds(
+            #     plottitle, dn[min_i], dn[max_i], dn[min_prom], dn[max_prom],
+            #     dn[min_in], dn[max_in],
+            #     log_path= saveplot.with_name('bounds.log')
+            # )
             plt.savefig(saveplot)
 
         if plot:
             plt.show()
 
-    # return dn[min_i], dn[max_i]
-    return dn[new_min_i], dn[new_max_i]
+    # return dn[new_min_i], dn[new_max_i]
+    return dn[min_i], dn[max_i]
 
 
 def pick_index(
-    min_i, min_i_ips, max_i, max_i_ips,
-    max_prom_i, # max_prom_left, max_prom_right,
-    prominences,
-    counts, minima_i, dn, centraldn, mindn, maxdn
+    min_indices: abc.Sequence,
+    max_indices: abc.Sequence,
+    max_prom_i: int,  # max_prom_left, max_prom_right,
+    prominences: np.array,
+    counts: np.array,
+    minima_i: np.array,
+    dn: np.array,
+    centraldn: int,
+    mindn: int,
+    maxdn: int,
+    span_factor=2,
+    count_ceiling=5000,
+    max_count_fraction=0.0125,
 ):
-    scaled = np.log10(
-        counts[minima_i] + prominences
-    ) - np.log10(counts[minima_i])
+    """Returns a minimum and maximum index based on examining minima
+    based on *min_indices* and *max_indices*.  Arguments that are
+    described as indices, are integers that are index values into the
+    *counts* array.
+
+    :param min_indices: Array of indices that are good candidates for the
+        minimum DN.
+    :param max_indices:Array of indices that are good candidates for the
+        maximum DN.
+    :param max_prom_i: Index of the peak of the maximum prominence.
+    :param prominences:  Prominences array output from find_peaks()
+    :param counts: Array of DN counts as defined in find_smart_window()
+    :param minima_i: Array of the indices of the minima from find_peaks()
+    :param dn: Array of the DN as defined in find_smart_window()
+    :param centraldn: DN value as defined in find_smart_widnow()
+    :param mindn: Guidance for the minimum DN from find_smart_window()
+    :param maxdn: Guidance for the maximum DN from find_smart_window()
+    :param span_factor:  Defaults to 2, which sets the allowable span to
+        is two times the distance between the centraldn and the mindn (or
+        the maxdn on the max side).
+    :param count_ceiling: Defaults to 5000 counts, and any minima above that
+        level will not be considered.
+    :param max_count_fraction: Defaults to 0.0125, the fraction of the
+        *counts* at *max_prom_i* above which any minima will not be considered.
+    :return: two-tuple of ints which represent the minimum and maximum indices.
+    """
+    scaled = np.log10(counts[minima_i] + prominences) - np.log10(
+        counts[minima_i]
+    )
     # print(f"scaled: {scaled}")
 
-    span_factor = 2
-    count_thresh = min(5000, counts[max_prom_i] / 80)
-    scaled_depth_thresh = 0.3
-    print(f"min/max i: {min_i}, {max_i}")
-    print(f"min/max ips: {min_i_ips}, {max_i_ips}")
-    print(f"count_thresh: {count_thresh}")
-    print(f"count min/max i: {counts[min_i]} {counts[max_i]}")
-    print(f"count min/max ips: {counts[min_i_ips]} {counts[max_i_ips]}")
+    count_thresh = min(count_ceiling, counts[max_prom_i] * max_count_fraction)
+    # print(f"min/max i: {min_i}, {max_i}")
+    # print(f"min/max ips: {min_i_ips}, {max_i_ips}")
+    # print(f"count_thresh: {count_thresh}")
+    # print(f"count min/max i: {counts[min_i]} {counts[max_i]}")
+    # print(f"count min/max ips: {counts[min_i_ips]} {counts[max_i_ips]}")
 
     # print(f"{max_prom_left}, {max_prom_right}")
     # print(
@@ -1506,20 +1668,26 @@ def pick_index(
     # )
 
     new_i = [None, None]
-    span_left = (centraldn - ((centraldn - mindn) * span_factor))
-    span_right = (centraldn + ((maxdn - centraldn) * span_factor))
-    print(f"DN edges of {span_factor} span envelope: {span_left}, {span_right}")
-    for m, i, ips, dnlim, message in (
-        (0, min_i, min_i_ips, mindn, "min"),
-        (1, max_i, max_i_ips, maxdn, "max")
+    span_left = centraldn - ((centraldn - mindn) * span_factor)
+    span_right = centraldn + ((maxdn - centraldn) * span_factor)
+    logging.info(
+        f"DN edges of {span_factor} span envelope: {span_left}, {span_right}"
+    )
+    increment = (1, -1)
+    for m, indices, message in (
+        (0, min_indices, "min"),
+        (1, max_indices, "max"),
     ):
-        print(f"Picking the index for {message}")
-        if i == ips and counts[i] < count_thresh:
-            print("i == ips")
-            new_i[m] = i
+        logging.info(f"Picking the index for {message}")
+        if len(set(indices)) == 1 and counts[indices[0]] < count_thresh:
+            # logging.info(
+            #     f"Input indices for {message} are all the same and below "
+            #     f"the count threshold."
+            # )
+            new_i[m] = indices[0]
         else:
-            left = min(i, ips)
-            right = max(i, ips)
+            left = min(indices)
+            right = max(indices)
             # print(f"minima_i: {minima_i}")
             # print(f"{left} LR {right}")
             if m == 0:
@@ -1527,147 +1695,96 @@ def pick_index(
             else:
                 # print(minima_i >= left)
                 potential_idxs = minima_i[(minima_i >= left)]
-            print(f"potential_idxs: {potential_idxs}")
+            # print(f"potential_idxs: {potential_idxs}")
 
-            below_thresh = potential_idxs[counts[potential_idxs] < count_thresh]
-            print(f"below_thresh: {below_thresh}")
+            below_thresh = potential_idxs[
+                counts[potential_idxs] < count_thresh
+            ]
+            # print(f"below_thresh: {below_thresh}")
             if np.size(below_thresh) == 0:
                 below_thresh = potential_idxs
-                print(f"fixed below_thresh: {below_thresh}")
+                # print(f"fixed below_thresh: {below_thresh}")
                 if np.size(below_thresh) == 0:
                     # Whoa, no potentials, either, so just fall back to the pair
-                    below_thresh = np.array([i, ips])
-            print(f"below_thresh: {below_thresh}")
+                    below_thresh = np.array([indices])
+            # print(f"below_thresh: {below_thresh}")
 
             if m == 0:
                 in_span = below_thresh[dn[below_thresh] >= span_left]
             else:
                 in_span = below_thresh[dn[below_thresh] <= span_right]
-            print(f"in_span: {in_span}")
+            # print(f"in_span: {in_span}")
             if np.size(in_span) == 0:
                 in_span = below_thresh
-                print(f"fixed in_span: {in_span}")
+                # print(f"fixed in_span: {in_span}")
 
-
-        #     print("sorting deep enough:")
-        #     scaled_idxs = list()
-        #     for span_i in in_span:
-        #         scaled_idxs.append(np.where(minima_i == span_i)[0].item())
-        #     print(scaled[scaled_idxs])
-        #     deep_enough = np.argwhere(scaled[scaled_idxs] >= scaled_depth_thresh)
-        #     if np.size(deep_enough) > 0:
-        #         print(f"deep_enough: {deep_enough}")
-        #         print(f"deep index: {in_span[deep_enough]}")
-        #         good_idxs = in_span[deep_enough]
-        #     else:
-        #         scaled_idxs = list()
-        #         for below_i in below_thresh:
-        #             scaled_idxs.append(np.where(minima_i == below_i)[0].item())
-        #         deep_enough = np.argwhere(scaled[scaled_idxs] >= scaled_depth_thresh)
-        #         if np.size(deep_enough) > 0:
-        #             print(f"fixed deep_enough: {deep_enough}")
-        #             print(f"fixed deep_enough index: {below_thresh[deep_enough]}")
-        #             good_idxs = below_thresh[deep_enough]
-        #         else:
-        #             print(f"depth thresh yielded no minima")
-        #             good_idxs = in_span
-
-
-        #     print(good_idxs)
-        #     # print(good_idxs.min())
-        #     # print(good_idxs.max())
-
-        #     new_i[m] = best_index(scaled, counts, minima_i, good_idxs.min(), good_idxs.max(), m)
-            # new_i[m] = best_index_depth(counts, minima_i, in_span, scaled, m)
-            new_i[m] = best_index(scaled, counts, minima_i, in_span[0], in_span[-1], m)
-            # new_i[m] = best_index_frac(counts, in_span, m)
-
-        # elif counts[i] > count_thresh:
-        #     print("count i above thresh")
-        #     new_i[m] = ips
-        # elif counts[ips] > count_thresh:
-        #     print("count ips above thresh")
-        #     new_i[m] = i
-        # else:
-        #     # if max_prom_left < i < max_prom_right:
-        #     #     print(f"{m} _i inside prominence envelope")
-        #     #     new_i[m] = best_index(scaled, minima_i, i, ips)
-        #     if not span_left < dn[ips] < span_right:
-        #         print(f"DN of {m} ips is outside span, revert to red dot")
-        #         new_i[m] = i
-        #     else:
-        #         print("best_index")
-        #         # print(f"scaled: {scaled}")
-        #         new_i[m] = best_index(scaled, counts, minima_i, i, ips, m)
-
-        if m:
-            increment = -1
-        else:
-            increment = 1
+            new_i[m] = best_index(
+                scaled, counts, minima_i, in_span[0], in_span[-1], bool(m)
+            )
 
         # If we are in a flat-bottomed minima, select the central-most
         # index, not the middle index, as find_peaks does.
         count_level = counts[new_i[m]]
-        while count_level == counts[new_i[m] + increment]:
-            new_i[m] += increment
+        while count_level == counts[new_i[m] + increment[m]]:
+            new_i[m] += increment[m]
 
         # If there's only a single pixel at a particular DN level, probably
         # best to exclude it.
         if counts[new_i[m]] == 1:
-                new_i[m] += increment
+            new_i[m] += increment[m]
 
     # print(f"--in pick_index new are: {new_i}")
     return new_i[0], new_i[1]
 
 
-def best_index_frac(counts, idxs, maximum=True):
-    # Examines all of the minima in idxs, and selects the minima
-    # that excludes noisy pixels based on the area under the curve
-    # between idxs.
-
-    if np.size(idxs) == 1:
-        return idxs[0]
-
-    frac = 0.0001
-    pixel_count = 0
-    total = np.sum(counts)
-    print(f"total: {total}")
-    idxs.sort()
-    if not maximum:
-        idxs = np.flip(idxs)
-    last_idx = idxs[0]
-    mi = min(idxs[0], idxs[1])
-    ma = max(idxs[0], idxs[1])
-    last_count = np.sum(counts[mi:ma])
-    best_idx = idxs[0]
-    for i in idxs[1:]:
-        print(f"indexes: {last_idx, i}")
-        # print(f"counts: {counts[last_idx:i]}")
-        mi = min(last_idx, i)
-        ma = max(last_idx, i)
-        c = np.sum(counts[mi:ma])
-        print(f"counts: {c}")
-        print(f"last_count: {last_count}")
-        # print(f"count between idxs: {c}")
-        # print(f"fraction: {c / total}")
-        pixel_count += c
-        # print(f"cumulative count: {pixel_count}")
-        # print(f"cumulative fraction: {pixel_count / total}")
-        count_ratio = c / last_count
-        print(f"last_count / total: {last_count / total}")
-        print(f"count_ratio: {count_ratio}")
-        if last_count / total > frac and count_ratio < 0.1:
-            # if (pixel_count / total) > frac:
-            # if pixel_count > 5000:
-            best_idx = last_idx
-            pixel_count = 0
-            # break
-        print(f"best_idx: {best_idx}")
-        last_idx = i
-        last_count = c
-
-    print(f"picked {best_idx}")
-    return best_idx
+# def best_index_frac(counts, idxs, maximum=True):
+#     # Examines all of the minima in idxs, and selects the minima
+#     # that excludes noisy pixels based on the area under the curve
+#     # between idxs.
+#
+#     if np.size(idxs) == 1:
+#         return idxs[0]
+#
+#     frac = 0.0001
+#     pixel_count = 0
+#     total = np.sum(counts)
+#     print(f"total: {total}")
+#     idxs.sort()
+#     if not maximum:
+#         idxs = np.flip(idxs)
+#     last_idx = idxs[0]
+#     mi = min(idxs[0], idxs[1])
+#     ma = max(idxs[0], idxs[1])
+#     last_count = np.sum(counts[mi:ma])
+#     best_idx = idxs[0]
+#     for i in idxs[1:]:
+#         print(f"indexes: {last_idx, i}")
+#         # print(f"counts: {counts[last_idx:i]}")
+#         mi = min(last_idx, i)
+#         ma = max(last_idx, i)
+#         c = np.sum(counts[mi:ma])
+#         print(f"counts: {c}")
+#         print(f"last_count: {last_count}")
+#         # print(f"count between idxs: {c}")
+#         # print(f"fraction: {c / total}")
+#         pixel_count += c
+#         # print(f"cumulative count: {pixel_count}")
+#         # print(f"cumulative fraction: {pixel_count / total}")
+#         count_ratio = c / last_count
+#         print(f"last_count / total: {last_count / total}")
+#         print(f"count_ratio: {count_ratio}")
+#         if last_count / total > frac and count_ratio < 0.1:
+#             # if (pixel_count / total) > frac:
+#             # if pixel_count > 5000:
+#             best_idx = last_idx
+#             pixel_count = 0
+#             # break
+#         print(f"best_idx: {best_idx}")
+#         last_idx = i
+#         last_count = c
+#
+#     print(f"picked {best_idx}")
+#     return best_idx
 
 
 # def best_index_depth(counts, minima_i, idxs, scaled, maximum=True):
@@ -1723,11 +1840,35 @@ def best_index_frac(counts, idxs, maximum=True):
 #     return best_idx
 
 
-def best_index(scaled, counts, minima_i, i1, i2, maximum=True):
-    # looks at all minima between i1 and i2, and
-    # and returns the one with the deepest scaled minima
+def best_index(
+    scaled: np.array,
+    counts: np.array,
+    minima_i: np.array,
+    i1: int,
+    i2: int,
+    maximum=True,
+    fraction=0.1,
+) -> int:
+    """
+    Returns the index of the deepest minima between (and including)
+    *i1* and *i2*.  If there are multiple, use the *fraction* to
+    determine which to select.
+
+    :param scaled: The log-scaled depths of the minima.
+    :param counts: The Array of DN counts as defined in find_smart_window()
+    :param minima_i: Array of the indices of the minima from find_peaks()
+    :param i1: An index into *counts*
+    :param i2: An index into *counts*
+    :param maximum: If true, calculation is performed on the assumption that
+        these indexes are to the right of the central DN value.
+    :param fraction: Defaults to 0.1 and is the fraction of pixels above which
+        is considered "real" signal and the selected index minima should
+        include it.
+    :return: index into *counts*
+    """
     # print(f"--in best_index")
 
+    # If they're the same, short circuit this whole function.
     if i1 == i2:
         return i1
 
@@ -1735,61 +1876,51 @@ def best_index(scaled, counts, minima_i, i1, i2, maximum=True):
     # print(minima_i)
     # print(i1)
     # print(i2)
-    minima_idx_i1 = np.where(minima_i == i1)[0]
-    minima_idx_i2 = np.where(minima_i == i2)[0]
-    # print(minima_idx_i1)
-    # print(minima_idx_i2)
-    if minima_idx_i1.size == 0:
-        if i1 < i2:
-            s_min_i = 0
-            s_max_i = minima_idx_i2[0]
+    scaled_idxs = list()
+    for i in (i1, i2):
+        w = np.where(minima_i == i)[0]
+        if w.size == 0:
+            if maximum:
+                scaled_idxs.append(len(minima_i) - 1)
+            else:
+                scaled_idxs.append(0)
         else:
-            s_min_i = minima_idx_i2[0]
-            s_max_i = len(minima_i)
-    elif minima_idx_i2.size == 0:
-        if i1 < i2:
-            s_min_i = minima_idx_i1[0]
-            s_max_i = len(minima_i)
-        else:
-            s_min_i = 0
-            s_max_i = minima_idx_i1[0]
-    else:
-        s_min_i = min(minima_idx_i1[0], minima_idx_i2[0])
-        s_max_i = max(minima_idx_i1[0], minima_idx_i2[0])
+            scaled_idxs.append(w.item())
+
+    s_min_i = min(scaled_idxs)
+    s_max_i = max(scaled_idxs)
     # print(s_min_i)
     # print(s_max_i)
+
     # print(scaled[s_min_i:s_max_i + 1])
-    # print(np.where(scaled[s_min_i:s_max_i + 1] == np.amax(scaled[s_min_i:s_max_i + 1])))
-    deepest_idxs = np.where(
-        scaled[s_min_i:s_max_i + 1] == np.amax(scaled[s_min_i:s_max_i + 1])
-    )[0] + s_min_i
+    deepest_idxs = (
+        np.where(
+            scaled[s_min_i : s_max_i + 1]
+            == np.amax(scaled[s_min_i : s_max_i + 1])
+        )[0]
+        + s_min_i
+    )
     # print(deepest_idxs)
     if deepest_idxs.size == 1:
-        print("Only one deepest idx")
+        # print("Only one deepest idx")
         idx = minima_i[deepest_idxs[0]]
     else:
-        print("Multiple deepest minima")
+        # print("Multiple deepest minima")
         low_i = minima_i[deepest_idxs[0]]
         high_i = minima_i[deepest_idxs[-1]]
 
-        print(f"{low_i}, {high_i}")
+        # print(f"{low_i}, {high_i}")
         pixels = np.sum(counts[low_i:high_i])
-        frac = pixels / np.sum(counts)
-        print(frac)
-        if frac > 0.1:
-            print("greater than frac, keep?")
+        f = pixels / np.sum(counts)
+        # print(f)
+        if f > fraction:
+            # print("greater than frac, keep?")
             # lots of pixels, pick outermost
-            if maximum:
-                idx = high_i
-            else:
-                idx = low_i
+            idx = high_i if maximum else low_i
         else:
-            print("less than frac, noise?")
+            # print("less than frac, noise?")
             # not may pixels, probably noise?
-            if maximum:
-                idx = low_i
-            else:
-                idx = high_i
+            idx = low_i if maximum else high_i
 
     # best_idx = np.argmax(scaled[s_min_i:s_max_i + 1])
     # print(best_idx)
@@ -1799,37 +1930,6 @@ def best_index(scaled, counts, minima_i, i1, i2, maximum=True):
     # print(f"--in best_index, idx is: {idx}")
 
     return idx
-
-
-def eval_bounds(
-    name, min_i, max_i, min_p, max_p, min_pin, max_pin, log_path=None
-):
-    # This is only here for temporary testing
-
-    goal_limits = goal_dn.get(name, None)
-    lines = list()
-    if goal_limits is not None:
-        lines.append(f"Goal DN: {goal_limits}")
-        lines.append("Min Index | Prominence | Prominence in limits")
-        lines.append(f"{min_i} {max_i} | {min_p} {max_p} | {min_pin} {max_pin}")
-        min_i_g = min_i == goal_limits[0]
-        max_i_g = max_i == goal_limits[1]
-        min_p_g = min_p == goal_limits[0]
-        max_p_g = max_p == goal_limits[1]
-        min_pin_g = min_pin == goal_limits[0]
-        max_pin_g = max_pin == goal_limits[1]
-        lines.append(f"{min_i_g} {max_i_g} | {min_p_g} {max_p_g} | {min_pin_g} {max_pin_g}")
-
-    else:
-        lines.append(f"{name} isn't in list of known bounds")
-
-    if log_path is None:
-        print("\n".join(lines))
-    else:
-        lines.insert(0, name)
-        with open(log_path, 'a+t') as f:
-            f.write("\n".join(lines))
-            f.write("\n\n")
 
 
 if __name__ == "__main__":
