@@ -427,7 +427,7 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
         new_pvl = pvl.PVLModule(ControlNetwork=cn)
 
         with open(path, 'w') as stream:
-            pvl.dump(new_pvl, stream)
+            pvl.dump(new_pvl, stream, encoder=pvl.encoder.ISISEncoder())
 
 
 def HiJitReg(red4, red5, ir10, ir11, bg12, bg13, conf: dict,
@@ -474,7 +474,7 @@ def jitter_iter(red: hicolor.HiColorCube, color: hicolor.HiColorCube,
     jit_param['SEARCHLONGER_LINES'] = conf_ar['SearchLongerChip']['Lines']
 
     if bin_ratio > 3:
-        hit_param['TOLERANCE'] -= conf_ar['Algorithm']['INCREMENT']
+        jit_param['TOLERANCE'] -= conf_ar['Algorithm']['INCREMENT']
 
     channels = isis.getkey_k(color.path, 'Instrument', 'StitchedProductIds')
 

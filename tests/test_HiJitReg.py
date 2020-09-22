@@ -200,10 +200,9 @@ class TestJitterCube(unittest.TestCase):
         with patch('pyrise.HiJitReg.pvl.load', return_value=cnet_pvl):
             with patch('pyrise.HiJitReg.open', mock_open()) as m:
                 c.filterCNetPVL()
-                ignorecall = call().write(b'Ignore')
-                self.assertEqual(len(tuple(filter(lambda x: x == ignorecall,
-                                                  m.mock_calls))),
-                                 2)
+                self.assertEqual(
+                    str(m().write.call_args[0][0]).count("Ignore"), 2
+                )
 
 
 class TestHiJitReg(unittest.TestCase):
