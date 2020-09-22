@@ -2,7 +2,7 @@
 History
 =======
 
-0.4.0 (2020-??-??)
+0.4.0 (2020-09-22)
 ------------------
 * Tremendous amount of re-working in bitflips to improve
   performance.
