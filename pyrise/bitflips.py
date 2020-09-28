@@ -1177,8 +1177,10 @@ def get_largest_prominence_with(idx: int, prominences, left_ips, right_ips):
     :param right_ips: from the result of find_peaks()
     :return: index of the selected prominence.
     """
-    # sorted_prom_idxs = np.argsort(prominences)
+    sorted_prom_idxs = np.argsort(prominences)
     # print(f"sorted_prom_idxs: {sorted_prom_idxs}")
+    if sorted_prom_idxs.size == 1:
+        return prominences[0]
     # print(f"maxima_i[sorted_prom_idxs]: {maxima_i[sorted_prom_idxs]}")
 
     max_prom_idx_i = -1  # Start at the biggest prominence
@@ -1321,14 +1323,15 @@ def find_smart_window(
     # print(dn)
     # print(f'mindn {mindn}')
     # print(f'maxdn {maxdn}')
+    # print(f'centraldn: {centraldn}')
+    # print(f'central_exclude_dn: {central_exclude_dn}')
 
     mindn_i = (np.abs(dn - mindn)).argmin()
     maxdn_i = (np.abs(dn - maxdn)).argmin()
-    central_i = np.where(dn == centraldn)[0].item(0)
+    central_i = (np.abs(dn - centraldn)).argmin()
+    # central_i = np.where(dn == centraldn)[0].item(0)
     # print(f'mindn_i {mindn_i}')
     # print(f'maxdn_i {maxdn_i}')
-    # print(f'centraldn: {centraldn}')
-    # print(f'central_exclude_dn: {central_exclude_dn}')
     # print(f'central_i {central_i}')
 
     central_min_i = (np.abs(dn - (centraldn - central_exclude_dn))).argmin()
