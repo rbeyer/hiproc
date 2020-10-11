@@ -238,6 +238,9 @@ def HiStitch(cubes: list, out_cube: os.PathLike, conf: dict, dbs: list,
         # run getkey from ?HiStitch_output?
         truthchannel = isis.getkey_k(out_path, 'HiStitch', 'TruthChannel')
         balanceratio = isis.getkey_k(out_path, 'HiStitch', 'BalanceRatio')
+    else:
+        truthchannel = None
+        balanceratio = None
 
     if flags.furrow:
         furrow_file = out_path.with_suffix(f'.{temp_token}.temp.cub')
@@ -245,10 +248,7 @@ def HiStitch(cubes: list, out_cube: os.PathLike, conf: dict, dbs: list,
         furrow_file.rename(out_path)
 
     logging.info('HiStitch done.')
-    if len(cubes) == 2 and flags.balance:
-        return(truthchannel, balanceratio)
-    else:
-        return(None, None)
+    return(truthchannel, balanceratio)
 
 
 def set_flags(conf, dbs, ccdnum: int, bindex: int,
@@ -294,9 +294,15 @@ def set_flags(conf, dbs, ccdnum: int, bindex: int,
                             'equalize and balance flags.')
             # To correct, change the indexing of the conf lists above with
             # 'bindex' instead of 'binning'.
-            equalize = bool(conf['HiStitch_Equalize'] and
-                            max_gper < float(conf['HiStitch_Gap_Percent']))
-            balance = conf['HiStitch_Balance']
+
+            # equalize and balance can't both be true
+            if(
+                conf['HiStitch_Equalize'] and
+                max_gper < float(conf['HiStitch_Gap_Percent'])
+            ):
+                equalize = True
+            elif conf['HiStitch_Balance']:
+                balance = conf['HiStitch_Balance']
 
     return HiStitchFlags(furrow, balance, equalize)
 
