@@ -1455,6 +1455,8 @@ def find_smart_window(
     # print(f"min_prom, max_prom: {min_prom}, {max_prom}")
     # print(f"min_in, max_in: {min_in}, {max_in}")
     # print(f"min_i_ips, max_i_ips: {min_i_ips}, {max_i_ips}")
+    # print(f"min_indices: {min_indices}")
+    # print(f"max_indices: {max_indices}")
 
     # new_min_i, new_max_i = pick_index(
     min_i, max_i = pick_index(
@@ -1625,6 +1627,7 @@ def pick_index(
     span_factor=2,
     count_ceiling=5000,
     max_count_fraction=0.0125,
+    count_fraction = 0.09
 ):
     """Returns a minimum and maximum index based on examining minima
     based on *min_indices* and *max_indices*.  Arguments that are
@@ -1650,6 +1653,11 @@ def pick_index(
         level will not be considered.
     :param max_count_fraction: Defaults to 0.0125, the fraction of the
         *counts* at *max_prom_i* above which any minima will not be considered.
+    "param count_fraction: Defaults to 0.09, the fraction of the *counts*
+        between two potential indices that are considered significant in
+        certain circumstances, less than this fraction will consider the
+        difference noise and will choose the index closer to centraldn, more
+        than the fraction will choose the index farther from the centraldn.
     :return: two-tuple of ints which represent the minimum and maximum indices.
     """
     scaled = np.log10(counts[minima_i] + prominences) - np.log10(
@@ -1691,6 +1699,7 @@ def pick_index(
         else:
             left = min(indices)
             right = max(indices)
+            consider_end = False
             # print(f"minima_i: {minima_i}")
             # print(f"{left} LR {right}")
             if m == 0:
@@ -1705,12 +1714,13 @@ def pick_index(
             ]
             # print(f"below_thresh: {below_thresh}")
             if np.size(below_thresh) == 0:
-                below_thresh = potential_idxs
-                # print(f"fixed below_thresh: {below_thresh}")
-                if np.size(below_thresh) == 0:
+                consider_end = True
+                if np.size(potential_idxs) > 0:
+                    below_thresh = potential_idxs
+                else:
                     # Whoa, no potentials, either, so just fall back to the pair
                     below_thresh = np.array([indices])
-            # print(f"below_thresh: {below_thresh}")
+                # print(f"fixed below_thresh: {below_thresh}")
 
             if m == 0:
                 in_span = below_thresh[dn[below_thresh] >= span_left]
@@ -1722,8 +1732,28 @@ def pick_index(
                 # print(f"fixed in_span: {in_span}")
 
             new_i[m] = best_index(
-                scaled, counts, minima_i, in_span[0], in_span[-1], bool(m)
+                scaled, counts, minima_i, in_span[0], in_span[-1], bool(m),
+                fraction=count_fraction
             )
+
+            end_idx = 0 if m == 0 else len(dn) - 1
+            # print(f"Consider: {consider_end} {counts[end_idx]} {dn[end_idx]} ")
+            if (
+                consider_end and
+                counts[end_idx] < count_thresh and
+                span_left <= dn[end_idx] <= span_right
+            ):
+                # print("Considering the end element")
+                low_i = min(new_i[m], end_idx)
+                high_i = max(new_i[m], end_idx)
+                pixels = np.sum(counts[low_i:high_i])
+                # print(f"pixels {pixels}")
+                f = pixels / np.sum(counts)
+                # print(f"fraction {f}")
+                if f > count_fraction:
+                    new_i[m] = high_i if m else low_i
+                else:
+                    new_i[m] = low_i if m else high_i
 
         # If we are in a flat-bottomed minima, select the central-most
         # index, not the middle index, as find_peaks does.
