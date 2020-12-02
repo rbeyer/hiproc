@@ -1660,6 +1660,9 @@ def pick_index(
         than the fraction will choose the index farther from the centraldn.
     :return: two-tuple of ints which represent the minimum and maximum indices.
     """
+    # print(f"min_indices: {min_indices}")
+    # print(f"max_indices: {max_indices}")
+    # print(f"minima_i: {minima_i}")
     scaled = np.log10(counts[minima_i] + prominences) - np.log10(
         counts[minima_i]
     )
@@ -1690,6 +1693,8 @@ def pick_index(
         (1, max_indices, "max"),
     ):
         logging.info(f"Picking the index for {message}")
+        # print(f"indices: {indices}")
+        # print(f"counts[indices[0]]: {counts[indices[0]]}")
         if len(set(indices)) == 1 and counts[indices[0]] < count_thresh:
             # logging.info(
             #     f"Input indices for {message} are all the same and below "
@@ -1708,19 +1713,25 @@ def pick_index(
                 # print(minima_i >= left)
                 potential_idxs = minima_i[(minima_i >= left)]
             # print(f"potential_idxs: {potential_idxs}")
+            # print(f"potential_idxs: {len(potential_idxs)}")
+            # print(f"counts: {len(counts)}")
 
-            below_thresh = potential_idxs[
-                counts[potential_idxs] < count_thresh
-            ]
-            # print(f"below_thresh: {below_thresh}")
-            if np.size(below_thresh) == 0:
-                consider_end = True
-                if np.size(potential_idxs) > 0:
-                    below_thresh = potential_idxs
-                else:
-                    # Whoa, no potentials, either, so just fall back to the pair
-                    below_thresh = np.array([indices])
-                # print(f"fixed below_thresh: {below_thresh}")
+            if len(potential_idxs) == 0:
+                below_thresh = np.array([indices])
+            else:
+                below_thresh = potential_idxs[
+                    counts[potential_idxs] < count_thresh
+                ]
+                # print(f"below_thresh: {below_thresh}")
+                if np.size(below_thresh) == 0:
+                    consider_end = True
+                    if np.size(potential_idxs) > 0:
+                        below_thresh = potential_idxs
+                    else:
+                        # Whoa, no potentials, either, so just fall back to the
+                        # pair
+                        below_thresh = np.array([indices])
+                    # print(f"fixed below_thresh: {below_thresh}")
 
             if m == 0:
                 in_span = below_thresh[dn[below_thresh] >= span_left]
