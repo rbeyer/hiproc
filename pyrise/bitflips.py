@@ -1424,6 +1424,8 @@ def find_smart_window(
                 default=len(dn) - 1,
             )
         )
+        # print(f"min_indices: {min_indices}")
+        # print(f"max_indices: {max_indices}")
 
         # min_prom, max_prom = find_prominence_index(
         #     minima_i, minprops["prominences"], central_min_i, central_max_i,
@@ -1460,26 +1462,35 @@ def find_smart_window(
         #     f"{dn[int(max_prom_right)]}"
         # )
 
-        min_indices.append(
-            find_minima_index(
-                central_min_i,
-                max_prom_left,
-                minima_i,
-                counts,
-                close_to_limit=closest,
-                default=0,
+        # if max_prom_left <= central_min_i:
+        if np.argmax(counts) == 0:
+            min_indices.append(0)
+        else:
+                min_indices.append(
+                find_minima_index(
+                    central_min_i,
+                    max_prom_left,
+                    minima_i,
+                    counts,
+                    close_to_limit=closest,
+                    default=0,
+                )
             )
-        )
-        max_indices.append(
-            find_minima_index(
-                central_max_i,
-                max_prom_right,
-                minima_i,
-                counts,
-                close_to_limit=closest,
-                default=len(dn) - 1,
+
+        # if max_prom_right >= central_max_i:
+        if np.argmax(counts) == len(dn) - 1:
+            max_indices.append(len(dn) - 1)
+        else:
+            max_indices.append(
+                find_minima_index(
+                    central_max_i,
+                    max_prom_right,
+                    minima_i,
+                    counts,
+                    close_to_limit=closest,
+                    default=len(dn) - 1,
+                )
             )
-        )
 
     # print(f"min_prom, max_prom: {min_prom}, {max_prom}")
     # print(f"min_in, max_in: {min_in}, {max_in}")
