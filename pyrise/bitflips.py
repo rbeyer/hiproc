@@ -1185,11 +1185,23 @@ def get_largest_prominence_with(idx: int, prominences, left_ips, right_ips):
 
     max_prom_idx_i = -1  # Start at the biggest prominence
     max_prom_idx = prominences[max_prom_idx_i]
-    while not left_ips[max_prom_idx] <= idx <= right_ips[max_prom_idx]:
-        max_prom_idx_i -= 1
-        max_prom_idx = prominences[max_prom_idx_i]
+    try:
+        while not left_ips[max_prom_idx] <= idx <= right_ips[max_prom_idx]:
+            # print(
+            #     f"left_ips[max_prom_idx] {left_ips[max_prom_idx]} "
+            #     f"<= idx {idx} "
+            #     f"<= right_ips[max_prom_idx] {right_ips[max_prom_idx]}"
+            # )
+            max_prom_idx_i -= 1
+            max_prom_idx = prominences[max_prom_idx_i]
 
-    return max_prom_idx
+        return max_prom_idx
+    except IndexError:
+        # This indicates that we have gone through all of the prominences,
+        # and none of them contain *idx*
+        raise ValueError(
+            f"The provided prominences did not enclose the idx ({idx})."
+        )
 
 
 def find_prominence_boundaries(
@@ -1207,9 +1219,20 @@ def find_prominence_boundaries(
     max_prom_idx = np.argmax(maxprops["prominences"])
     max_prom_left = maxprops["left_ips"][max_prom_idx]
     max_prom_right = maxprops["right_ips"][max_prom_idx]
+    # print(f"max_prom_idx: {max_prom_idx}")
     # print(
     #   f"initial max_prom_left/right: {max_prom_left}, {max_prom_right}"
     # )
+
+    # If there's only one prominence, then that's it
+    if len(maxprops["prominences"]) == 1:
+        return (
+            max_prom_idx,
+            max_prom_left,
+            max_prom_right,
+            central_min_i,
+            central_max_i,
+        )
 
     # If the image is very noisy (in some sense it is not clear that
     # it is worth fixing if it is this bad, but we will try our best),
@@ -1217,24 +1240,30 @@ def find_prominence_boundaries(
     # garbage.  If it is outside the mindn / maxdn range, reject it,
     # and pick the next best.
     # print(f"mode index: {maxima_i[max_prom_idx]}")
+    # print(f"mindn_i, maxdn_i: {mindn_i}, {maxdn_i}")
     if not mindn_i <= maxima_i[max_prom_idx] <= maxdn_i:
         sorted_prom_idxs = np.argsort(maxprops["prominences"])
-        max_prom_idx = get_largest_prominence_with(
-            central_i,
-            sorted_prom_idxs[:-1],
-            maxprops["left_ips"],
-            maxprops["right_ips"],
-        )
-        # This is the original, so -1 idx is the right index to use:
-        if maxima_i[sorted_prom_idxs[-1]] > maxdn_i:
-            max_prom_right = maxprops["right_ips"][max_prom_idx]
-            if max_prom_left > max_prom_right:
-                max_prom_left = maxprops["left_ips"][max_prom_idx]
-        else:
-            # print("less than max")
-            max_prom_left = maxprops["left_ips"][max_prom_idx]
-            if max_prom_right < max_prom_left:
+        # print(f"sorted_prom_idxs: {sorted_prom_idxs}")
+        try:
+            max_prom_idx = get_largest_prominence_with(
+                central_i,
+                sorted_prom_idxs[:-1],
+                maxprops["left_ips"],
+                maxprops["right_ips"],
+            )
+            # This is the original, so -1 idx is the right index to use:
+            if maxima_i[sorted_prom_idxs[-1]] > maxdn_i:
                 max_prom_right = maxprops["right_ips"][max_prom_idx]
+                if max_prom_left > max_prom_right:
+                    max_prom_left = maxprops["left_ips"][max_prom_idx]
+            else:
+                # print("less than max")
+                max_prom_left = maxprops["left_ips"][max_prom_idx]
+                if max_prom_right < max_prom_left:
+                    max_prom_right = maxprops["right_ips"][max_prom_idx]
+        except ValueError:
+            # None of the other prominences enclosed central_i
+            pass
 
     # Again, if the image is noisy, and central and mode are separate,
     # but not outside the mindn/maxdn bounds, you could get major
