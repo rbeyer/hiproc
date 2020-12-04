@@ -1693,7 +1693,7 @@ def pick_index(
         level will not be considered.
     :param max_count_fraction: Defaults to 0.0125, the fraction of the
         *counts* at *max_prom_i* above which any minima will not be considered.
-    "param count_fraction: Defaults to 0.09, the fraction of the *counts*
+    :param count_fraction: Defaults to 0.09, the fraction of the *counts*
         between two potential indices that are considered significant in
         certain circumstances, less than this fraction will consider the
         difference noise and will choose the index closer to centraldn, more
@@ -1791,8 +1791,13 @@ def pick_index(
             # print(f"Consider: {consider_end} {counts[end_idx]} {dn[end_idx]} ")
             if (
                 consider_end and
-                counts[end_idx] < count_thresh and
-                span_left <= dn[end_idx] <= span_right
+                (
+                    (
+                    counts[end_idx] < count_thresh and
+                    span_left <= dn[end_idx] <= span_right
+                    ) or
+                    new_i[m] == minima_i[-1 * m]
+                )
             ):
                 # print("Considering the end element")
                 low_i = min(new_i[m], end_idx)
