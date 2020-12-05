@@ -54,6 +54,39 @@ def parent_parser() -> argparse.ArgumentParser:
     return parent
 
 
+def set_logger(logger, i, filename=None) -> None:
+    """Sets the log level and configuration for applications."""
+    if isinstance(i, int):
+        log_level = i
+    else:
+        log_level = getattr(logging, i.upper(), logging.WARNING)
+
+    logger.setLevel(log_level)
+
+    ch = logging.StreamHandler()
+    ch.setLevel(log_level)
+
+    if log_level < 20:  # less than INFO
+        formatter = logging.Formatter(
+            "%(name)s - %(levelname)s: %(message)s"
+        )
+    else:
+        formatter = logging.Formatter(
+            "%(levelname)s: %(message)s"
+        )
+
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    if filename is not None:
+        fh = logging.FileHandler(filename)
+        fh.setLevel(log_level)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+
+    return
+
+
 def set_logging(i, filename=None) -> None:
     """Sets the log level and basic configuration."""
     if isinstance(i, int):

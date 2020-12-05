@@ -103,6 +103,8 @@ import kalasiris as isis
 import pyrise.img as img
 import pyrise.util as util
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     try:
@@ -168,7 +170,8 @@ def main():
 
         args = parser.parse_args()
 
-        util.set_logging(args.log, args.logfile)
+        # util.set_logging(args.log, args.logfile)
+        util.set_logger(logger, args.log, args.logfile)
 
         out_p = util.path_w_suffix(args.output, args.file)
 
@@ -314,12 +317,12 @@ def clean_cube(
         gdal_array.LoadFile(str(in_p)), specialpix.Min, specialpix.Max
     )
 
-    logging.info(f"Bit-flip cleaning Image area.")
+    logger.info(f"Bit-flip cleaning Image area.")
     # These four lines are just informational.
     img_mean = np.ma.mean(image)
     img_mode = mstats.mode(image, axis=None)[0][0]
     d = img_mean - img_mode
-    logging.info(f"Mean: {img_mean}, Mode: {img_mode}, diff: {d}")
+    logger.info(f"Mean: {img_mean}, Mode: {img_mode}, diff: {d}")
 
     (s_min, s_max) = find_smart_window_from_ma(
         image,
@@ -431,7 +434,7 @@ def clean_img(
 
     image = np.ma.masked_outside(img_arr, specialpix.Min, specialpix.Max)
 
-    logging.info(f"Bit-flip cleaning Image area.")
+    logger.info(f"Bit-flip cleaning Image area.")
     (s_min, s_max) = find_smart_window_from_ma(
         image,
         width=width,
@@ -711,7 +714,7 @@ def clean_cal_tables(
             )
 
     if rev_area:
-        logging.info(f"Bit-flip cleaning Reverse-Clock area.")
+        logger.info(f"Bit-flip cleaning Reverse-Clock area.")
         # Apply the cleaning along the lines, rather than along
         # the columns, since the statistics are better, and also
         # restrict the medstd_limit down to 200, since these reverse
@@ -749,7 +752,7 @@ def clean_array(data: np.ma.array, *args, **kwargs):
     If all of the values in *data* are masked, a ValueError is raised.
     """
     if np.all(data.mask):
-        logging.info("All of the values in data are masked.")
+        logger.info("All of the values in data are masked.")
         return data
 
     (w_min, w_max) = find_smart_window_from_ma(data, *args, **kwargs)
@@ -847,7 +850,7 @@ def find_smart_window_from_ma(
     # it actually is.
     # median = median_limit(np.ma.median(data), data)
     median = np.ma.median(data).item()
-    logging.info(f"Median: {median}")
+    logger.info(f"Median: {median}")
     medstd = median_std_from_ma(data, axis=axis)
 
     unique, unique_counts = np.unique(data.compressed(), return_counts=True)
@@ -877,11 +880,11 @@ def median_limit(median, data: np.ndarray, limit=4000):
     it cannot, it will return the median, even if larger than
     *limit*.
     """
-    logging.info(f"Median: {median}")
+    logger.info(f"Median: {median}")
 
     if median > limit and np.any([data < limit]):
         median = np.ma.median(data[data < limit])
-        logging.info(
+        logger.info(
             f"The median was too high (> {limit}), "
             f"found a better one: {median}."
         )
@@ -919,12 +922,12 @@ def median_std(valid_points: np.ma, std_devs: np.ma):
     standard deviation of those rows or columns.
     """
     maxvp = max(valid_points)
-    logging.info(f"Maximum count of valid pixels along axis: {maxvp}")
+    logger.info(f"Maximum count of valid pixels along axis: {maxvp}")
 
     std_w_maxvp = np.extract(valid_points == maxvp, std_devs)
     medstd = np.ma.median(std_w_maxvp)
-    logging.info(f"Number of rows/columns with that count: {len(std_w_maxvp)}")
-    logging.info(
+    logger.info(f"Number of rows/columns with that count: {len(std_w_maxvp)}")
+    logger.info(
         "Median standard deviation of elements along the axis "
         f"that have the maximum valid pixel count: {medstd}."
     )
@@ -954,7 +957,7 @@ def min_max_ex(
     if medstd > medstd_limit:
         medstd = medstd_fallback
         ex = 16
-        logging.info(
+        logger.info(
             "The derived medstd was too big, setting the medstd "
             f"to {medstd} and the exclusion value to {ex}."
         )
@@ -1088,18 +1091,18 @@ def find_minima_index(
         select_idx, idx_name = find_select_idx_name(
             central_idx, limit_idx, close_to_limit
         )
-        logging.info(info_str.format(idx_name, "inside"))
+        logger.info(info_str.format(idx_name, "inside"))
 
         min_i = min(central_idx, limit_idx)
         max_i = max(central_idx, limit_idx)
         inrange_i = minima_idxs[
             (minima_idxs >= min_i) * (minima_idxs <= max_i)
         ]
-        logging.info(str(inrange_i) + " are the indexes inside the range.")
+        logger.info(str(inrange_i) + " are the indexes inside the range.")
 
         try:
             value = min(np.take(pixel_counts, inrange_i))
-            logging.info(
+            logger.info(
                 f"{value} is the minimum Pixel count amongst those indexes."
             )
 
@@ -1108,18 +1111,18 @@ def find_minima_index(
             ][select_idx]
         except ValueError:
             if limit_idx < central_idx:
-                logging.info(info_str.format("min", "outside"))
+                logger.info(info_str.format("min", "outside"))
                 idx = max(minima_idxs[minima_idxs < limit_idx])
             elif limit_idx > central_idx:
-                logging.info(info_str.format("max", "outside"))
+                logger.info(info_str.format("max", "outside"))
                 idx = min(minima_idxs[minima_idxs > limit_idx])
             else:
                 # So limit_idx == central_idx, not good.
                 raise ValueError
 
-        logging.info(f"{idx} is the minimum index.")
+        logger.info(f"{idx} is the minimum index.")
     except ValueError:
-        logging.info(
+        logger.info(
             f"Could not find a valid minima, defaulting to {default}."
             # "Could not find a valid minima, returning "
             # f"the limit index: {limit_idx}."
@@ -1395,13 +1398,13 @@ def find_smart_window(
     max_indices = list()
 
     if len(minima_i) == 0:
-        logging.info("No minima found.")
+        logger.info("No minima found.")
         min_indices.append(0)
         max_indices.append(len(dn) - 1)
         max_prom_idx = None
     else:
         # The first guess is based on the mindn and maxdn values
-        logging.info(
+        logger.info(
             "Finding minima based on provided mindn and maxdn values."
         )
         min_indices.append(
@@ -1438,7 +1441,7 @@ def find_smart_window(
 
         # The second guess is based on the width of the largest prominence
         # in the data, and we need to do some pre-conditioning.
-        logging.info("Finding minima based on the largest prominence.")
+        logger.info("Finding minima based on the largest prominence.")
 
         (
             max_prom_idx,
@@ -1512,8 +1515,8 @@ def find_smart_window(
         maxdn,
     )
 
-    logging.info(f"indexes: {min_i}, {max_i}")
-    logging.info(f"DN window: {dn[min_i]}, {dn[max_i]}")
+    logger.info(f"indexes: {min_i}, {max_i}")
+    logger.info(f"DN window: {dn[min_i]}, {dn[max_i]}")
 
     # print(f"new_indexes: {new_min_i}, {new_max_i}")
     # print(f"new DN window: {dn[new_min_i]}, {dn[new_max_i]}")
@@ -1700,6 +1703,7 @@ def pick_index(
         than the fraction will choose the index farther from the centraldn.
     :return: two-tuple of ints which represent the minimum and maximum indices.
     """
+    logger = logging.getLogger(f"{__name__}.pick_index")
     # print(f"min_indices: {min_indices}")
     # print(f"max_indices: {max_indices}")
     # print(f"minima_i: {minima_i}")
@@ -1724,7 +1728,7 @@ def pick_index(
     new_i = [None, None]
     span_left = centraldn - ((centraldn - mindn) * span_factor)
     span_right = centraldn + ((maxdn - centraldn) * span_factor)
-    logging.info(
+    logger.info(
         f"DN edges of {span_factor} span envelope: {span_left}, {span_right}"
     )
     increment = (1, -1)
@@ -1732,7 +1736,7 @@ def pick_index(
         (0, min_indices, "min"),
         (1, max_indices, "max"),
     ):
-        logging.info(f"Picking the index for {message}")
+        logger.info(f"Picking the index for {message}")
         # print(f"indices: {indices}")
         # print(f"counts[indices[0]]: {counts[indices[0]]}")
         if len(set(indices)) == 1 and counts[indices[0]] < count_thresh:
@@ -1822,7 +1826,7 @@ def pick_index(
         if counts[new_i[m]] == 1:
             new_i[m] += increment[m]
 
-    # print(f"--in pick_index new are: {new_i}")
+    logger.debug(f"--in pick_index new are: {new_i}")
     return new_i[0], new_i[1]
 
 
