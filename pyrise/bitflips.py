@@ -1713,11 +1713,7 @@ def pick_index(
     # print(f"scaled: {scaled}")
 
     count_thresh = min(count_ceiling, counts[max_prom_i] * max_count_fraction)
-    # print(f"min/max i: {min_i}, {max_i}")
-    # print(f"min/max ips: {min_i_ips}, {max_i_ips}")
-    # print(f"count_thresh: {count_thresh}")
-    # print(f"count min/max i: {counts[min_i]} {counts[max_i]}")
-    # print(f"count min/max ips: {counts[min_i_ips]} {counts[max_i_ips]}")
+    logger.debug(f"count_thresh: {count_thresh}")
 
     # print(f"{max_prom_left}, {max_prom_right}")
     # print(
@@ -1737,8 +1733,8 @@ def pick_index(
         (1, max_indices, "max"),
     ):
         logger.info(f"Picking the index for {message}")
-        # print(f"indices: {indices}")
-        # print(f"counts[indices[0]]: {counts[indices[0]]}")
+        logger.debug(f"indices: {indices}")
+        logger.debug(f"counts[indices[0]]: {counts[indices[0]]}")
         if len(set(indices)) == 1 and counts[indices[0]] < count_thresh:
             # logging.info(
             #     f"Input indices for {message} are all the same and below "
@@ -1749,16 +1745,16 @@ def pick_index(
             left = min(indices)
             right = max(indices)
             consider_end = False
-            # print(f"minima_i: {minima_i}")
-            # print(f"{left} LR {right}")
+            logger.debug(f"minima_i: {minima_i}")
+            logger.debug(f"{left} LR {right}")
             if m == 0:
                 potential_idxs = minima_i[(minima_i <= right)]
             else:
-                # print(minima_i >= left)
+                logger.debug(minima_i >= left)
                 potential_idxs = minima_i[(minima_i >= left)]
-            # print(f"potential_idxs: {potential_idxs}")
-            # print(f"potential_idxs: {len(potential_idxs)}")
-            # print(f"counts: {len(counts)}")
+            logger.debug(f"potential_idxs: {potential_idxs}")
+            logger.debug(f"potential_idxs: {len(potential_idxs)}")
+            logger.debug(f"counts: {len(counts)}")
 
             if len(potential_idxs) == 0:
                 below_thresh = np.array([indices])
@@ -1766,7 +1762,7 @@ def pick_index(
                 below_thresh = potential_idxs[
                     counts[potential_idxs] < count_thresh
                 ]
-                # print(f"below_thresh: {below_thresh}")
+                logger.debug(f"below_thresh: {below_thresh}")
                 if np.size(below_thresh) == 0:
                     consider_end = True
                     if np.size(potential_idxs) > 0:
@@ -1775,16 +1771,16 @@ def pick_index(
                         # Whoa, no potentials, either, so just fall back to the
                         # pair
                         below_thresh = np.array([indices])
-                    # print(f"fixed below_thresh: {below_thresh}")
+                    logger.debug(f"fixed below_thresh: {below_thresh}")
 
             if m == 0:
                 in_span = below_thresh[dn[below_thresh] >= span_left]
             else:
                 in_span = below_thresh[dn[below_thresh] <= span_right]
-            # print(f"in_span: {in_span}")
+            logger.debug(f"in_span: {in_span}")
             if np.size(in_span) == 0:
                 in_span = below_thresh
-                # print(f"fixed in_span: {in_span}")
+                logger.debug(f"fixed in_span: {in_span}")
 
             new_i[m] = best_index(
                 scaled, counts, minima_i, in_span[0], in_span[-1], bool(m),
@@ -1792,7 +1788,9 @@ def pick_index(
             )
 
             end_idx = 0 if m == 0 else len(dn) - 1
-            # print(f"Consider: {consider_end} {counts[end_idx]} {dn[end_idx]} ")
+            logger.debug(
+                f"Consider: {consider_end} {counts[end_idx]} {dn[end_idx]} "
+            )
             if (
                 consider_end and
                 (
@@ -1803,13 +1801,13 @@ def pick_index(
                     new_i[m] == minima_i[-1 * m]
                 )
             ):
-                # print("Considering the end element")
+                logger.debug("Considering the end element")
                 low_i = min(new_i[m], end_idx)
                 high_i = max(new_i[m], end_idx)
                 pixels = np.sum(counts[low_i:high_i])
-                # print(f"pixels {pixels}")
+                logger.debug(f"pixels between {pixels}")
                 f = pixels / np.sum(counts)
-                # print(f"fraction {f}")
+                logger.debug(f"fraction {f}")
                 if f > count_fraction:
                     new_i[m] = high_i if m else low_i
                 else:
@@ -1826,7 +1824,7 @@ def pick_index(
         if counts[new_i[m]] == 1:
             new_i[m] += increment[m]
 
-    logger.debug(f"--in pick_index new are: {new_i}")
+    logger.debug(f"picked indexes are: {new_i}")
     return new_i[0], new_i[1]
 
 
@@ -1959,7 +1957,7 @@ def best_index(
         include it.
     :return: index into *counts*
     """
-    # print(f"--in best_index")
+    logger = logging.getLogger(f"{__name__}.best_index")
 
     # If they're the same, short circuit this whole function.
     if i1 == i2:
@@ -1995,23 +1993,23 @@ def best_index(
     )
     # print(deepest_idxs)
     if deepest_idxs.size == 1:
-        # print("Only one deepest idx")
+        logger.debug("Only one deepest idx")
         idx = minima_i[deepest_idxs[0]]
     else:
-        # print("Multiple deepest minima")
+        logger.debug("Multiple deepest minima")
         low_i = minima_i[deepest_idxs[0]]
         high_i = minima_i[deepest_idxs[-1]]
 
-        # print(f"{low_i}, {high_i}")
+        logger.debug(f"{low_i}, {high_i}")
         pixels = np.sum(counts[low_i:high_i])
         f = pixels / np.sum(counts)
         # print(f)
         if f > fraction:
-            # print("greater than frac, keep?")
+            logger.debug("greater than frac, keep?")
             # lots of pixels, pick outermost
             idx = high_i if maximum else low_i
         else:
-            # print("less than frac, noise?")
+            logger.debug("less than frac, noise?")
             # not may pixels, probably noise?
             idx = low_i if maximum else high_i
 
@@ -2020,7 +2018,7 @@ def best_index(
     # print(scaled[s_min_i])
     # print(scaled[s_max_i])
     # idx = minima_i[s_min_i + best_idx]
-    # print(f"--in best_index, idx is: {idx}")
+    logger.debug(f"best_index is: {idx}")
 
     return idx
 
