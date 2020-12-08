@@ -830,7 +830,7 @@ def find_smart_window_from_ma(
     data: np.ma.array,
     width=5,
     axis=0,
-    medstd_limit=300,
+    medstd_limit=400,
     medstd_fallback=64,
     plot=False,
     plottitle=None,
@@ -935,7 +935,7 @@ def median_std(valid_points: np.ma, std_devs: np.ma):
 
 
 def min_max_ex(
-    central, medstd, width, medstd_limit=300, medstd_fallback=64
+    central, medstd, width, medstd_limit=400, medstd_fallback=64
 ) -> tuple:
     """Return a minimum, maximum, and exclusion value based on the
     provided *central* value, and adding and subtracting the result
@@ -1980,10 +1980,13 @@ def best_index(
 
     s_min_i = min(scaled_idxs)
     s_max_i = max(scaled_idxs)
-    # print(s_min_i)
-    # print(s_max_i)
+    logger.debug(f"s_min_i: {s_min_i}")
+    logger.debug(f"s_max_i: {s_max_i}")
 
-    # print(scaled[s_min_i:s_max_i + 1])
+    logger.debug(
+        f"scaled depths between s_min_i and s_max_i: "
+        f"{scaled[s_min_i:s_max_i + 1]}"
+    )
     deepest_idxs = (
         np.where(
             scaled[s_min_i : s_max_i + 1]
@@ -1991,7 +1994,7 @@ def best_index(
         )[0]
         + s_min_i
     )
-    # print(deepest_idxs)
+    logger.debug(f"deepest_idxs: {deepest_idxs}")
     if deepest_idxs.size == 1:
         logger.debug("Only one deepest idx")
         idx = minima_i[deepest_idxs[0]]
