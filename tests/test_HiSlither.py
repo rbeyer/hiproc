@@ -25,60 +25,83 @@ import pyrise.HiSlither as sli
 
 
 def getkey(cube, group, key):
-            values = {'ProductId': None,
-                      'Summing': 2,
-                      'Lines': 1024,
-                      'Samples': 1024,
-                      'TDI': 64,
-                      'StitchedProductIds': ['PSP_010502_2090_RED4_0',
-                                             'PSP_010502_2090_RED4_1']}
-            return values[key]
+    values = {
+        "ProductId": None,
+        "Summing": 2,
+        "Lines": 1024,
+        "Samples": 1024,
+        "TDI": 64,
+        "StitchedProductIds": [
+            "PSP_010502_2090_RED4_0",
+            "PSP_010502_2090_RED4_1",
+        ],
+    }
+    return values[key]
 
 
 class TestHiSlither(unittest.TestCase):
-
-    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch("pyrise.HiColorInit.isis.getkey_k", side_effect=getkey)
     def test_cube_check(self, m_getkey):
-        r = hci.HiColorCube('dummy/PSP_010502_2090_RED5.HiStitch.balance.cub')
-        i = hci.HiColorCube('dummy/PSP_010502_2090_IR11.HiStitch.balance.precolor.cub')
-        b = hci.HiColorCube('dummy/PSP_010502_2090_BG13.HiStitch.balance.precolor.cub')
+        r = hci.HiColorCube("dummy/PSP_010502_2090_RED5.HiStitch.balance.cub")
+        i = hci.HiColorCube(
+            "dummy/PSP_010502_2090_IR11.HiStitch.balance.precolor.cub"
+        )
+        b = hci.HiColorCube(
+            "dummy/PSP_010502_2090_BG13.HiStitch.balance.precolor.cub"
+        )
         self.assertTrue(sli.cube_check(r, i, b))
         self.assertTrue(sli.cube_check(r, None, b))
         self.assertFalse(sli.cube_check(None, None, None))
         self.assertFalse(sli.cube_check(None, i, b))
         self.assertFalse(sli.cube_check(r, i, None))
 
-    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch("pyrise.HiColorInit.isis.getkey_k", side_effect=getkey)
     def test_get_slither_path(self, m_getkey):
-        c = hci.HiColorCube('dummy/PSP_010502_2090_IR10.HiStitch.balance.precolor.cub')
-        self.assertEqual(sli.get_slither_path(c),
-                         Path('dummy/PSP_010502_2090_IR10.slither.cub'))
+        c = hci.HiColorCube(
+            "dummy/PSP_010502_2090_IR10.HiStitch.balance.precolor.cub"
+        )
+        self.assertEqual(
+            sli.get_slither_path(c),
+            Path("dummy/PSP_010502_2090_IR10.slither.cub"),
+        )
 
-    @patch('pyrise.HiSlither.isis.editlab')
-    @patch('pyrise.HiSlither.isis.mask')
-    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch("pyrise.HiSlither.isis.editlab")
+    @patch("pyrise.HiSlither.isis.mask")
+    @patch("pyrise.HiColorInit.isis.getkey_k", side_effect=getkey)
     def test_make_dummy_IR(self, m_getkey, m_mask, m_editlab):
-        r = hci.HiColorCube('dummy/PSP_010502_2090_RED4.HiStitch.balance.cub')
-        b = hci.HiColorCube('dummy/PSP_010502_2090_BG12.HiStitch.balance.precolor.cub')
-        self.assertEqual(sli.make_dummy_IR(r, b),
-                         Path('dummy/PSP_010502_2090_IR10.slither.cub'))
+        r = hci.HiColorCube("dummy/PSP_010502_2090_RED4.HiStitch.balance.cub")
+        b = hci.HiColorCube(
+            "dummy/PSP_010502_2090_BG12.HiStitch.balance.precolor.cub"
+        )
+        self.assertEqual(
+            sli.make_dummy_IR(r, b),
+            Path("dummy/PSP_010502_2090_IR10.slither.cub"),
+        )
 
-    @patch('pyrise.HiSlither.isis.slither')
-    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch("pyrise.HiSlither.isis.slither")
+    @patch("pyrise.HiColorInit.isis.getkey_k", side_effect=getkey)
     def test_run_slither(self, m_getkey, m_slither):
-        c = hci.HiColorCube('dummy/PSP_010502_2090_IR10.HiStitch.balance.precolor.cub')
+        c = hci.HiColorCube(
+            "dummy/PSP_010502_2090_IR10.HiStitch.balance.precolor.cub"
+        )
         sli.run_slither(c)
         m_slither.called_once()
 
-    @patch('pyrise.HiSlither.isis.trim')
-    @patch('pyrise.HiSlither.isis.hicubeit')
-    @patch('pyrise.HiSlither.run_slither')
-    @patch('pyrise.HiColorInit.isis.getkey_k', side_effect=getkey)
+    @patch("pyrise.HiSlither.isis.trim")
+    @patch("pyrise.HiSlither.isis.hicubeit")
+    @patch("pyrise.HiSlither.run_slither")
+    @patch("pyrise.HiColorInit.isis.getkey_k", side_effect=getkey)
     def test_HiSlither(self, m_getkey, m_sli, m_hicubeit, m_trim):
-        r = hci.HiColorCube('dummy/PSP_010502_2090_RED5.HiStitch.balance.cub')
-        i = hci.HiColorCube('dummy/PSP_010502_2090_IR11.HiStitch.balance.precolor.cub')
-        b = hci.HiColorCube('dummy/PSP_010502_2090_BG13.HiStitch.balance.precolor.cub')
-        self.assertEqual(sli.HiSlither(r, i, b, keep=True),
-                         Path('dummy/PSP_010502_2090_COLOR5.cub'))
+        r = hci.HiColorCube("dummy/PSP_010502_2090_RED5.HiStitch.balance.cub")
+        i = hci.HiColorCube(
+            "dummy/PSP_010502_2090_IR11.HiStitch.balance.precolor.cub"
+        )
+        b = hci.HiColorCube(
+            "dummy/PSP_010502_2090_BG13.HiStitch.balance.precolor.cub"
+        )
+        self.assertEqual(
+            sli.HiSlither(r, i, b, keep=True),
+            Path("dummy/PSP_010502_2090_COLOR5.cub"),
+        )
         _, trim_args = m_trim.call_args
-        self.assertEqual(trim_args['left'], 3)
+        self.assertEqual(trim_args["left"], 3)

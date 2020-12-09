@@ -67,13 +67,9 @@ def set_logger(logger, i, filename=None) -> None:
     ch.setLevel(log_level)
 
     if log_level < 20:  # less than INFO
-        formatter = logging.Formatter(
-            "%(name)s - %(levelname)s: %(message)s"
-        )
+        formatter = logging.Formatter("%(name)s - %(levelname)s: %(message)s")
     else:
-        formatter = logging.Formatter(
-            "%(levelname)s: %(message)s"
-        )
+        formatter = logging.Formatter("%(levelname)s: %(message)s")
 
     ch.setFormatter(formatter)
     logger.addHandler(ch)

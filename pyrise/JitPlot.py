@@ -45,13 +45,20 @@ import pyrise.HiJitReg as hjr
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     parents=[util.parent_parser()])
-    parser.add_argument('-c', '--conf',    required=False,
-                        default=Path(__file__).resolve().parent.parent /
-                        'data' / 'HiJitReg.conf')
-    parser.add_argument('cubes', metavar="balance.precolor.cub files",
-                        nargs='+')
+    parser = argparse.ArgumentParser(
+        description=__doc__, parents=[util.parent_parser()]
+    )
+    parser.add_argument(
+        "-c",
+        "--conf",
+        required=False,
+        default=Path(__file__).resolve().parent.parent
+        / "data"
+        / "HiJitReg.conf",
+    )
+    parser.add_argument(
+        "cubes", metavar="balance.precolor.cub files", nargs="+"
+    )
 
     args = parser.parse_args()
 
@@ -65,8 +72,8 @@ def main():
     plt.ioff()
     fig, axes = plt.subplots(1, 4, sharex=True, sharey=True)
 
-    axes[0].set_ylabel('Line')
-    fig.text(0.5, 0.04, 'Error Magnitude (pixels)', ha='center', va='center')
+    axes[0].set_ylabel("Line")
+    fig.text(0.5, 0.04, "Error Magnitude (pixels)", ha="center", va="center")
 
     for c, ax in zip([ir10, ir11, bg12, bg13], axes):
         if c is None:
@@ -81,21 +88,37 @@ def main():
         size = 5
         if len(accepted) > 0:
             acceptA = np.array(accepted)
-            ax.scatter(acceptA[:, 1], acceptA[:, 0], s=size,
-                       label='Accepted', facecolors='none', edgecolors='black')
+            ax.scatter(
+                acceptA[:, 1],
+                acceptA[:, 0],
+                s=size,
+                label="Accepted",
+                facecolors="none",
+                edgecolors="black",
+            )
         if len(rejected) > 0:
             rejectedA = np.array(rejected)
-            ax.scatter(rejectedA[:, 1], rejectedA[:, 0], c='red', s=size,
-                       label='Rejected')
+            ax.scatter(
+                rejectedA[:, 1],
+                rejectedA[:, 0],
+                c="red",
+                s=size,
+                label="Rejected",
+            )
         if len(smoothed) > 0:
             smoothedA = np.array(smoothed)
-            ax.scatter(smoothedA[:, 1], smoothedA[:, 0], c='blue', s=size,
-                       label='Smoothed')
+            ax.scatter(
+                smoothedA[:, 1],
+                smoothedA[:, 0],
+                c="blue",
+                s=size,
+                label="Smoothed",
+            )
     fig.suptitle(str(j.get_obsid()))
     bottom, top = plt.ylim()
     plt.ylim(top, bottom)
     plt.xlim(0, 10)
-    plt.legend(loc='upper right', bbox_to_anchor=(1, -0.05), ncol=3)
+    plt.legend(loc="upper right", bbox_to_anchor=(1, -0.05), ncol=3)
     plt.show()
     return
 
@@ -107,22 +130,25 @@ def filter_and_smooth(j: hjr.JitterCube) -> tuple:
 
     for i, cm in enumerate(j.control_measures):
         start = 0
-        end = int(i + j['BoxcarLength'] / 2)
+        end = int(i + j["BoxcarLength"] / 2)
 
-        if i > j['BoxcarLength'] / 2:
-            start = int(i - j['BoxcarLength'] / 2)
+        if i > j["BoxcarLength"] / 2:
+            start = int(i - j["BoxcarLength"] / 2)
 
-        error_median = statistics.median(map(lambda x: x['ErrorMagnitude'],
-                                             j.control_measures[start:end]))
+        error_median = statistics.median(
+            map(lambda x: x["ErrorMagnitude"], j.control_measures[start:end])
+        )
 
-        point = (cm['Row'] * j['LineSpacing'], cm['ErrorMagnitude'])
+        point = (cm["Row"] * j["LineSpacing"], cm["ErrorMagnitude"])
         smoothed.append((point[0], error_median))
 
-        if(abs(cm['ErrorMagnitude'] - error_median) > j['ExcludeLimit'] or
-           cm['PointId'] in j.IgnoredPoints):
+        if (
+            abs(cm["ErrorMagnitude"] - error_median) > j["ExcludeLimit"]
+            or cm["PointId"] in j.IgnoredPoints
+        ):
             rejected.append(point)
-            logging.info('Rejecting {}, {}'.format(cm['Row'], cm['Column']))
+            logging.info("Rejecting {}, {}".format(cm["Row"], cm["Column"]))
         else:
             accepted.append(point)
 
-    return(accepted, rejected, smoothed)
+    return accepted, rejected, smoothed

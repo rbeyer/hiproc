@@ -57,7 +57,7 @@ clean-test: ## remove test and coverage artifacts
 	rm -fr test-resources
 
 lint: ## check style with flake8
-	flake8 pyrise tests
+	flake8 --max-complexity 10 --ignore E203,E501,W503 pyrise tests
 
 test: test-resources ## run tests quickly with the default Python
 	pytest

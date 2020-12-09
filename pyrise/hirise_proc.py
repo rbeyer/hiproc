@@ -37,16 +37,8 @@
 
 
 import argparse
-import hashlib
 import itertools
-import json
-import logging
-import math
-import os
 from pathlib import Path
-
-import pvl
-import kalasiris as isis
 
 import pyrise.hirise as hirise
 import pyrise.util as util
@@ -65,7 +57,6 @@ import pyrise.HiJACK as HiJACK
 
 
 class ChannelCube(hirise.ChannelID):
-
     def __init__(self, pathlike, db=None):
         self.path = Path(pathlike)
         self.nextpath = self.path
@@ -74,27 +65,47 @@ class ChannelCube(hirise.ChannelID):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     parents=[util.parent_parser()])
-    parser.add_argument('-c', '--color', action='store_true',
-                        help='Perform Color processing.')
-    parser.add_argument('-p', '--precision', action='store_true',
-                        help='Perform HiPrecision processing to result '
-                        'in NOPROJ.cub that might be processed through '
-                        'HiJACK.')
-    parser.add_argument('-j', '--jack', action='store_true',
-                        help='Do not test if HiJACK is needed, but force '
-                        'HiJACK to run.')
-    parser.add_argument('img', metavar="some.img-file", nargs='+',
-                        help='More than one can be listed here.')
+    parser = argparse.ArgumentParser(
+        description=__doc__, parents=[util.parent_parser()]
+    )
     parser.add_argument(
-        '--conf_dir', required=False, type=Path,
-        default=Path(__file__).resolve().parent.parent / 'data')
-    parser.add_argument('--db', required=False, default='.HiCat.json',
-                        help="The .json file to use.  Optionally, if it "
-                        "starts with a '.' it is considered an extension "
-                        "and will be swapped with the input file's "
-                        "extension to find the .json file to use.")
+        "-c", "--color", action="store_true", help="Perform Color processing."
+    )
+    parser.add_argument(
+        "-p",
+        "--precision",
+        action="store_true",
+        help="Perform HiPrecision processing to result "
+        "in NOPROJ.cub that might be processed through "
+        "HiJACK.",
+    )
+    parser.add_argument(
+        "-j",
+        "--jack",
+        action="store_true",
+        help="Do not test if HiJACK is needed, but force " "HiJACK to run.",
+    )
+    parser.add_argument(
+        "img",
+        metavar="some.img-file",
+        nargs="+",
+        help="More than one can be listed here.",
+    )
+    parser.add_argument(
+        "--conf_dir",
+        required=False,
+        type=Path,
+        default=Path(__file__).resolve().parent.parent / "data",
+    )
+    parser.add_argument(
+        "--db",
+        required=False,
+        default=".HiCat.json",
+        help="The .json file to use.  Optionally, if it "
+        "starts with a '.' it is considered an extension "
+        "and will be swapped with the input file's "
+        "extension to find the .json file to use.",
+    )
 
     args = parser.parse_args()
 
@@ -103,13 +114,13 @@ def main():
     oid = hirise.get_ObsID_fromfile(args.img[0])
     parent = Path(args.img[0]).parent
     if args.img == 1:
-        imgs = parent.glob(f'{oid}*.img') + parent.glob(f'{oid}*.IMG')
+        imgs = parent.glob(f"{oid}*.img") + parent.glob(f"{oid}*.IMG")
     else:
         imgs = args.img
 
     db_list = None
     try:
-        get_cubes(f'{oid}*balance.cub', parent)
+        get_cubes(f"{oid}*balance.cub", parent)
     except FileNotFoundError:
         chancubes = edr2stitch(imgs, args.conf_dir, keep=args.keep)
         db_list = [x.db for x in chancubes]
@@ -122,12 +133,13 @@ def main():
         if args.jack:
             jack = True
         else:
-            slithers = list(parent.glob(f'*.slither.txt'))
+            slithers = list(parent.glob(f"*.slither.txt"))
 
             # HiPrecisionInit to determine if you need to HiNoProj or HiJACK
             #   takes *slither.txt
             HiJACK_flags = HiPrecisionInit.start(
-                slithers, args.conf_dir / 'HiPrecisionInit.conf')
+                slithers, args.conf_dir / "HiPrecisionInit.conf"
+            )
 
             if any(HiJACK_flags):
                 jack = True
@@ -138,29 +150,35 @@ def main():
 def get_cubes(glob: str, parent: Path) -> list:
     cubes = list(parent.glob(glob))
     if len(cubes) == 0:
-        raise FileNotFoundError('Did not find any files that match '
-                                f'{glob} in {parent}.')
+        raise FileNotFoundError(
+            "Did not find any files that match " f"{glob} in {parent}."
+        )
     return cubes
 
 
 def edr2stitch(images, conf_dir, keep=False):
     chids = list()
     for i in images:
-        out_edr = util.path_w_suffix('.EDR_Stats.cub', i)
+        out_edr = util.path_w_suffix(".EDR_Stats.cub", i)
 
         # EDR_Stats
-        db = EDR_Stats.EDR_Stats(i, out_edr,
-                                 conf_dir / 'EDR_Stats_gains_config.pvl',
-                                 keep=keep)
+        db = EDR_Stats.EDR_Stats(
+            i, out_edr, conf_dir / "EDR_Stats_gains_config.pvl", keep=keep
+        )
 
         # HiCal
-        out_hical = util.path_w_suffix('.HiCal.cub', out_edr)
+        out_hical = util.path_w_suffix(".HiCal.cub", out_edr)
 
-        db = HiCal.start(out_edr, out_hical, db,
-                         HiCal.conf_setup(conf_dir / 'HiCal.conf',
-                                          'NoiseFilter.conf'),
-                         conf_dir / 'HiCal.conf',
-                         None, None, keep=keep)
+        db = HiCal.start(
+            out_edr,
+            out_hical,
+            db,
+            HiCal.conf_setup(conf_dir / "HiCal.conf", "NoiseFilter.conf"),
+            conf_dir / "HiCal.conf",
+            None,
+            None,
+            keep=keep,
+        )
 
         chids.append(ChannelCube(out_hical, db))
 
@@ -168,11 +186,15 @@ def edr2stitch(images, conf_dir, keep=False):
     # get Channel pairs
     cids = list()
     for chid1, chid2 in get_CCDpairs(chids):
-        (db, o_path) = HiStitch.start(chid1.nextpath, chid2.nextpath,
-                                      chid1.db, chid2.db,
-                                      '.HiStitch.cub',
-                                      conf_dir / 'HiStitch.conf',
-                                      keep=keep)
+        (db, o_path) = HiStitch.start(
+            chid1.nextpath,
+            chid2.nextpath,
+            chid1.db,
+            chid2.db,
+            ".HiStitch.cub",
+            conf_dir / "HiStitch.conf",
+            keep=keep,
+        )
         cid = HiccdStitch.HiccdStitchCube(o_path)
         cid.gather_from_db(db)
         cids.append(cid)
@@ -181,31 +203,33 @@ def edr2stitch(images, conf_dir, keep=False):
     # need to separate by color:
     color_groups = get_color_groups(cids)
     for color_group in color_groups.values():
-        db, out_stitch = HiccdStitch.start(color_group,
-                                           conf_dir / 'HiccdStitch.conf',
-                                           '.HiccdStitch.cub', sline=None,
-                                           eline=None, keep=keep)
+        db, out_stitch = HiccdStitch.start(
+            color_group,
+            conf_dir / "HiccdStitch.conf",
+            ".HiccdStitch.cub",
+            sline=None,
+            eline=None,
+            keep=keep,
+        )
     # HiColorInit
     #   takes *balance.cub
     #   creates *[IR|BG]*.balance.precolor.cub
     #   Can then run JitPlot on these *.balance.precolor.cub
-    HiColorInit.start([c.nextpath for c in cids], '.precolor.cub',
-                      keep=keep)
+    HiColorInit.start([c.nextpath for c in cids], ".precolor.cub", keep=keep)
 
     # HiJitReg
     #   takes tmp/*balance.cub tmp/*balance.precolor.cub
     #   creates *regdef.pvl and *flat.tab files
     for_jitreg = list()
     for color, balcubes in color_groups.items():
-        if color == 'RED':
+        if color == "RED":
             for c in balcubes:
                 for_jitreg.append(c.nextpath)
         else:
             for c in balcubes:
-                for_jitreg.append(c.nextpath.with_suffix('.precolor.cub'))
+                for_jitreg.append(c.nextpath.with_suffix(".precolor.cub"))
 
-    HiJitReg.start(for_jitreg, conf_dir / 'HiJitReg.conf',
-                   keep=keep)
+    HiJitReg.start(for_jitreg, conf_dir / "HiJitReg.conf", keep=keep)
 
     # HiSlither
     #   takes same as HiJitReg (and assumes its products are available.
@@ -216,41 +240,44 @@ def edr2stitch(images, conf_dir, keep=False):
     return chids
 
 
-def color(obsid, path: Path, conf_dir: Path, parent: Path, db_list: list,
-          keep=False):
-    colors = get_cubes(f'{obsid}_COLOR*.cub', parent)
+def color(
+    obsid, path: Path, conf_dir: Path, parent: Path, db_list: list, keep=False
+):
+    colors = get_cubes(f"{obsid}_COLOR*.cub", parent)
 
     # HiColorNorm - only for color
     #   takes *COLOR[4|5].cub
     #   creates *UNFILTERED_COLOR[4|5].cub and *COLOR[4|5].HiColorNorm.cub
-    HiColorNorm.start(colors, '_COLOR.cub', conf_dir / 'HiColorNorm.conf',
-                      db_list, keep=keep)
+    HiColorNorm.start(
+        colors, "_COLOR.cub", conf_dir / "HiColorNorm.conf", db_list, keep=keep
+    )
 
     # HiBeautify - only for color
     #   takes tmp/*.HiColorNorm.cub
     #   creates *IRB.cub and *RGB.cub
     for x in colors:
-        x.with_suffix('.HiColorNorm.cub')
-    HiBeautify.start([x.with_suffix('.HiColorNorm.cub') for x in colors],
-                     conf_dir / 'HiBeautify.conf')
+        x.with_suffix(".HiColorNorm.cub")
+    HiBeautify.start(
+        [x.with_suffix(".HiColorNorm.cub") for x in colors],
+        conf_dir / "HiBeautify.conf",
+    )
     return
 
 
 def precision(obsid, conf_dir: Path, parent: Path, hijack=False, keep=False):
 
     if hijack:
-        bal_cubs = get_cubes(f'{obsid}*balance.cub', parent)
+        bal_cubs = get_cubes(f"{obsid}*balance.cub", parent)
         # HiJACK - starts with balance cubes, needs all the colors
         #   takes all color balance.cubs
         #   creates a whole slow of files in HiJACK/
-        HiJACK.start(bal_cubs, conf_dir, outdir=(parent / 'HiJACK'),
-                     keep=keep)
+        HiJACK.start(bal_cubs, conf_dir, outdir=(parent / "HiJACK"), keep=keep)
     else:
-        red_bal_cubs = get_cubes(f'{obsid}_RED*balance.cub', parent)
+        red_bal_cubs = get_cubes(f"{obsid}_RED*balance.cub", parent)
         # HiNoProj - alternate to HiccdStitch, starts with balance cubes
         #   takes only REDS: *RED*balance.cub
         #   creates PSP_010502_2090_RED.NOPROJ.cub
-        HiNoProj.start(red_bal_cubs, conf_dir / 'HiNoProj.conf', keep=keep)
+        HiNoProj.start(red_bal_cubs, conf_dir / "HiNoProj.conf", keep=keep)
 
     return
 

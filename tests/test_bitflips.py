@@ -46,12 +46,12 @@ class TestHist(unittest.TestCase):
     def setUp(self):
         HistRow = collections.namedtuple("HistRow", ["DN", "Pixels"])
         self.hist = [
-            HistRow(1, 1),   # 0 *
-            HistRow(2, 2),   # 1 **
-            HistRow(5, 3),   # 2 ***
-            HistRow(6, 4),   # 3 ****
-            HistRow(7, 3),   # 4 ***
-            HistRow(8, 2),   # 5 **
+            HistRow(1, 1),  # 0 *
+            HistRow(2, 2),  # 1 **
+            HistRow(5, 3),  # 2 ***
+            HistRow(6, 4),  # 3 ****
+            HistRow(7, 3),  # 4 ***
+            HistRow(8, 2),  # 5 **
             HistRow(10, 1),  # 6 *
             HistRow(11, 2),  # 7 **
             HistRow(12, 2),  # 8 **
@@ -239,7 +239,7 @@ class TestMock(unittest.TestCase):
                 Path("dummy-in.cub"),
                 Path("dummy-out.cub"),
                 width=5,
-                rev_area=True
+                rev_area=True,
             )
 
             # Need to build new test here.

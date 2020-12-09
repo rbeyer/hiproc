@@ -23,13 +23,12 @@ from .utils import resource_check as rc
 
 
 class TestResources(unittest.TestCase):
-
     def setUp(self):
-        t = Path('tests')
-        self.exists1 = t / 'test_hirise.py'
-        self.exists2 = t / 'test_utils.py'
-        self.not1 = t / 'notexists' / 'foo'
-        self.not2 = t / 'notexists' / 'foo2'
+        t = Path("tests")
+        self.exists1 = t / "test_hirise.py"
+        self.exists2 = t / "test_utils.py"
+        self.not1 = t / "notexists" / "foo"
+        self.not2 = t / "notexists" / "foo2"
 
     def test_have(self):
         (truth, test) = rc(self.exists1, self.exists2)

@@ -44,17 +44,23 @@ import pyrise.util as util
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     parents=[util.parent_parser()])
-    parser.add_argument('-c', '--conf',    required=False,
-                        default=Path(__file__).resolve().parent.parent /
-                        'data' / 'HiPrecisionInit.conf')
-    parser.add_argument('slither_text', metavar="slither.txt-files", nargs='+')
+    parser = argparse.ArgumentParser(
+        description=__doc__, parents=[util.parent_parser()]
+    )
+    parser.add_argument(
+        "-c",
+        "--conf",
+        required=False,
+        default=Path(__file__).resolve().parent.parent
+        / "data"
+        / "HiPrecisionInit.conf",
+    )
+    parser.add_argument("slither_text", metavar="slither.txt-files", nargs="+")
 
     args = parser.parse_args()
 
     # Ignore args.log to always print info when run from the command line.
-    util.set_logging('info')
+    util.set_logging("info")
 
     start(args.slither_text, args.conf)
 
@@ -65,17 +71,17 @@ def start(slither_paths: list, conf_path: os.PathLike):
     conf = pvl.load(str(conf_path))
 
     yes_HiJACK = list()
-    thresh = float(conf['HiPrecisionInit']['Mean_Jitter_Magnitude_Threshold'])
-    logging.info(f'Mean_Jitter_Magnitude_Threshold: {thresh}')
-    logging.info(f'Average\tProcess \tFile Name')
+    thresh = float(conf["HiPrecisionInit"]["Mean_Jitter_Magnitude_Threshold"])
+    logging.info(f"Mean_Jitter_Magnitude_Threshold: {thresh}")
+    logging.info(f"Average\tProcess \tFile Name")
     for s in slither_paths:
         (need, avediff) = needs_HiJACK(s, thresh)
         if need:
-            terminus = 'HiJACK  '
+            terminus = "HiJACK  "
         else:
-            terminus = 'HiNoProj'
+            terminus = "HiNoProj"
 
-        logging.info('{:.2}\t{}\t{}'.format(avediff, terminus, s))
+        logging.info("{:.2}\t{}\t{}".format(avediff, terminus, s))
         yes_HiJACK.append(need)
 
     return yes_HiJACK

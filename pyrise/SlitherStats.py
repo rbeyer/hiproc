@@ -40,12 +40,13 @@ import pyrise.util as util
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     parents=[util.parent_parser()])
-    parser.add_argument('-p', '--plot', action='store_true',
-                        help='Display plots')
-    parser.add_argument('slithertxts', metavar="slither.txt files",
-                        nargs='+')
+    parser = argparse.ArgumentParser(
+        description=__doc__, parents=[util.parent_parser()]
+    )
+    parser.add_argument(
+        "-p", "--plot", action="store_true", help="Display plots"
+    )
+    parser.add_argument("slithertxts", metavar="slither.txt files", nargs="+")
 
     args = parser.parse_args()
 
@@ -53,9 +54,12 @@ def main():
 
     for s in args.slithertxts:
         slitherstats = Polyfit(s, args.plot)
-        print(f'Stats for {s}')
-        print('Max Diff: {:.2f}\nAve Diff: {:.2f}\nStd Dev: {:.2f}'.format(
-            *slitherstats))
+        print(f"Stats for {s}")
+        print(
+            "Max Diff: {:.2f}\nAve Diff: {:.2f}\nStd Dev: {:.2f}".format(
+                *slitherstats
+            )
+        )
 
 
 def read_slithertxt(filename: os.PathLike) -> tuple:
@@ -65,10 +69,10 @@ def read_slithertxt(filename: os.PathLike) -> tuple:
 
     reg_statistics = list()
     consume = False
-    with open(filename, 'r') as f:
+    with open(filename, "r") as f:
         for line in f:
             if not consume:
-                if line.startswith('  FromLine'):
+                if line.startswith("  FromLine"):
                     reg_statistics.append(line)
                     consume = True
                 else:
@@ -85,42 +89,53 @@ def read_slithertxt(filename: os.PathLike) -> tuple:
     sampoffset = list()
 
     dialect = csv.Dialect
-    dialect.delimiter = ' '
+    dialect.delimiter = " "
     dialect.skipinitialspace = True
     dialect.quoting = csv.QUOTE_NONE
-    dialect.lineterminator = '\n'
+    dialect.lineterminator = "\n"
 
     reader = csv.DictReader(reg_statistics, dialect=dialect)
     for row in reader:
-        matchline.append(float(row['MatchLine']))
-        lineoffset.append(float(row['LineOffset']))
-        sampoffset.append(float(row['SampOffset']))
+        matchline.append(float(row["MatchLine"]))
+        lineoffset.append(float(row["LineOffset"]))
+        sampoffset.append(float(row["SampOffset"]))
 
     return (np.array(matchline), np.array(lineoffset), np.array(sampoffset))
 
 
-def plot_stats(filename, xline, magnitudes, poly_values,
-               poly_deg, absdiff, maxdiff, avediff):
+def plot_stats(
+    filename,
+    xline,
+    magnitudes,
+    poly_values,
+    poly_deg,
+    absdiff,
+    maxdiff,
+    avediff,
+):
 
     plt.ioff()
     fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True)
-    fig.suptitle(f'SliterStats for {filename}')
+    fig.suptitle(f"SliterStats for {filename}")
 
-    ax0.set_ylabel('Slither Magnitude (pixels)')
-    ax0.scatter(xline, magnitudes, label='Magnitude')
-    ax0.scatter(xline, poly_values, label=f'Polynomial Fit, degree {poly_deg}')
+    ax0.set_ylabel("Slither Magnitude (pixels)")
+    ax0.scatter(xline, magnitudes, label="Magnitude")
+    ax0.scatter(xline, poly_values, label=f"Polynomial Fit, degree {poly_deg}")
     ax0.legend()
 
-    ax1.set_ylabel('Jitter Amplitude (pixels)')
-    ax1.set_xlabel('Image Line')
+    ax1.set_ylabel("Jitter Amplitude (pixels)")
+    ax1.set_xlabel("Image Line")
     ax1.scatter(xline, absdiff)
     ax1.axhline(y=avediff)
 
-    ax1.text(1, 1,
-             'Maximum Diff: {:.2f}\nAverage Diff: {:.2f}'.format(maxdiff,
-                                                                 avediff),
-             verticalalignment='top', horizontalalignment='right',
-             transform=ax1.transAxes)
+    ax1.text(
+        1,
+        1,
+        "Maximum Diff: {:.2f}\nAverage Diff: {:.2f}".format(maxdiff, avediff),
+        verticalalignment="top",
+        horizontalalignment="right",
+        transform=ax1.transAxes,
+    )
 
     plt.show()
 
@@ -156,7 +171,15 @@ def Polyfit(slither_file: os.PathLike, plot=False) -> tuple:
     stddiff = np.std(absdiff)
 
     if plot:
-        plot_stats(slither_file, xline, magnitudes, poly_values,
-                   poly_deg, absdiff, maxdiff, avediff)
+        plot_stats(
+            slither_file,
+            xline,
+            magnitudes,
+            poly_values,
+            poly_deg,
+            absdiff,
+            maxdiff,
+            avediff,
+        )
 
     return (maxdiff, avediff, stddiff)

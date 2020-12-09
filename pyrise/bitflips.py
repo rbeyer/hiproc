@@ -318,7 +318,7 @@ def clean_cube(
         gdal_array.LoadFile(str(in_p)), specialpix.Min, specialpix.Max
     )
 
-    logger.info(f"Bit-flip cleaning Image area.")
+    logger.info("Bit-flip cleaning Image area.")
     # These four lines are just informational.
     img_mean = np.ma.mean(image)
     img_mode = mstats.mode(image, axis=None)[0][0]
@@ -435,7 +435,7 @@ def clean_img(
 
     image = np.ma.masked_outside(img_arr, specialpix.Min, specialpix.Max)
 
-    logger.info(f"Bit-flip cleaning Image area.")
+    logger.info("Bit-flip cleaning Image area.")
     (s_min, s_max) = find_smart_window_from_ma(
         image,
         width=width,
@@ -715,7 +715,7 @@ def clean_cal_tables(
             )
 
     if rev_area:
-        logger.info(f"Bit-flip cleaning Reverse-Clock area.")
+        logger.info("Bit-flip cleaning Reverse-Clock area.")
         # Apply the cleaning along the lines, rather than along
         # the columns, since the statistics are better, and also
         # restrict the medstd_limit down to 200, since these reverse
@@ -1407,9 +1407,7 @@ def find_smart_window(
         max_prom_idx = None
     else:
         # The first guess is based on the mindn and maxdn values
-        logger.info(
-            "Finding minima based on provided mindn and maxdn values."
-        )
+        logger.info("Finding minima based on provided mindn and maxdn values.")
         min_indices.append(
             find_minima_index(
                 central_min_i,
@@ -1677,7 +1675,7 @@ def pick_index(
     span_factor=2,
     count_ceiling=5000,
     max_count_fraction=0.0125,
-    count_fraction=0.09
+    count_fraction=0.09,
 ):
     """Returns a minimum and maximum index based on examining minima
     based on *min_indices* and *max_indices*.  Arguments that are
@@ -1792,23 +1790,25 @@ def pick_index(
                 logger.debug(f"fixed in_span: {in_span}")
 
             new_i[m] = best_index(
-                scaled, counts, minima_i, in_span[0], in_span[-1], bool(m),
-                fraction=count_fraction
+                scaled,
+                counts,
+                minima_i,
+                in_span[0],
+                in_span[-1],
+                bool(m),
+                fraction=count_fraction,
             )
 
         end_idx = 0 if m == 0 else len(dn) - 1
         logger.debug(
             f"Consider: {consider_end} {counts[end_idx]} {dn[end_idx]} "
         )
-        if (
-            consider_end and
+        if consider_end and (
             (
-                (
-                counts[end_idx] < count_thresh and
-                span_left <= dn[end_idx] <= span_right
-                ) or
-                new_i[m] == minima_i[-1 * m]
+                counts[end_idx] < count_thresh
+                and span_left <= dn[end_idx] <= span_right
             )
+            or new_i[m] == minima_i[-1 * m]
         ):
             logger.debug("Considering the end element")
             low_i = min(new_i[m], end_idx)
@@ -1820,9 +1820,8 @@ def pick_index(
             max_scaled = np.log10(
                 counts[maxima_i[-1 * m]] + max_prominences[-1 * m]
             ) - np.log10(counts[maxima_i[-1 * m]])
-            if (
-                f > count_fraction or
-                math.isclose(max_scaled, scaled[-1 * m], rel_tol=0.01)
+            if f > count_fraction or math.isclose(
+                max_scaled, scaled[-1 * m], rel_tol=0.01
             ):
                 new_i[m] = high_i if m else low_i
             else:

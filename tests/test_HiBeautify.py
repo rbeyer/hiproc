@@ -24,57 +24,77 @@ import pyrise.HiBeautify as hbeaut
 
 
 def getkey(cube, group, key):
-    values = {'ObservationId': 'PSP_010502_2090',
-              'ProductId': None,
-              'Summing': 2,
-              'Lines': 1024,
-              'Samples': 1024,
-              'Bands': 3,
-              'TDI': 64,
-              'Center': '(900, 700, 500) <NANOMETERS>',
-              'SourceProductId': ('PSP_010502_2090_RED4_0, PSP_010502_2090_RED4_1')}
+    values = {
+        "ObservationId": "PSP_010502_2090",
+        "ProductId": None,
+        "Summing": 2,
+        "Lines": 1024,
+        "Samples": 1024,
+        "Bands": 3,
+        "TDI": 64,
+        "Center": "(900, 700, 500) <NANOMETERS>",
+        "SourceProductId": ("PSP_010502_2090_RED4_0, PSP_010502_2090_RED4_1"),
+    }
     return values[key]
 
 
 class TestHiBeautify(unittest.TestCase):
-
-    @patch('pyrise.HiColorNorm.ColorCube.get_binning', return_value=2)
-    @patch('pyrise.HiColorNorm.isis.getkey_k', side_effect=getkey)
+    @patch("pyrise.HiColorNorm.ColorCube.get_binning", return_value=2)
+    @patch("pyrise.HiColorNorm.isis.getkey_k", side_effect=getkey)
     def setUp(self, m_getkey, m_get_binning):
-        c4 = hcn.ColorCube('dummy/PSP_010502_2090_COLOR4.HiColorNorm')
-        c5 = hcn.ColorCube('dummy/PSP_010502_2090_COLOR5.HiColorNorm')
+        c4 = hcn.ColorCube("dummy/PSP_010502_2090_COLOR4.HiColorNorm")
+        c5 = hcn.ColorCube("dummy/PSP_010502_2090_COLOR5.HiColorNorm")
         self.cubes = [c4, c5]
 
-    @patch('pyrise.HiBeautify.isis.cubeit_k')
-    @patch('pyrise.HiBeautify.isis.algebra')
-    @patch('pyrise.HiBeautify.isis.handmos')
+    @patch("pyrise.HiBeautify.isis.cubeit_k")
+    @patch("pyrise.HiBeautify.isis.algebra")
+    @patch("pyrise.HiBeautify.isis.handmos")
     def test_HiBeautify(self, m_handmos, m_algebra, m_cubeit_k):
-        conf = {'Beautify': {'Synthetic_A_Coefficient': 2,
-                             'Synthetic_B_Coefficient': 0.3}}
-        outirb = Path('outirb.cub')
-        outrgb = Path('outrgb.cub')
+        conf = {
+            "Beautify": {
+                "Synthetic_A_Coefficient": 2,
+                "Synthetic_B_Coefficient": 0.3,
+            }
+        }
+        outirb = Path("outirb.cub")
+        outrgb = Path("outrgb.cub")
         hbeaut.HiBeautify(self.cubes, (outirb, outrgb), conf, keep=True)
 
-        self.assertEqual(m_handmos.call_args_list,
-                         [call(self.cubes[0].path, create='Y',
-                               mosaic=outirb,
-                               nbands=3, nlines=1024, nsamp=2024.0,
-                               outband=1, outline=1, outsample=1),
-                          call(self.cubes[1].path,
-                               mosaic=outirb,
-                               outband=1, outline=1, outsample=1001)])
+        self.assertEqual(
+            m_handmos.call_args_list,
+            [
+                call(
+                    self.cubes[0].path,
+                    create="Y",
+                    mosaic=outirb,
+                    nbands=3,
+                    nlines=1024,
+                    nsamp=2024.0,
+                    outband=1,
+                    outline=1,
+                    outsample=1,
+                ),
+                call(
+                    self.cubes[1].path,
+                    mosaic=outirb,
+                    outband=1,
+                    outline=1,
+                    outsample=1001,
+                ),
+            ],
+        )
 
         args, kwargs = m_algebra.call_args
-        red = f'{outirb}+2'
-        bg = f'{outirb}+3'
-        blue = m_algebra.call_args[1]['to']
+        red = f"{outirb}+2"
+        bg = f"{outirb}+3"
+        blue = m_algebra.call_args[1]["to"]
         self.assertEqual(m_algebra.call_args[0][0], bg)
-        self.assertEqual(m_algebra.call_args[1]['A'], 2)
-        self.assertEqual(m_algebra.call_args[1]['B'], 0.3)
-        self.assertEqual(m_algebra.call_args[1]['from2'], red)
-        self.assertEqual(m_algebra.call_args[1]['op'], 'subtract')
-        self.assertTrue(str(blue).endswith('_B.cub'))
+        self.assertEqual(m_algebra.call_args[1]["A"], 2)
+        self.assertEqual(m_algebra.call_args[1]["B"], 0.3)
+        self.assertEqual(m_algebra.call_args[1]["from2"], red)
+        self.assertEqual(m_algebra.call_args[1]["op"], "subtract")
+        self.assertTrue(str(blue).endswith("_B.cub"))
 
-        self.assertEqual(m_cubeit_k.call_args_list,
-                         [call([red, bg, blue],
-                               to=outrgb)])
+        self.assertEqual(
+            m_cubeit_k.call_args_list, [call([red, bg, blue], to=outrgb)]
+        )

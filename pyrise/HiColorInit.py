@@ -38,10 +38,12 @@ import pyrise.hirise as hirise
 import pyrise.util as util
 
 
-CCD_Corresponence = {'IR10': 'RED4',
-                     'IR11': 'RED5',
-                     'BG12': 'RED4',
-                     'BG13': 'RED5'}
+CCD_Corresponence = {
+    "IR10": "RED4",
+    "IR11": "RED5",
+    "BG12": "RED4",
+    "BG13": "RED5",
+}
 
 
 class HiColorCube(hirise.CCDID):
@@ -51,29 +53,33 @@ class HiColorCube(hirise.CCDID):
 
         self.path = Path(pathlike)
         super().__init__(hirise.get_CCDID_fromfile(self.path))
-        self.bin = int(isis.getkey_k(self.path, 'Instrument', 'Summing'))
-        self.tdi = int(isis.getkey_k(self.path, 'Instrument', 'TDI'))
-        self.lines = int(isis.getkey_k(self.path, 'Dimensions', 'Lines'))
-        self.samps = int(isis.getkey_k(self.path, 'Dimensions', 'Samples'))
+        self.bin = int(isis.getkey_k(self.path, "Instrument", "Summing"))
+        self.tdi = int(isis.getkey_k(self.path, "Instrument", "TDI"))
+        self.lines = int(isis.getkey_k(self.path, "Dimensions", "Lines"))
+        self.samps = int(isis.getkey_k(self.path, "Dimensions", "Samples"))
 
     def __repr__(self):
-        return (f'{self.__class__.__name__}(\'{self.path}\')')
+        return f"{self.__class__.__name__}('{self.path}')"
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     parents=[util.parent_parser()])
-    parser.add_argument('-o', '--output_suffix', required=False,
-                        default='.precolor.cub')
-    parser.add_argument('cubes', metavar="balance.cub-files", nargs='+')
+    parser = argparse.ArgumentParser(
+        description=__doc__, parents=[util.parent_parser()]
+    )
+    parser.add_argument(
+        "-o", "--output_suffix", required=False, default=".precolor.cub"
+    )
+    parser.add_argument("cubes", metavar="balance.cub-files", nargs="+")
 
     args = parser.parse_args()
 
     util.set_logging(args.log)
 
-    if not args.output_suffix.startswith('.'):
-        logging.critical('--output_suffix must start with a period, and it '
-                         f'does not: {args.output_suffix}')
+    if not args.output_suffix.startswith("."):
+        logging.critical(
+            "--output_suffix must start with a period, and it "
+            f"does not: {args.output_suffix}"
+        )
         sys.exit()
 
     try:
@@ -82,11 +88,11 @@ def main():
         logging.critical(err)
         sys.exit()
     except subprocess.CalledProcessError as err:
-            print('Had an ISIS error:')
-            print(' '.join(err.cmd))
-            print(err.stdout)
-            print(err.stderr)
-            raise err
+        print("Had an ISIS error:")
+        print(" ".join(err.cmd))
+        print(err.stdout)
+        print(err.stderr)
+        raise err
     return
 
 
@@ -96,12 +102,11 @@ def start(cube_paths: list, output_suffix: str, keep=False):
     (red4, red5, ir10, ir11, bg12, bg13) = separate_ccds(cubes)
 
     if red4 is None and red5 is None:
-        raise ValueError('Neither RED4 nor RED5 were provided.')
+        raise ValueError("Neither RED4 nor RED5 were provided.")
 
     if red4 is not None and red5 is not None:
-        if(red4.lines != red5.lines or
-           red4.samps != red5.samps):
-            raise ValueError('RED4 dimensions not equal to RED5 dimensions!')
+        if red4.lines != red5.lines or red4.samps != red5.samps:
+            raise ValueError("RED4 dimensions not equal to RED5 dimensions!")
 
     if red4 is not None:
         HiColorInit(red4, ir10, bg12, output_suffix, keep=keep)
@@ -114,17 +119,17 @@ def separate_ccds(cubes: list) -> tuple:
     """Return a tuple of six values, either HiColorCubes, or None."""
     red4 = red5 = ir10 = ir11 = bg12 = bg13 = None
     for c in cubes:
-        if c.ccdnumber == '4':
+        if c.ccdnumber == "4":
             red4 = c
-        elif c.ccdnumber == '5':
+        elif c.ccdnumber == "5":
             red5 = c
-        elif c.ccdnumber == '10':
+        elif c.ccdnumber == "10":
             ir10 = c
-        elif c.ccdnumber == '11':
+        elif c.ccdnumber == "11":
             ir11 = c
-        elif c.ccdnumber == '12':
+        elif c.ccdnumber == "12":
             bg12 = c
-        elif c.ccdnumber == '13':
+        elif c.ccdnumber == "13":
             bg13 = c
         else:
             # Not one of the six that we care about,
@@ -133,16 +138,32 @@ def separate_ccds(cubes: list) -> tuple:
     return (red4, red5, ir10, ir11, bg12, bg13)
 
 
-def HiColorInit(red: HiColorCube, ir: HiColorCube, bg: HiColorCube,
-                outsuffix: str, keep=False):
+def HiColorInit(
+    red: HiColorCube,
+    ir: HiColorCube,
+    bg: HiColorCube,
+    outsuffix: str,
+    keep=False,
+):
     """Do all of the scaling and cropping for a RED/IR/BG set."""
 
-    if len(set(map(lambda c: c.get_obsid(), filter(lambda x: x is not None,
-                                                   [red, ir, bg])))) != 1:
-        raise ValueError("These cube files don't all have the same "
-                         f"Observation ID: {cubes}")
+    if (
+        len(
+            set(
+                map(
+                    lambda c: c.get_obsid(),
+                    filter(lambda x: x is not None, [red, ir, bg]),
+                )
+            )
+        )
+        != 1
+    ):
+        raise ValueError(
+            "These cube files don't all have the same "
+            f"Observation ID: {red}, {ir}, {bg}"
+        )
 
-    temp_token = datetime.now().strftime('HiColorInit-%y%m%d%H%M%S')
+    temp_token = datetime.now().strftime("HiColorInit-%y%m%d%H%M%S")
 
     # These two values are calculated but only written to a PVL file,
     # which I think we can skip.
@@ -157,7 +178,7 @@ def HiColorInit(red: HiColorCube, ir: HiColorCube, bg: HiColorCube,
         offset = int((200 * (c.bin - red.bin) + c.tdi - red.tdi) / red.bin)
 
         bin_ratio = c.bin / red.bin
-        tdi_ratio = c.tdi / red.tdi
+        # tdi_ratio = c.tdi / red.tdi
         mag_ratio = bin_ratio / 1.0006
         # ratio of color to red for enlargement, correction of optical
         # distortion from OPTICAL_ENLARGEMENT_RATIO constant in original
@@ -165,33 +186,50 @@ def HiColorInit(red: HiColorCube, ir: HiColorCube, bg: HiColorCube,
 
         # Rescale the color by the bin ratio and mag ratio, to match the red.
         # These will be the BG and IR "pre-color" cubes.
-        rescaled = c.path.with_suffix(f'.{temp_token}.rescaled' + outsuffix)
+        rescaled = c.path.with_suffix(f".{temp_token}.rescaled" + outsuffix)
 
         if mag_ratio < 1:
             s = 1 / mag_ratio
             isis.reduce(
-                c.path, to=rescaled, sscale=s, lscale=bin_ratio,
-                validper=1, algorithm='nearest', vper_replace='nearest'
+                c.path,
+                to=rescaled,
+                sscale=s,
+                lscale=bin_ratio,
+                validper=1,
+                algorithm="nearest",
+                vper_replace="nearest",
             )
         else:
             isis.enlarge(
-                c.path, to=rescaled, sscale=mag_ratio,
-                lscale=bin_ratio, interp='bilinear'
+                c.path,
+                to=rescaled,
+                sscale=mag_ratio,
+                lscale=bin_ratio,
+                interp="bilinear",
             )
 
         # The original Perl had an additional step to divide c.bin by the
         # bin_ratio, and provide that to value= below, but that's
         # mathematically just red.bin, so we'll skip a calculation:
         isis.editlab(
-            rescaled, options='modkey', grpname='Instrument',
-            keyword='Summing', value=red.bin
+            rescaled,
+            options="modkey",
+            grpname="Instrument",
+            keyword="Summing",
+            value=red.bin,
         )
 
         # trim by placing in a new image
         isis.handmos(
-            rescaled, mosaic=c.path.with_suffix(outsuffix), create='Y',
-            nlines=red.lines, nsamp=red.samps, nband=1, outline=offset,
-            outsamp=1, outband=1
+            rescaled,
+            mosaic=c.path.with_suffix(outsuffix),
+            create="Y",
+            nlines=red.lines,
+            nsamp=red.samps,
+            nband=1,
+            outline=offset,
+            outsamp=1,
+            outband=1,
         )
 
         if not keep:

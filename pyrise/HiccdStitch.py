@@ -35,12 +35,9 @@ import logging
 import operator
 import os
 import pvl
-import re
-import shutil
 import statistics
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import kalasiris as isis
@@ -57,9 +54,9 @@ class HiccdStitchCube(hirise.CCDID):
         self.path = Path(pathlike)
         self.nextpath = self.path
         super().__init__(hirise.get_CCDID_fromfile(self.path))
-        self.ns = int(isis.getkey_k(self.path, 'Dimensions', 'Samples'))
-        self.nl = int(isis.getkey_k(self.path, 'Dimensions', 'Lines'))
-        self.bin = int(isis.getkey_k(self.path, 'Instrument', 'Summing'))
+        self.ns = int(isis.getkey_k(self.path, "Dimensions", "Samples"))
+        self.nl = int(isis.getkey_k(self.path, "Dimensions", "Lines"))
+        self.bin = int(isis.getkey_k(self.path, "Instrument", "Summing"))
         self.cubenormstep = cubenormstep
         self.cubenorm_stddev = None
         self.sl_cubenorm = None
@@ -83,7 +80,7 @@ class HiccdStitchCube(hirise.CCDID):
         self.snr_list = list()
 
     def __repr__(self):
-        return (f'{self.__class__.__name__}(\'{self.path}\')')
+        return f"{self.__class__.__name__}('{self.path}')"
 
     def set_cubenorm_lines(self, skiptop, skipbot, sline, eline, minbin):
         # For the cubenorm process, determine starting line and number of lines
@@ -96,29 +93,36 @@ class HiccdStitchCube(hirise.CCDID):
         if sline is not None and sline > 0:
             start_line = int(sline * (minbin / self.bin))
             if start_line > self.nl:
-                raise ValueError(f'The effective starting line ({sline}) of '
-                                 'the training area is outside the range of '
-                                 f'the image ({self.path})')
+                raise ValueError(
+                    f"The effective starting line ({sline}) of "
+                    "the training area is outside the range of "
+                    f"the image ({self.path})"
+                )
 
         if eline is not None and eline > 0:
             end_line = int(eline * (minbin / self.bin))
             if end_line > self.nl:
-                raise ValueError(f'The effective ending line ({eline}) of '
-                                 'the training area is outside the range of '
-                                 f'the image ({self.path})')
+                raise ValueError(
+                    f"The effective ending line ({eline}) of "
+                    "the training area is outside the range of "
+                    f"the image ({self.path})"
+                )
 
         if end_line < start_line:
-            raise RuntimeError('Something wrong with the calculated training '
-                               'area: end_line < start_line for cubenorm '
-                               'trainging area.  The calculated start, end '
-                               f'lines are: {start_line}, {end_line}.')
+            raise RuntimeError(
+                "Something wrong with the calculated training "
+                "area: end_line < start_line for cubenorm "
+                "trainging area.  The calculated start, end "
+                f"lines are: {start_line}, {end_line}."
+            )
 
         self.sl_cubenorm = int(start_line)
         self.nl_cubenorm = int(end_line - start_line + 1)
         return (self.sl_cubenorm, self.nl_cubenorm)
 
-    def set_balance(self, skiptop: int, skipbot: int, area: dict,
-                    minbinlines: int):
+    def set_balance(
+        self, skiptop: int, skipbot: int, area: dict, minbinlines: int
+    ):
         # For balance cube process, determine the crop area for left
         # and right crop areas and the scaling needed for each crop are.
         (skip, samps) = area[self.bin]
@@ -154,43 +158,54 @@ class HiccdStitchCube(hirise.CCDID):
             dbs = list()
             # Scan the parent directory of cube for any .json DB files that
             # match the CCD name
-            for p in self.path.parent.glob(str(self) + '*.json'):
-                with open(p, 'r') as f:
+            for p in self.path.parent.glob(str(self) + "*.json"):
+                with open(p, "r") as f:
                     dbs.append(json.load(f))
 
         for db in dbs:
-            if 'hical_status' in db:
-                if 'BadCal' == db['hical_status']:
+            if "hical_status" in db:
+                if "BadCal" == db["hical_status"]:
                     bad_flag = True
                 else:
-                    self.hical_status = db['hical_status']
+                    self.hical_status = db["hical_status"]
 
-            if 'IMAGE_SIGNAL_TO_NOISE_RATIO' in db:
-                self.snr_list.append(float(db['IMAGE_SIGNAL_TO_NOISE_RATIO']))
+            if "IMAGE_SIGNAL_TO_NOISE_RATIO" in db:
+                self.snr_list.append(float(db["IMAGE_SIGNAL_TO_NOISE_RATIO"]))
 
         if bad_flag:
-            self.hical_status = 'BadCal'
+            self.hical_status = "BadCal"
         return
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     parents=[util.parent_parser()])
-    parser.add_argument('-o', '--output', required=False,
-                        default='.HiccdStitch.cub')
-    parser.add_argument('-c', '--conf',    required=False,
-                        default=Path(__file__).resolve().parent.parent /
-                        'data' / 'HiccdStitch.conf')
-    parser.add_argument('--db',         required=False, default='.HiCat.json',
-                        help="The .json file to use.  Optionally, if it "
-                        "starts with a '.' it is considered an extension "
-                        "and will be swapped with the input file's extension "
-                        "to find the .json file to use.")
-    parser.add_argument('--sline', required=False, default=None, type=int)
-    parser.add_argument('--eline', required=False, default=None, type=int)
-    parser.add_argument('--reduce', required=False, default=None, type=int)
-    parser.add_argument('--cubenorm', required=False, nargs='+', type=bool)
-    parser.add_argument('cubes', metavar=".cub-file", nargs='+')
+    parser = argparse.ArgumentParser(
+        description=__doc__, parents=[util.parent_parser()]
+    )
+    parser.add_argument(
+        "-o", "--output", required=False, default=".HiccdStitch.cub"
+    )
+    parser.add_argument(
+        "-c",
+        "--conf",
+        required=False,
+        default=Path(__file__).resolve().parent.parent
+        / "data"
+        / "HiccdStitch.conf",
+    )
+    parser.add_argument(
+        "--db",
+        required=False,
+        default=".HiCat.json",
+        help="The .json file to use.  Optionally, if it "
+        "starts with a '.' it is considered an extension "
+        "and will be swapped with the input file's extension "
+        "to find the .json file to use.",
+    )
+    parser.add_argument("--sline", required=False, default=None, type=int)
+    parser.add_argument("--eline", required=False, default=None, type=int)
+    parser.add_argument("--reduce", required=False, default=None, type=int)
+    parser.add_argument("--cubenorm", required=False, nargs="+", type=bool)
+    parser.add_argument("cubes", metavar=".cub-file", nargs="+")
 
     # The Original Perl took a .pvl file as input which mostly just had the
     # filenames of the ccd files to stitch together.  We'll just take those
@@ -204,9 +219,11 @@ def main():
 
     if args.cubenorm is not None:
         if len(args.cubenorm) != len(args.cubes):
-            logging.critical(f'The number of cubes ({len(args.cubes)}) and '
-                             'the number of cubenorm flags given '
-                             f'({len(args.cubenorm)}) did not match. Exiting.')
+            logging.critical(
+                f"The number of cubes ({len(args.cubes)}) and "
+                "the number of cubenorm flags given "
+                f"({len(args.cubenorm)}) did not match. Exiting."
+            )
             sys.exit()
     else:
         args.cubenorm = [False] * len(args.cubes)
@@ -237,9 +254,13 @@ def main():
 
     if len(args.cubes) == 1:
         # Assume this is a filepath to a file of cube names
-        cubes = list(map(HiccdStitchCube,
-                         Path(args.cubes[0]).read_text().splitlines(),
-                         args.cubenorm))
+        cubes = list(
+            map(
+                HiccdStitchCube,
+                Path(args.cubes[0]).read_text().splitlines(),
+                args.cubenorm,
+            )
+        )
     else:
         cubes = list(map(HiccdStitchCube, args.cubes, args.cubenorm))
 
@@ -247,24 +268,35 @@ def main():
         c.gather_from_db()
 
     try:
-        (db, outpath) = start(cubes, args.conf, args.output,
-                              args.sline, args.eline,
-                              keep=args.keep)
+        (db, outpath) = start(
+            cubes,
+            args.conf,
+            args.output,
+            args.sline,
+            args.eline,
+            keep=args.keep,
+        )
     except subprocess.CalledProcessError as err:
-            print('Had an ISIS error:')
-            print(' '.join(err.cmd))
-            print(err.stdout)
-            print(err.stderr)
-            raise err
+        print("Had an ISIS error:")
+        print(" ".join(err.cmd))
+        print(err.stdout)
+        print(err.stderr)
+        raise err
 
     db_path = util.path_w_suffix(args.db, outpath)
 
-    with open(db_path, 'w') as f:
+    with open(db_path, "w") as f:
         json.dump(db, f, indent=0, sort_keys=True)
 
 
-def start(cubes: list, conf_path: os.PathLike, output: os.PathLike,
-          sline=None, eline=None, keep=False):
+def start(
+    cubes: list,
+    conf_path: os.PathLike,
+    output: os.PathLike,
+    sline=None,
+    eline=None,
+    keep=False,
+):
 
     # Perl: GetConfigurationParameters()
     conf = pvl.load(str(conf_path))
@@ -278,27 +310,29 @@ def start(cubes: list, conf_path: os.PathLike, output: os.PathLike,
     cubes = HiccdStitch(cubes, outcub_path, conf, keep=keep)
 
     # Afterwards inserts into CCD_Processing_Statistics table.
-    db = {'OBSERVATION_ID': str(cubes[0].get_obsid())}
+    db = {"OBSERVATION_ID": str(cubes[0].get_obsid())}
     for c in cubes:
-        ccd_db = {'CCDID': str(c),
-                  'RADIOMETRIC_MATCHING_CORRECTION': c.correction,
-                  'LEFT_OVERLAP_AVERAGE': c.lstats,
-                  'RIGHT_OVERLAP_AVERAGE': c.rstats,
-                  'CUBENORM_COLUMN_CORRECTION_STANDARD_DEVIATION':
-                  c.cubenorm_stddev}
+        ccd_db = {
+            "CCDID": str(c),
+            "RADIOMETRIC_MATCHING_CORRECTION": c.correction,
+            "LEFT_OVERLAP_AVERAGE": c.lstats,
+            "RIGHT_OVERLAP_AVERAGE": c.rstats,
+            "CUBENORM_COLUMN_CORRECTION_STANDARD_DEVIATION": c.cubenorm_stddev,
+        }
         db[c.get_ccd()] = ccd_db
 
     return (db, outcub_path)
 
 
-def HiccdStitch(cubes: list, out_path: os.PathLike, conf: dict,
-                keep=False) -> list:
-    logging.info('HiccdStitch start.')
+def HiccdStitch(
+    cubes: list, out_path: os.PathLike, conf: dict, keep=False
+) -> list:
+    logging.info("HiccdStitch start.")
 
     # This string will get placed in the filename for all of our
     # temporary files. It will (hopefully) prevent collisions with
     # existing files and also allow for easy clean-up if keep=True
-    temp_token = datetime.now().strftime('HiccdStitch-%y%m%d%H%M%S')
+    # temp_token = datetime.now().strftime('HiccdStitch-%y%m%d%H%M%S')
     out_p = Path(out_path)
 
     to_delete = isis.PathSet()
@@ -309,29 +343,32 @@ def HiccdStitch(cubes: list, out_path: os.PathLike, conf: dict,
 
     for i, c in enumerate(cubes):
         if c.cubenormstep:
-            cubes[i] = CubeNormStep(c, conf['HiccdStitch'], keep=keep)
+            cubes[i] = CubeNormStep(c, conf["HiccdStitch"], keep=keep)
 
-    if conf['HiccdStitch']['HiccdStitch_Balance']:
-        cubes = BalanceStep(cubes, conf['HiccdStitch'], keep=keep)
+    if conf["HiccdStitch"]["HiccdStitch_Balance"]:
+        cubes = BalanceStep(cubes, conf["HiccdStitch"], keep=keep)
 
     for c in cubes:
         SpecialProcessingFlags(c)
 
     cubes.sort()
 
-    logging.info("The Original Perl looked for a custom file for "
-                 "hiccdstitch's shiftdef parameter, but the default ISIS "
-                 "file seems better, so this isn't implemented.")
+    logging.info(
+        "The Original Perl looked for a custom file for "
+        "hiccdstitch's shiftdef parameter, but the default ISIS "
+        "file seems better, so this isn't implemented."
+    )
 
     with isis.fromlist.temp([str(c.nextpath) for c in cubes]) as f:
         isis.hiccdstitch(
-            fromlist=f, to=out_p,
-            interp=conf['HiccdStitch']['HiccdStitch_Interpolation']
+            fromlist=f,
+            to=out_p,
+            interp=conf["HiccdStitch"]["HiccdStitch_Interpolation"],
         )
 
-    SNR_Check(cubes, conf['HiccdStitch']['HiccdStitch_SNR_Threshold'])
+    SNR_Check(cubes, conf["HiccdStitch"]["HiccdStitch_SNR_Threshold"])
 
-    logging.info('HiccdStitch done.')
+    logging.info("HiccdStitch done.")
     if not keep:
         to_delete.unlink()
 
@@ -341,67 +378,112 @@ def HiccdStitch(cubes: list, out_path: os.PathLike, conf: dict,
 def conf_check(conf: dict) -> dict:
     """Various checks on parameters in the configuration."""
 
-    util.conf_check_strings('HiccdStitch_Clean', ('DELETE', 'KEEP'),
-                            conf['HiccdStitch']['HiccdStitch_Clean'])
+    util.conf_check_strings(
+        "HiccdStitch_Clean",
+        ("DELETE", "KEEP"),
+        conf["HiccdStitch"]["HiccdStitch_Clean"],
+    )
 
-    util.conf_check_bool('HiccdStitch_Version_Enable',
-                         conf['HiccdStitch']['HiccdStitch_Version_Enable'])
+    util.conf_check_bool(
+        "HiccdStitch_Version_Enable",
+        conf["HiccdStitch"]["HiccdStitch_Version_Enable"],
+    )
 
-    util.conf_check_bool('HiccdStitch_Balance',
-                         conf['HiccdStitch']['HiccdStitch_Balance'])
+    util.conf_check_bool(
+        "HiccdStitch_Balance", conf["HiccdStitch"]["HiccdStitch_Balance"]
+    )
 
     util.conf_check_bounds(
-        'HiccdStitch_Normalization_Minimum', (-16384.0, 16364.0),
-        conf['HiccdStitch']['HiccdStitch_Normalization_Minimum'])
+        "HiccdStitch_Normalization_Minimum",
+        (-16384.0, 16364.0),
+        conf["HiccdStitch"]["HiccdStitch_Normalization_Minimum"],
+    )
 
     util.conf_check_bounds(
-        'HiccdStitch_Normalization_Maximum', (-16384.0, 16364.0),
-        conf['HiccdStitch']['HiccdStitch_Normalization_Maximum'])
+        "HiccdStitch_Normalization_Maximum",
+        (-16384.0, 16364.0),
+        conf["HiccdStitch"]["HiccdStitch_Normalization_Maximum"],
+    )
 
     util.conf_check_strings(
-        'HiccdStitch_Cubenorm_Method', ('DIVIDE', 'SUBTRACT'),
-        conf['HiccdStitch']['HiccdStitch_Cubenorm_Method'])
-
-    util.conf_check_strings('HiccdStitch_Interpolation', ('NEAREST',
-                                                          'BILINEAR', 'CUBIC'),
-                            conf['HiccdStitch']['HiccdStitch_Interpolation'])
+        "HiccdStitch_Cubenorm_Method",
+        ("DIVIDE", "SUBTRACT"),
+        conf["HiccdStitch"]["HiccdStitch_Cubenorm_Method"],
+    )
 
     util.conf_check_strings(
-        'HiccdStitch_Balance_Correction', ('MULTIPLY', 'ADD'),
-        conf['HiccdStitch']['HiccdStitch_Balance_Correction'])
+        "HiccdStitch_Interpolation",
+        ("NEAREST", "BILINEAR", "CUBIC"),
+        conf["HiccdStitch"]["HiccdStitch_Interpolation"],
+    )
 
-    util.conf_check_strings('HiccdStitch_Balance_Method',
-                            ('AVERAGE', 'MEDIAN'),
-                            conf['HiccdStitch']['HiccdStitch_Balance_Method'])
+    util.conf_check_strings(
+        "HiccdStitch_Balance_Correction",
+        ("MULTIPLY", "ADD"),
+        conf["HiccdStitch"]["HiccdStitch_Balance_Correction"],
+    )
 
-    util.conf_check_count('HiccdStitch_Bin01_Area', 2, 'value',
-                          conf['HiccdStitch']['HiccdStitch_Bin01_Area'])
+    util.conf_check_strings(
+        "HiccdStitch_Balance_Method",
+        ("AVERAGE", "MEDIAN"),
+        conf["HiccdStitch"]["HiccdStitch_Balance_Method"],
+    )
 
-    util.conf_check_count('HiccdStitch_Bin02_Area', 2, 'value',
-                          conf['HiccdStitch']['HiccdStitch_Bin02_Area'])
+    util.conf_check_count(
+        "HiccdStitch_Bin01_Area",
+        2,
+        "value",
+        conf["HiccdStitch"]["HiccdStitch_Bin01_Area"],
+    )
 
-    util.conf_check_count('HiccdStitch_Bin03_Area', 2, 'value',
-                          conf['HiccdStitch']['HiccdStitch_Bin03_Area'])
+    util.conf_check_count(
+        "HiccdStitch_Bin02_Area",
+        2,
+        "value",
+        conf["HiccdStitch"]["HiccdStitch_Bin02_Area"],
+    )
 
-    util.conf_check_count('HiccdStitch_Bin04_Area', 2, 'value',
-                          conf['HiccdStitch']['HiccdStitch_Bin04_Area'])
+    util.conf_check_count(
+        "HiccdStitch_Bin03_Area",
+        2,
+        "value",
+        conf["HiccdStitch"]["HiccdStitch_Bin03_Area"],
+    )
 
-    util.conf_check_count('HiccdStitch_Bin08_Area', 2, 'value',
-                          conf['HiccdStitch']['HiccdStitch_Bin08_Area'])
+    util.conf_check_count(
+        "HiccdStitch_Bin04_Area",
+        2,
+        "value",
+        conf["HiccdStitch"]["HiccdStitch_Bin04_Area"],
+    )
 
-    util.conf_check_count('HiccdStitch_Bin16_Area', 2, 'value',
-                          conf['HiccdStitch']['HiccdStitch_Bin16_Area'])
+    util.conf_check_count(
+        "HiccdStitch_Bin08_Area",
+        2,
+        "value",
+        conf["HiccdStitch"]["HiccdStitch_Bin08_Area"],
+    )
+
+    util.conf_check_count(
+        "HiccdStitch_Bin16_Area",
+        2,
+        "value",
+        conf["HiccdStitch"]["HiccdStitch_Bin16_Area"],
+    )
 
 
 def set_outpath(out: os.PathLike, cubes) -> Path:
     # Check that they all have the same Obs ID:
     if len(set(map(lambda c: c.get_obsid(), cubes))) != 1:
-        raise ValueError("These cube files don't all have the same "
-                         f"Observation ID: {cubes}")
+        raise ValueError(
+            "These cube files don't all have the same "
+            f"Observation ID: {cubes}"
+        )
 
-    if str(out).startswith('.'):
-        return (cubes[0].path.parent / Path(str(cubes[0].get_obsid()) + '_' +
-                                            cubes[0].ccdname + out))
+    if str(out).startswith("."):
+        return cubes[0].path.parent / Path(
+            str(cubes[0].get_obsid()) + "_" + cubes[0].ccdname + out
+        )
     else:
         return Path(out)
 
@@ -410,21 +492,28 @@ def GetImageDims(cubes: list, in_conf: dict, sline, eline) -> list:
     """Gathers information for each image."""
     # The functionality is different in this function than the original
     # Perl because I've placed more logic into the HiccdStitchCube class.
-    conf = in_conf['HiccdStitch']
+    conf = in_conf["HiccdStitch"]
 
     # cubes should be a list of HiccdStitchCube objects.
     minbin = min(map(lambda c: c.bin, cubes))
     minbinlines = min(map(lambda c: c.bin * c.nl, cubes))
 
     for c in cubes:
-        c.set_cubenorm_lines(conf['HiccdStitch_Bin1_Skip_Top_Lines'],
-                             conf['HiccdStitch_Bin1_Skip_Bot_Lines'],
-                             sline, eline, minbin)
+        c.set_cubenorm_lines(
+            conf["HiccdStitch_Bin1_Skip_Top_Lines"],
+            conf["HiccdStitch_Bin1_Skip_Bot_Lines"],
+            sline,
+            eline,
+            minbin,
+        )
 
         area = make_area_dict(conf)
-        c.set_balance(conf['HiccdStitch_Bin1_Skip_Top_Lines'],
-                      conf['HiccdStitch_Bin1_Skip_Bot_Lines'],
-                      area, minbinlines)
+        c.set_balance(
+            conf["HiccdStitch_Bin1_Skip_Top_Lines"],
+            conf["HiccdStitch_Bin1_Skip_Bot_Lines"],
+            area,
+            minbinlines,
+        )
 
         if c.bin == minbin:
             ns_balance_scale = c.ns_balance_left
@@ -438,12 +527,14 @@ def GetImageDims(cubes: list, in_conf: dict, sline, eline) -> list:
 
 
 def make_area_dict(conf: dict) -> dict:
-    d = {1: conf['HiccdStitch_Bin01_Area'],
-         2: conf['HiccdStitch_Bin02_Area'],
-         3: conf['HiccdStitch_Bin03_Area'],
-         4: conf['HiccdStitch_Bin04_Area'],
-         8: conf['HiccdStitch_Bin08_Area'],
-         16: conf['HiccdStitch_Bin16_Area']}
+    d = {
+        1: conf["HiccdStitch_Bin01_Area"],
+        2: conf["HiccdStitch_Bin02_Area"],
+        3: conf["HiccdStitch_Bin03_Area"],
+        4: conf["HiccdStitch_Bin04_Area"],
+        8: conf["HiccdStitch_Bin08_Area"],
+        16: conf["HiccdStitch_Bin16_Area"],
+    }
     return d
 
 
@@ -451,21 +542,27 @@ def CubeNormStep(cube, hconf: dict, keep=False) -> HiccdStitchCube:
     to_del = isis.PathSet()
 
     # crop removing the top and bottom portion of the image
-    crop_p = to_del.add(cube.nextpath.with_suffix('.crop.cub'))
+    crop_p = to_del.add(cube.nextpath.with_suffix(".crop.cub"))
     isis.crop(
-        cube.nextpath, to=crop_p, line=cube.sl_cubenorm, nlines=cube.nl_cubenorm
+        cube.nextpath,
+        to=crop_p,
+        line=cube.sl_cubenorm,
+        nlines=cube.nl_cubenorm,
     )
 
     # run cubenorm to get statistics of the cropped area
-    stats_p = to_del.add(cube.nextpath.with_suffix('.cubenorm.tab'))
+    stats_p = to_del.add(cube.nextpath.with_suffix(".cubenorm.tab"))
     isis.cubenorm(
-        crop_p, stats=stats_p, format_='TABLE',
-        direction='COLUMN', normalizer='AVERAGE',
-        MODE=hconf['HiccdStitch_Cubenorm_Method'],
-        PRESERVE=True
+        crop_p,
+        stats=stats_p,
+        format_="TABLE",
+        direction="COLUMN",
+        normalizer="AVERAGE",
+        MODE=hconf["HiccdStitch_Cubenorm_Method"],
+        PRESERVE=True,
     )
 
-    stats_filtered_p = to_del.add(cube.nextpath.with_suffix('.cubenorm2.tab'))
+    stats_filtered_p = to_del.add(cube.nextpath.with_suffix(".cubenorm2.tab"))
 
     # Original Perl: write cubenorm_stdev to the DB (again?) but we'll just
     cube.cubenorm_stddev = AnalyzeStats(stats_p, stats_filtered_p)
@@ -474,17 +571,21 @@ def CubeNormStep(cube, hconf: dict, keep=False) -> HiccdStitchCube:
     # Original Perl: if HiccdStitchC: write cubenorm_stdev to a PVL file?
 
     # run cubenorm again, this time make the correction to the file
-    next_path = cube.nextpath.with_suffix('.cubenorm.cub')
-    to_s = '{}+SignedWord+{}:{}'.format(
-        next_path, hconf['HiccdStitch_Normalization_Minimum'],
-        hconf['HiccdStitch_Normalization_Maximum'])
+    next_path = cube.nextpath.with_suffix(".cubenorm.cub")
+    to_s = "{}+SignedWord+{}:{}".format(
+        next_path,
+        hconf["HiccdStitch_Normalization_Minimum"],
+        hconf["HiccdStitch_Normalization_Maximum"],
+    )
     isis.cubenorm(
-        cube.nextpath, to=to_s,
+        cube.nextpath,
+        to=to_s,
         fromstats=stats_filtered_p,
-        statsource='TABLE',
-        direction='COLUMN', normalizer='AVERAGE',
-        MODE=hconf['HiccdStitch_Cubenorm_Method'],
-        PRESERVE=True
+        statsource="TABLE",
+        direction="COLUMN",
+        normalizer="AVERAGE",
+        MODE=hconf["HiccdStitch_Cubenorm_Method"],
+        PRESERVE=True,
     )
 
     cube.nextpath = next_path
@@ -495,26 +596,28 @@ def CubeNormStep(cube, hconf: dict, keep=False) -> HiccdStitchCube:
     return cube
 
 
-def AnalyzeStats(cubenorm_out_p: os.PathLike,
-                 filtered_p: os.PathLike) -> float:
+def AnalyzeStats(
+    cubenorm_out_p: os.PathLike, filtered_p: os.PathLike
+) -> float:
     # Does more than just 'analyze,' also performs some correction.
     valid_points = list()
     averages = list()
     medians = list()
     other_cols = list()
-    header = list()
+    # header = list()
     with open(cubenorm_out_p) as csvfile:
         reader = csv.DictReader(csvfile, dialect=isis.cubenormfile.Dialect)
-        header = reader.fieldnames
+        # header = reader.fieldnames
         for row in reader:
-            valid_points.append(int(row.pop('ValidPoints')))
-            averages.append(float(row.pop('Average')))
-            medians.append(float(row.pop('Median')))
+            valid_points.append(int(row.pop("ValidPoints")))
+            averages.append(float(row.pop("Average")))
+            medians.append(float(row.pop("Median")))
             other_cols.append(row)
 
     # Calculate the average of the column averages
-    average = sum(map(operator.mul, valid_points,
-                      averages)) / sum(valid_points)
+    average = sum(map(operator.mul, valid_points, averages)) / sum(
+        valid_points
+    )
 
     # Treat the left and right halves independently
     half = int((len(valid_points) + 1) / 2)
@@ -531,14 +634,15 @@ def AnalyzeStats(cubenorm_out_p: os.PathLike,
             medians[i] = average
 
     # Write the results of the filtered cubenorm data
-    with open(filtered_p, 'w') as csvfile:
+    with open(filtered_p, "w") as csvfile:
         writer = isis.cubenormfile.DictWriter(csvfile)
         writer.writeheader()
-        for (d, vp, av, md) in zip(other_cols, valid_points,
-                                   averages, medians):
-            d['ValidPoints'] = str(vp)
-            d['Average'] = '{:f}'.format(av)
-            d['Median'] = '{:f}'.format(md)
+        for (d, vp, av, md) in zip(
+            other_cols, valid_points, averages, medians
+        ):
+            d["ValidPoints"] = str(vp)
+            d["Average"] = "{:f}".format(av)
+            d["Median"] = "{:f}".format(md)
             writer.writerow(d)
 
     # compute standard deviation of averages
@@ -567,20 +671,28 @@ def BalanceStep(cubes, conf, keep=False) -> list:
     # The third step is to mask the left and right overlap areas. We
     # want to zap pixels where there is not common coverage.
     for i, c in enumerate(cubes):
-        if(i + 1 < len(cubes)
-           and int(cubes[i].ccdnumber) + 1 == int(cubes[i + 1].ccdnumber)):
+        if i + 1 < len(cubes) and int(cubes[i].ccdnumber) + 1 == int(
+            cubes[i + 1].ccdnumber
+        ):
             cubes[i].rm_path = to_del.add(
-                c.nextpath.with_suffix('.right.mask.cub'))
+                c.nextpath.with_suffix(".right.mask.cub")
+            )
             cubes[i + 1].lm_path = to_del.add(
-                cubes[i + 1].nextpath.with_suffix('.left.mask.cub'))
+                cubes[i + 1].nextpath.with_suffix(".left.mask.cub")
+            )
 
-            for f, m, t in zip([cubes[i].rs_path, cubes[i + 1].ls_path],
-                               [cubes[i + 1].ls_path, cubes[i].rs_path],
-                               [cubes[i].rm_path, cubes[i + 1].lm_path]):
+            for f, m, t in zip(
+                [cubes[i].rs_path, cubes[i + 1].ls_path],
+                [cubes[i + 1].ls_path, cubes[i].rs_path],
+                [cubes[i].rm_path, cubes[i + 1].lm_path],
+            ):
                 isis.mask(
-                    f, mask=m, to=t, preserve='INSIDE',
-                    min_=conf['HiccdStitch_Normalization_Minimum'],
-                    max_=conf['HiccdStitch_Normalization_Maximum']
+                    f,
+                    mask=m,
+                    to=t,
+                    preserve="INSIDE",
+                    min_=conf["HiccdStitch_Normalization_Minimum"],
+                    max_=conf["HiccdStitch_Normalization_Maximum"],
                 )
 
     # The fourth step is to get image statistics for left and right
@@ -599,25 +711,31 @@ def BalanceStep(cubes, conf, keep=False) -> list:
     # Here's the pythonic version:
     cubes.sort()
     for (offset, group) in get_group_i(cubes):
-        logging.info('Correction before redistribution.')
+        logging.info("Correction before redistribution.")
         for ccd in group:
             i = ccd + offset
             cubes[i].correction = get_correction(
-                cubes[i], cubes[i - 1],
-                conf['HiccdStitch_Balance_Correction'], i)
+                cubes[i],
+                cubes[i - 1],
+                conf["HiccdStitch_Balance_Correction"],
+                i,
+            )
             logging.info(
-                f'CCDID: {cubes[i]}, correction: {cubes[i].correction}')
+                f"CCDID: {cubes[i]}, correction: {cubes[i].correction}"
+            )
 
-        normalization = get_normalization(cubes, group, offset,
-                                          conf['HiccdStitch_Control_CCD'])
+        normalization = get_normalization(
+            cubes, group, offset, conf["HiccdStitch_Control_CCD"]
+        )
 
-        logging.info('Correction after redistribution.')
+        logging.info("Correction after redistribution.")
         for ccd in group:
             i = ccd + offset
             cubes[i].correction /= normalization
             logging.info(
-                f'CCDID: {cubes[i]}, correction: {cubes[i].correction}, '
-                f'left: {cubes[i].lstats}, right: {cubes[i].rstats}')
+                f"CCDID: {cubes[i]}, correction: {cubes[i].correction}, "
+                f"left: {cubes[i].lstats}, right: {cubes[i].rstats}"
+            )
 
             # In the original Perl, they wrote out to the DB here, but we'll
             # do it later.  There was also a distinction that if it was
@@ -627,7 +745,7 @@ def BalanceStep(cubes, conf, keep=False) -> list:
         # Create the balance cubes
         for ccd in group:
             i = ccd + offset
-            balance_path = cubes[i].nextpath.with_suffix('.balance.cub')
+            balance_path = cubes[i].nextpath.with_suffix(".balance.cub")
             make_balance(cubes[i], conf, balance_path)
             cubes[i].nextpath = balance_path
 
@@ -642,15 +760,21 @@ def crop_and_scale(cubes: list) -> list:
     for i, c in enumerate(cubes):
         # First step in balancing process is to crop out the left and
         # right overlap areas of each CCD
-        lc_path = to_del.add(c.nextpath.with_suffix('.left.crop.cub'))
-        rc_path = to_del.add(c.nextpath.with_suffix('.right.crop.cub'))
+        lc_path = to_del.add(c.nextpath.with_suffix(".left.crop.cub"))
+        rc_path = to_del.add(c.nextpath.with_suffix(".right.crop.cub"))
 
-        for t, s, n in zip([lc_path, rc_path],
-                           [c.ss_balance_left, c.ss_balance_right],
-                           [c.ns_balance_left, c.ns_balance_right]):
+        for t, s, n in zip(
+            [lc_path, rc_path],
+            [c.ss_balance_left, c.ss_balance_right],
+            [c.ns_balance_left, c.ns_balance_right],
+        ):
             isis.crop(
-                c.nextpath, to=t, sample=s, nsamples=n, line=c.sl_balance,
-                nlines=c.nl_balance
+                c.nextpath,
+                to=t,
+                sample=s,
+                nsamples=n,
+                line=c.sl_balance,
+                nlines=c.nl_balance,
             )
 
         # Second step is to scale all of the croped files to have the
@@ -660,13 +784,16 @@ def crop_and_scale(cubes: list) -> list:
             cubes[i].set_rs_path(rc_path)
         else:
             cubes[i].set_ls_path(
-                to_del.add(c.nextpath.with_suffix('.left.scale.cub')))
+                to_del.add(c.nextpath.with_suffix(".left.scale.cub"))
+            )
             cubes[i].set_rs_path(
-                to_del.add(c.nextpath.with_suffix('.right.scale.cub')))
-            for lc, ls in zip([lc_path, rc_path],
-                              [cubes[i].ls_path, cubes[i].rs_path]):
+                to_del.add(c.nextpath.with_suffix(".right.scale.cub"))
+            )
+            for lc, ls in zip(
+                [lc_path, rc_path], [cubes[i].ls_path, cubes[i].rs_path]
+            ):
                 isis.enlarge(
-                    lc, to=ls, sscale=c.smag, lscale=c.lmag, interp='CUBIC'
+                    lc, to=ls, sscale=c.smag, lscale=c.lmag, interp="CUBIC"
                 )
     return (cubes, to_del)
 
@@ -687,34 +814,39 @@ def get_group_i(cubes: list) -> list:
     good_indexes.sort()
     # print(f'good indexes: {good_indexes}')
     pairs = list()
-    for offset, group in itertools.groupby(good_indexes, lambda x,
-                                           c=itertools.count(): next(c) - x):
+    for offset, group in itertools.groupby(
+        good_indexes, lambda x, c=itertools.count(): next(c) - x
+    ):
         pairs.append((offset, list(group)))
     return pairs
 
 
 def get_stats(cubes: list) -> list:
     for i, c in enumerate(cubes):
-        cubes[i].lstats = float(pvl.loads(
-            isis.stats(c.lm_path).stdout)['Results']['Average'])
-        cubes[i].rstats = float(pvl.loads(
-            isis.stats(c.rm_path).stdout)['Results']['Average'])
+        cubes[i].lstats = float(
+            pvl.loads(isis.stats(c.lm_path).stdout)["Results"]["Average"]
+        )
+        cubes[i].rstats = float(
+            pvl.loads(isis.stats(c.rm_path).stdout)["Results"]["Average"]
+        )
 
     return cubes
 
 
 def get_correction(this_c, prev_c, Balance_corr, is_not_first=True) -> float:
-    if 'MULTIPLY' == Balance_corr:
+    if "MULTIPLY" == Balance_corr:
         if is_not_first:
             return prev_c.correction * (prev_c.rstats / this_c.lstats)
         else:
             return 1
     else:
         if is_not_first:
-            logging.warning('Original Perl issue: non-MULTIPLY value '
-                            'for HiccdStitch_Balance_Correction leads '
-                            'to a correction value that is calculated '
-                            'strangely.')
+            logging.warning(
+                "Original Perl issue: non-MULTIPLY value "
+                "for HiccdStitch_Balance_Correction leads "
+                "to a correction value that is calculated "
+                "strangely."
+            )
             # I think the below should be:
             # prev_c.correction + (prev_c.rstats - this_c.lstats)
             return prev_c.correction + (prev_c.rstats - this_c.rstats)
@@ -722,83 +854,95 @@ def get_correction(this_c, prev_c, Balance_corr, is_not_first=True) -> float:
             return 0
 
 
-def get_normalization(cubes: list, group: list,
-                      offset: int, control_ccds: list) -> float:
-        # If a CCD is a control CCD, defined in HiccdStitch_Control_CCD
-        # keyword in the confguration file then use it as the normalization,
-        # otherwise use the average
-        normalization = None
-        corrections = list()
-        for ccd in group:
-            i = ccd + offset
-            corrections.append(cubes[i].correction)
-            if int(cubes[i].ccdnumber) in control_ccds:
-                normalization = cubes[i].correction
+def get_normalization(
+    cubes: list, group: list, offset: int, control_ccds: list
+) -> float:
+    # If a CCD is a control CCD, defined in HiccdStitch_Control_CCD
+    # keyword in the confguration file then use it as the normalization,
+    # otherwise use the average
+    normalization = None
+    corrections = list()
+    for ccd in group:
+        i = ccd + offset
+        corrections.append(cubes[i].correction)
+        if int(cubes[i].ccdnumber) in control_ccds:
+            normalization = cubes[i].correction
 
-        if normalization is None:
-            normalization = statistics.mean(corrections)
+    if normalization is None:
+        normalization = statistics.mean(corrections)
 
-        return normalization
+    return normalization
 
 
 def make_balance(cube, conf, balance_path):
     a_param = None
     c_param = None
-    if conf['HiccdStitch_Balance_Correction'] == 'MULTIPLY':
+    if conf["HiccdStitch_Balance_Correction"] == "MULTIPLY":
         a_param = cube.correction
         c_param = 0
-    elif conf['HiccdStitch_Balance_Correction'] == 'ADD':
+    elif conf["HiccdStitch_Balance_Correction"] == "ADD":
         a_param = 1
         c_param = cube.correction
 
-    to_s = '{}+SignedWord+{}:{}'.format(
-        balance_path, conf['HiccdStitch_Normalization_Minimum'],
-        conf['HiccdStitch_Normalization_Maximum'])
+    to_s = "{}+SignedWord+{}:{}".format(
+        balance_path,
+        conf["HiccdStitch_Normalization_Minimum"],
+        conf["HiccdStitch_Normalization_Maximum"],
+    )
     isis.algebra(
-        cube.nextpath, to=to_s, operator='unary', a=a_param, c=c_param
+        cube.nextpath, to=to_s, operator="unary", a=a_param, c=c_param
     )
 
 
 def SpecialProcessingFlags(cube: HiccdStitchCube):
     """Set the special processing flags in the ISIS label."""
-    status = 'NOMINAL'
+    status = "NOMINAL"
 
-    if cube.hical_status == 'BadCal':
-        status = 'BADCAL'
+    if cube.hical_status == "BadCal":
+        status = "BADCAL"
 
     if cube.cubenormstep:
-        status = 'CUBENORM'
+        status = "CUBENORM"
 
     try:
-        isis.getkey_k(cube.nextpath, 'Instrument', 'Special_Processing_Flag')
-        option = 'MODKEY'
+        isis.getkey_k(cube.nextpath, "Instrument", "Special_Processing_Flag")
+        option = "MODKEY"
     except subprocess.CalledProcessError:
-        option = 'ADDKEY'
+        option = "ADDKEY"
 
     isis.editlab(
-        cube.nextpath, option=option, grpname='Instrument',
-        keyword='Special_Processing_Flag', value=status
+        cube.nextpath,
+        option=option,
+        grpname="Instrument",
+        keyword="Special_Processing_Flag",
+        value=status,
     )
 
 
 def SNR_Check(cubes: list, snr_threshold: float):
     snr_list = list()
     for c in cubes:
-        logging.info(f'{c}, binning: {c.bin}, SNRs: {c.snr_list}')
+        logging.info(f"{c}, binning: {c.bin}, SNRs: {c.snr_list}")
         if c.bin == 1:
             if len(c.snr_list) > 0:
                 snr_list.extend(c.snr_list)
             else:
-                logging.info("Without SNR values, this won't be included in "
-                             "the check.")
+                logging.info(
+                    "Without SNR values, this won't be included in "
+                    "the check."
+                )
         else:
-            logging.info("Since binning is more than 1, this CCD won't be "
-                         " included in the check.")
+            logging.info(
+                "Since binning is more than 1, this CCD won't be "
+                " included in the check."
+            )
 
     if len(snr_list) == 0:
         return
 
     snr_average = statistics.mean(snr_list)
     if snr_average < snr_threshold:
-        logging.warning(f"The average SNR is {snr_average}, which is greater "
-                        f"than the threshold: {snr_threshold}")
+        logging.warning(
+            f"The average SNR is {snr_average}, which is greater "
+            f"than the threshold: {snr_threshold}"
+        )

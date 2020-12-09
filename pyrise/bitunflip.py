@@ -47,10 +47,12 @@ def main():
         parser = argparse.ArgumentParser(
             description=__doc__,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            parents=[util.parent_parser()])
-        parser.add_argument('-o', '--output',
-                            required=False, default='.bitunflip.cub')
-        parser.add_argument('cube', help='ISIS Cube file.')
+            parents=[util.parent_parser()],
+        )
+        parser.add_argument(
+            "-o", "--output", required=False, default=".bitunflip.cub"
+        )
+        parser.add_argument("cube", help="ISIS Cube file.")
 
         args = parser.parse_args()
 
@@ -61,8 +63,8 @@ def main():
         unflip(Path(args.cube), out_p, keep=args.keep)
 
     except subprocess.CalledProcessError as err:
-        print('Had an ISIS error:', file=sys.stderr)
-        print(' '.join(err.cmd), file=sys.stderr)
+        print("Had an ISIS error:", file=sys.stderr)
+        print(" ".join(err.cmd), file=sys.stderr)
         print(err.stdout, file=sys.stderr)
         print(err.stderr, file=sys.stderr)
 
@@ -107,19 +109,19 @@ def find_gap(hist: list, start, stop, step=None, findfirst=False) -> int:
     """
     dn_window = get_range(start, stop, step)
 
-    hist_set = set(filter(lambda d: d in dn_window,
-                          (int(x.DN) for x in hist)))
+    hist_set = set(filter(lambda d: d in dn_window, (int(x.DN) for x in hist)))
 
-    missing = sorted(set(dn_window).difference(hist_set),
-                     reverse=(dn_window.step < 0))
+    missing = sorted(
+        set(dn_window).difference(hist_set), reverse=(dn_window.step < 0)
+    )
     # logging.info(f'{bs} missing: ' + str(missing))
 
     if len(missing) > 0:
         sequences = list()
-        for k, g in itertools.groupby(missing,
-                                      (lambda x,
-                                       c=itertools.count(): next(c) -
-                                       (dn_window.step * x))):
+        for k, g in itertools.groupby(
+            missing,
+            (lambda x, c=itertools.count(): next(c) - (dn_window.step * x)),
+        ):
             sequences.append(list(g))
 
         if findfirst:
@@ -129,8 +131,9 @@ def find_gap(hist: list, start, stop, step=None, findfirst=False) -> int:
             return max(sequences, key=len)[0]
     else:
         # There was no gap in DN.
-        raise ValueError('There was no gap in the DN window from '
-                         f'{start} to {stop}.')
+        raise ValueError(
+            "There was no gap in the DN window from " f"{start} to {stop}."
+        )
 
 
 def find_min_dn(hist: list, start, stop, step=None) -> int:
@@ -145,16 +148,19 @@ def find_min_dn(hist: list, start, stop, step=None) -> int:
     (if there is more than one).
     """
     r = get_range(start, stop, step)
-    hist_list = sorted(filter(lambda x: int(x.DN) in r, hist),
-                       key=lambda x: int(x.DN),
-                       reverse=(r.step < 0))
+    hist_list = sorted(
+        filter(lambda x: int(x.DN) in r, hist),
+        key=lambda x: int(x.DN),
+        reverse=(r.step < 0),
+    )
 
     h = min(hist_list, key=lambda x: int(x.Pixels))
     return int(h.DN)
 
 
-def subtract_over_thresh(in_path: Path, out_path: Path,
-                         thresh: int, delta: int, keep=False):
+def subtract_over_thresh(
+    in_path: Path, out_path: Path, thresh: int, delta: int, keep=False
+):
     """This is a convenience function that runs ISIS programs to add or
     subtract a value to DN values for pixels that are above or below
     a threshold.
@@ -172,17 +178,18 @@ def subtract_over_thresh(in_path: Path, out_path: Path,
 
     shutil.copyfile(in_path, out_path)
 
-    mask_p = in_path.with_suffix('.threshmask.cub')
-    mask_args = {'from': in_path, 'to': mask_p}
+    mask_p = in_path.with_suffix(".threshmask.cub")
+    mask_args = {"from": in_path, "to": mask_p}
     if delta > 0:
-        mask_args['min'] = thresh
+        mask_args["min"] = thresh
     else:
-        mask_args['max'] = thresh
+        mask_args["max"] = thresh
     isis.mask(**mask_args)
 
-    delta_p = in_path.with_suffix('.delta.cub')
-    isis.algebra(mask_p, from2=in_path, to=delta_p,
-                 op='add', a=0, c=(-1 * delta))
+    delta_p = in_path.with_suffix(".delta.cub")
+    isis.algebra(
+        mask_p, from2=in_path, to=delta_p, op="add", a=0, c=(-1 * delta)
+    )
 
     isis.handmos(delta_p, mosaic=out_path)
 
@@ -205,16 +212,16 @@ def mask_gap(in_path: Path, out_path: Path):
 
     hist = isis.Histogram(in_path)
 
-    median = math.trunc(float(hist['Median']))
+    median = math.trunc(float(hist["Median"]))
     # std = math.trunc(float(hist['Std Deviation']))
 
-    high = find_gap(hist, median,
-                    math.trunc(float(hist['Maximum'])),
-                    findfirst=True)
+    high = find_gap(
+        hist, median, math.trunc(float(hist["Maximum"])), findfirst=True
+    )
 
-    low = find_gap(hist, median,
-                   math.trunc(float(hist['Minimum'])),
-                   findfirst=True)
+    low = find_gap(
+        hist, median, math.trunc(float(hist["Minimum"])), findfirst=True
+    )
 
     highdist = high - median
     lowdist = median - low
@@ -229,21 +236,21 @@ def mask_gap(in_path: Path, out_path: Path):
 
 def get_unflip_thresh(hist: list, far, near, lowlimit) -> int:
     """Provides a robust threshhold for the unflipping process."""
-    try:
-        thresh = find_gap(hist, far, near)
-    except ValueError:
-        logging.info('No zero threshold found.')
-        # d is not defined here, and I think this was the victim of
-        # some cut'n'paste work, but would need to go analyze the
-        # repo history to track it down.  For the moment, this will
-        # just error!
-        if d >= lowlimit:
-            thresh = find_min_dn(hist, far, near)
-            logging.info(f'Found a minimum threshold: {thresh}')
-            if thresh == far or thresh == near:
-                raise ValueError(f'Minimum, {thresh}, at edge of range.')
-        else:
-            raise ValueError(f'Below {lowlimit}, skipping.')
+    # try:
+    thresh = find_gap(hist, far, near)
+    # except ValueError:
+    #     logging.info('No zero threshold found.')
+    #     # d is not defined here, and I think this was the victim of
+    #     # some cut'n'paste work, but would need to go analyze the
+    #     # repo history to track it down.  For the moment, this will
+    #     # just error!
+    #     if d >= lowlimit:
+    #         thresh = find_min_dn(hist, far, near)
+    #         logging.info(f'Found a minimum threshold: {thresh}')
+    #         if thresh == far or thresh == near:
+    #             raise ValueError(f'Minimum, {thresh}, at edge of range.')
+    #     else:
+    #         raise ValueError(f'Below {lowlimit}, skipping.')
     return thresh
 
 
@@ -264,14 +271,13 @@ def unflip(in_p: Path, out_p: Path, keep=False):
     deltas = (8192, 4096, 2048, 1024)
 
     count = 0
-    suffix = '.bf{}-{}{}.cub'
+    suffix = ".bf{}-{}{}.cub"
     this_p = to_del.add(in_p.with_suffix(suffix.format(count, 0, 0)))
     this_p.symlink_to(in_p)
 
-    median = math.trunc(float(isis.stats_k(in_p)['Median']))
+    median = math.trunc(float(isis.stats_k(in_p)["Median"]))
 
-    for (sign, pm, extrema) in ((+1, 'm', 'Maximum'),
-                                (-1, 'p', 'Minimum')):
+    for (sign, pm, extrema) in ((+1, "m", "Maximum"), (-1, "p", "Minimum")):
         # logging.info(pm)
         for delt in deltas:
             d = sign * delt
@@ -280,13 +286,16 @@ def unflip(in_p: Path, out_p: Path, keep=False):
 
             hist = isis.Histogram(this_p)
 
-            logging.info(f'bitflip position {pm}{delt}, near: {near} '
-                         f'far: {far}, extrema: {hist[extrema]}')
-            if((sign > 0 and far < float(hist[extrema])) or
-               (sign < 0 and far > float(hist[extrema]))):
+            logging.info(
+                f"bitflip position {pm}{delt}, near: {near} "
+                f"far: {far}, extrema: {hist[extrema]}"
+            )
+            if (sign > 0 and far < float(hist[extrema])) or (
+                sign < 0 and far > float(hist[extrema])
+            ):
                 count += 1
                 s = suffix.format(count, pm, delt)
-                next_p = to_del.add(this_p.with_suffix('').with_suffix(s))
+                next_p = to_del.add(this_p.with_suffix("").with_suffix(s))
                 try:
                     thresh = get_unflip_thresh(hist, far, near, d)
                 except ValueError as err:
@@ -296,8 +305,9 @@ def unflip(in_p: Path, out_p: Path, keep=False):
                 subtract_over_thresh(this_p, next_p, thresh, d, keep=keep)
                 this_p = next_p
             else:
-                logging.info("The far value was beyond the extrema. "
-                             "Didn't bother.")
+                logging.info(
+                    "The far value was beyond the extrema. " "Didn't bother."
+                )
 
     shutil.move(this_p, out_p)
 

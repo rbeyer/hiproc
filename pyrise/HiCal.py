@@ -1548,9 +1548,7 @@ def NoiseFilter(
     (LisP, MaxVal) = getHistVal(h, conf)
 
     cn_tab = to_delete.add(output.with_suffix(".cn.tab"))
-    isis.cubenorm(
-        in_cube, stats=cn_tab, format_="TABLE", direction="COLUMN"
-    )
+    isis.cubenorm(in_cube, stats=cn_tab, format_="TABLE", direction="COLUMN")
 
     cn2_tab = to_delete.add(output.with_suffix(".cn2.tab"))
     cn3_tab = to_delete.add(output.with_suffix(".cn3.tab"))
