@@ -209,12 +209,12 @@ class TestHiStitch(unittest.TestCase):
                                                            5, b.index(2),
                                                            6491.35))
         self.my_c['HiStitch_Equalize'] = True
-        self.assertEqual((True, True, True), hs.set_flags(self.my_c,
+        self.assertEqual((True, False, True), hs.set_flags(self.my_c,
                                                           self.my_dbs,
                                                           5, b.index(2),
                                                           6491.35))
         self.my_dbs[0]['zapped'] = True
-        self.assertEqual((False, True, True), hs.set_flags(self.my_c,
+        self.assertEqual((False, False, True), hs.set_flags(self.my_c,
                                                            self.my_dbs,
                                                            5, b.index(2),
                                                            6491.35))
