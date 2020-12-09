@@ -83,6 +83,7 @@ to mitigate the bit-flip pixels once they have been identified.
 
 import argparse
 import logging
+import math
 import os
 import shutil
 import subprocess
@@ -1352,6 +1353,8 @@ def find_smart_window(
     # I didn't want to eliminate all of it, as it might be needed
     # again.
 
+    logger = logging.getLogger(f"{__name__}.find_smart_window")
+
     # print(dn)
     # print(f'mindn {mindn}')
     # print(f'maxdn {maxdn}')
@@ -1390,7 +1393,8 @@ def find_smart_window(
         width=(None, None),
         rel_height=1,
     )
-    # print("maxprops: ")
+    # print("maxima_i and maxprops: ")
+    # print(maxima_i)
     # print(maxprops)
 
     # We will now generate some "guesses" for the min and max indices
@@ -1507,8 +1511,10 @@ def find_smart_window(
         max_indices,
         maxima_i[max_prom_idx],
         minprops["prominences"],
+        maxprops["prominences"],
         counts,
         minima_i,
+        maxima_i,
         dn,
         centraldn,
         mindn,
@@ -1661,8 +1667,10 @@ def pick_index(
     max_indices: abc.Sequence,
     max_prom_i: int,  # max_prom_left, max_prom_right,
     prominences: np.array,
+    max_prominences: np.array,
     counts: np.array,
     minima_i: np.array,
+    maxima_i: np.array,
     dn: np.array,
     centraldn: int,
     mindn: int,
@@ -1670,7 +1678,7 @@ def pick_index(
     span_factor=2,
     count_ceiling=5000,
     max_count_fraction=0.0125,
-    count_fraction = 0.09
+    count_fraction=0.09
 ):
     """Returns a minimum and maximum index based on examining minima
     based on *min_indices* and *max_indices*.  Arguments that are
@@ -1682,9 +1690,11 @@ def pick_index(
     :param max_indices:Array of indices that are good candidates for the
         maximum DN.
     :param max_prom_i: Index of the peak of the maximum prominence.
-    :param prominences:  Prominences array output from find_peaks()
+    :param prominences:  Prominences array output from find_peaks() for minima.
+    :param max_prominences: Prominences of maxima.
     :param counts: Array of DN counts as defined in find_smart_window()
     :param minima_i: Array of the indices of the minima from find_peaks()
+    :param maxima_i: Array of the indices of the maxima from find_peaks()
     :param dn: Array of the DN as defined in find_smart_window()
     :param centraldn: DN value as defined in find_smart_widnow()
     :param mindn: Guidance for the minimum DN from find_smart_window()
@@ -1808,7 +1818,13 @@ def pick_index(
                 logger.debug(f"pixels between {pixels}")
                 f = pixels / np.sum(counts)
                 logger.debug(f"fraction {f}")
-                if f > count_fraction:
+                max_scaled = np.log10(
+                    counts[maxima_i[-1 * m]] + max_prominences[-1 * m]
+                ) - np.log10(counts[maxima_i[-1 * m]])
+                if (
+                    f > count_fraction or
+                    math.isclose(max_scaled, scaled[-1 * m], rel_tol=0.01)
+                ):
                     new_i[m] = high_i if m else low_i
                 else:
                     new_i[m] = low_i if m else high_i
