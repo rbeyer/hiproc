@@ -1354,7 +1354,6 @@ def find_smart_window(
     # again.
 
     logger = logging.getLogger(f"{__name__}.find_smart_window")
-
     # print(dn)
     # print(f'mindn {mindn}')
     # print(f'maxdn {maxdn}')
@@ -1473,7 +1472,7 @@ def find_smart_window(
         if np.argmax(counts) == 0:
             min_indices.append(0)
         else:
-                min_indices.append(
+            min_indices.append(
                 find_minima_index(
                     central_min_i,
                     max_prom_left,
@@ -1745,6 +1744,7 @@ def pick_index(
         logger.info(f"Picking the index for {message}")
         logger.debug(f"indices: {indices}")
         logger.debug(f"counts[indices[0]]: {counts[indices[0]]}")
+        consider_end = False
         if len(set(indices)) == 1 and counts[indices[0]] < count_thresh:
             # logging.info(
             #     f"Input indices for {message} are all the same and below "
@@ -1754,7 +1754,6 @@ def pick_index(
         else:
             left = min(indices)
             right = max(indices)
-            consider_end = False
             logger.debug(f"minima_i: {minima_i}")
             logger.debug(f"{left} LR {right}")
             if m == 0:
@@ -1797,37 +1796,37 @@ def pick_index(
                 fraction=count_fraction
             )
 
-            end_idx = 0 if m == 0 else len(dn) - 1
-            logger.debug(
-                f"Consider: {consider_end} {counts[end_idx]} {dn[end_idx]} "
-            )
-            if (
-                consider_end and
+        end_idx = 0 if m == 0 else len(dn) - 1
+        logger.debug(
+            f"Consider: {consider_end} {counts[end_idx]} {dn[end_idx]} "
+        )
+        if (
+            consider_end and
+            (
                 (
-                    (
-                    counts[end_idx] < count_thresh and
-                    span_left <= dn[end_idx] <= span_right
-                    ) or
-                    new_i[m] == minima_i[-1 * m]
-                )
+                counts[end_idx] < count_thresh and
+                span_left <= dn[end_idx] <= span_right
+                ) or
+                new_i[m] == minima_i[-1 * m]
+            )
+        ):
+            logger.debug("Considering the end element")
+            low_i = min(new_i[m], end_idx)
+            high_i = max(new_i[m], end_idx)
+            pixels = np.sum(counts[low_i:high_i])
+            logger.debug(f"pixels between {pixels}")
+            f = pixels / np.sum(counts)
+            logger.debug(f"fraction {f}")
+            max_scaled = np.log10(
+                counts[maxima_i[-1 * m]] + max_prominences[-1 * m]
+            ) - np.log10(counts[maxima_i[-1 * m]])
+            if (
+                f > count_fraction or
+                math.isclose(max_scaled, scaled[-1 * m], rel_tol=0.01)
             ):
-                logger.debug("Considering the end element")
-                low_i = min(new_i[m], end_idx)
-                high_i = max(new_i[m], end_idx)
-                pixels = np.sum(counts[low_i:high_i])
-                logger.debug(f"pixels between {pixels}")
-                f = pixels / np.sum(counts)
-                logger.debug(f"fraction {f}")
-                max_scaled = np.log10(
-                    counts[maxima_i[-1 * m]] + max_prominences[-1 * m]
-                ) - np.log10(counts[maxima_i[-1 * m]])
-                if (
-                    f > count_fraction or
-                    math.isclose(max_scaled, scaled[-1 * m], rel_tol=0.01)
-                ):
-                    new_i[m] = high_i if m else low_i
-                else:
-                    new_i[m] = low_i if m else high_i
+                new_i[m] = high_i if m else low_i
+            else:
+                new_i[m] = low_i if m else high_i
 
         # If we are in a flat-bottomed minima, select the central-most
         # index, not the middle index, as find_peaks does.
@@ -2021,8 +2020,9 @@ def best_index(
 
         logger.debug(f"{low_i}, {high_i}")
         pixels = np.sum(counts[low_i:high_i])
+        logger.debug(f"count of pixels between: {pixels}")
         f = pixels / np.sum(counts)
-        # print(f)
+        logger.debug(f"fraction of pixels between: {f}")
         if f > fraction:
             logger.debug("greater than frac, keep?")
             # lots of pixels, pick outermost
