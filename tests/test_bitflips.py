@@ -82,7 +82,7 @@ class TestHist(unittest.TestCase):
         dn = np.fromiter((int(x.DN) for x in hist_list), int)
 
         self.assertEqual(
-            (2, 8),
+            (2, 12),
             bf.find_smart_window(dn, pixel_counts, 1, 12, 6, plot=False),
         )
 
@@ -136,7 +136,8 @@ class TestArrays(unittest.TestCase):
     def test_min_max_ex(self):
         self.assertEqual(bf.min_max_ex(5, 2, 2), (1, 9, 16))
         self.assertEqual(bf.min_max_ex(5, 20, 2), (-35, 45, 20))
-        self.assertEqual(bf.min_max_ex(100, 400, 2), (-28, 228, 16))
+        self.assertEqual(bf.min_max_ex(100, 400, 2), (-700, 900, 400))
+        self.assertEqual(bf.min_max_ex(100, 401, 2), (-28, 228, 16))
 
     # Need to upgrade: find_smart_window got complicated, this test is not.
     # def test_find_smart_window_from_ma(self):
@@ -262,5 +263,5 @@ class TestMock(unittest.TestCase):
                 Path("dummy-in.cub"), Path("dummy-out.cub"), keep=True
             )
 
-        self.assertEqual(m_mask.call_args[1]["minimum"], 1000)
-        self.assertEqual(m_mask.call_args[1]["maximum"], 1001)
+        self.assertEqual(m_mask.call_args[1]["minimum"], 990)
+        self.assertEqual(m_mask.call_args[1]["maximum"], 1010)
