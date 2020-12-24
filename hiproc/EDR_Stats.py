@@ -56,6 +56,8 @@ import kalasiris as isis
 import hiproc.hirise as hirise
 import hiproc.util as util
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -93,10 +95,10 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log, args.logfile)
+    util.set_logger(logger, args.log, args.logfile)
 
     if len(args.img) > 1 and not args.output.startswith("."):
-        logging.critical(
+        logger.critical(
             "With more than one input IMG file, the --output must start with "
             f"a period, and it does not: {args.output}"
         )
@@ -126,14 +128,14 @@ def EDR_Stats(
     histmax=99.99,
     keep=False,
 ) -> dict:
-    logging.info(
+    logger.info(
         f"EDR_Stats(in: {img}, out: {out_path}, gains: {gains_path}, "
         f"hist min & max: {histmin} & {histmax}, keep: {keep})"
     )
     try:
-        logging.info("The LUT for this file is: " + str(check_lut(img)))
+        logger.info("The LUT for this file is: " + str(check_lut(img)))
     except KeyError as err:
-        logging.error("The LUT header area is either corrupted or has a gap.")
+        logger.error("The LUT header area is either corrupted or has a gap.")
         raise err
 
     # Convert to .cub
@@ -177,7 +179,7 @@ def EDR_Stats(
     tdi_bin_check(out_path, histats)
     lut_check(out_path, histats)
 
-    logging.info("EDR_Stats done.")
+    logger.info("EDR_Stats done.")
     return histats
 
 
@@ -267,7 +269,7 @@ def get_dncnt(cub: os.PathLike, hmin=0.01, hmax=99.99, keep=False) -> int:
     # that are within the boundaries, not the number of DN.
     # And the # of bins is automatically computed by isis.hist,
     # so could be different for each cube.
-    logging.info(get_dncnt.__doc__)
+    logger.info(get_dncnt.__doc__)
 
     histfile = Path(cub).with_suffix(".hist")
     if not histfile.is_file():
@@ -287,7 +289,7 @@ def get_dncnt(cub: os.PathLike, hmin=0.01, hmax=99.99, keep=False) -> int:
 
 def calc_snr(cub: os.PathLike, gainsfile: os.PathLike, histats: dict) -> float:
     """Calculate the signal to noise ratio."""
-    logging.info(calc_snr.__doc__)
+    logger.info(calc_snr.__doc__)
 
     ccdchan = "{0[0]}_{0[1]}".format(hirise.get_ccdchannel(str(cub)))
 
@@ -307,12 +309,12 @@ def calc_snr(cub: os.PathLike, gainsfile: os.PathLike, histats: dict) -> float:
     if 0 == lis_pixels and img_mean > 0.0 and buf_mean > 0.0:
         s = (img_mean - buf_mean) * gain
         snr = s / math.sqrt(s + r * r)
-        logging.info("Calculation of Signal/Noise Ratio:")
-        logging.info("\tIMAGE_MEAN:        {}".format(img_mean))
-        logging.info("\tIMAGE_BUFFER_MEAN: {}".format(buf_mean))
-        logging.info("\tR (electrons/DN):  {}".format(r))
-        logging.info("\tGain:              {}".format(gain))
-        logging.info("Signal/Noise ratio: {}".format(snr))
+        logger.info("Calculation of Signal/Noise Ratio:")
+        logger.info("\tIMAGE_MEAN:        {}".format(img_mean))
+        logger.info("\tIMAGE_BUFFER_MEAN: {}".format(buf_mean))
+        logger.info("\tR (electrons/DN):  {}".format(r))
+        logger.info("\tGain:              {}".format(gain))
+        logger.info("Signal/Noise ratio: {}".format(snr))
 
     return snr
 
@@ -320,7 +322,7 @@ def calc_snr(cub: os.PathLike, gainsfile: os.PathLike, histats: dict) -> float:
 def check_lut(img: os.PathLike):
     """Checks whether a stored look up table (LUT) matches a known LUT."""
     # Original author of this function was Robert King, in December 2006.
-    logging.info(check_lut.__doc__)
+    logger.info(check_lut.__doc__)
 
     img_pvl = pvl.load(str(img))
     lut_type = img_pvl["INSTRUMENT_SETTING_PARAMETERS"][
@@ -435,13 +437,13 @@ def tdi_bin_check(cube: os.PathLike, histats: dict):
 
     # TDI and binning check
     if float(histats["IMAGE_MEAN"]) >= 8000:
-        logging.warning(
+        logger.warning(
             "Channel mean greater than 8000 (TDI or binning too high)."
         )
     elif float(histats["IMAGE_MEAN"]) < 2500:
         tdi = isis.getkey_k(cube, "Instrument", "Tdi")
         if tdi == "32" or tdi == "64":
-            logging.warning("TDI too low.")
+            logger.warning("TDI too low.")
     return
 
 
@@ -635,13 +637,13 @@ def lut_check(cube: os.PathLike, histats: dict):
                         direction = "to the right"
                     else:
                         direction = "to the left"
-                    logging.warning(
+                    logger.warning(
                         f"LUT is {lut_diff} column(s) ({direction}) from "
                         "ideal settings - image overcompressed."
                     )
                 break
         else:
-            logging.warning(
+            logger.warning(
                 "DN value, {}, lower than lowest DN value "
                 "with defined LUT for this "
                 "channel.".format(histats["IMAGE_MEAN"])

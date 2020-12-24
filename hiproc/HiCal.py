@@ -94,6 +94,8 @@ import hiproc.bitflips as bf
 import hiproc.hirise as hirise
 import hiproc.util as util
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -154,12 +156,12 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log, args.logfile)
+    util.set_logger(logger, args.log, args.logfile)
 
     if len(args.cube) > 1 and (
         not args.output.startswith(".") or not args.db.startswith(".")
     ):
-        logging.critical(
+        logger.critical(
             "With more than one input cube file, the --output "
             "and --db must start with a period, and one of them "
             f"does not: {args.output} {args.db}"
@@ -169,7 +171,7 @@ def main():
     try:
         conf = conf_setup(args.conf, args.nfconf)
     except (TypeError, NotADirectoryError, FileNotFoundError) as err:
-        logging.critical(err)
+        logger.critical(err)
         sys.exit()
 
     for c in args.cube:
@@ -193,10 +195,10 @@ def main():
                 keep=args.keep,
             )
         except UserWarning as err:
-            logging.warning(err)
+            logger.warning(err)
             continue
         except ValueError as err:
-            logging.critical(err)
+            logger.critical(err)
             sys.exit()
         except subprocess.CalledProcessError as err:
             print("Had an ISIS error:")
@@ -321,7 +323,7 @@ def HiCal(
     bitflipwidth=0,
     keep=False,
 ) -> tuple:
-    logging.info("HiCal start.")
+    logger.info("HiCal start.")
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
 
@@ -335,10 +337,10 @@ def HiCal(
     # existing files and also allow for easy clean-up if keep=True
     temp_token = datetime.now().strftime("HiCal-%y%m%d%H%M%S")
 
-    logging.info(f"destripe: {destripe}")
+    logger.info(f"destripe: {destripe}")
 
     flags = set_flags(hconf, db, ccdchan, b.index(int(db["BINNING"])))
-    logging.info(flags)
+    logger.info(flags)
 
     # Start processing cube files
     to_delete = isis.PathSet()
@@ -353,9 +355,9 @@ def HiCal(
         next_cube = furrow_cube
     else:
         next_cube = to_delete.add(in_c.with_suffix(f".{temp_token}.cub"))
-        logging.info(f"Symlink {in_c} to {next_cube}")
+        logger.info(f"Symlink {in_c} to {next_cube}")
         next_cube.symlink_to(in_c.resolve())
-    logging.info(f"Furrow Fix application: {furrows_found}")
+    logger.info(f"Furrow Fix application: {furrows_found}")
 
     # Run hical
     lis_per = (
@@ -481,13 +483,13 @@ def HiCal(
 
     # Create final output file
     to_delete.remove(next_cube)
-    logging.info(f"Rename {next_cube} to {out_cube}.")
+    logger.info(f"Rename {next_cube} to {out_cube}.")
     next_cube.rename(out_cube)
 
     if not keep:
         to_delete.unlink()
 
-    logging.info("HiCal done.")
+    logger.info("HiCal done.")
     return std_final, diff_std_dev, zapped, hical_status
 
 
@@ -636,7 +638,7 @@ def check_destripe(
     if (1 == mybinning and (bin2 or bin4)) or (2 == mybinning and bin4):
         destripe_filter = True
     elif warn_message is not None:
-        logging.warning(warn_message)
+        logger.warning(warn_message)
 
     return destripe_filter
 
@@ -884,7 +886,7 @@ def mask(
     keep=False,
 ) -> None:
     """mask out unwanted pixels"""
-    logging.info(mask.__doc__)
+    logger.info(mask.__doc__)
     to_del = isis.PathSet()
     out_path = Path(out_cube)
     temp_cube = to_del.add(out_path.with_suffix(".mask_temp.cub"))
@@ -919,7 +921,7 @@ def mask(
         # swamps the good, so *this* approach attempts to find the median
         # standard deviation that might be an approximation to the 'real'
         # standard devation of the data without the bit-flip noise.
-        logging.info("More severe handling of images with LIS pixels engaged.")
+        logger.info("More severe handling of images with LIS pixels engaged.")
         bf.clean_cube(temp_cube, out_path, width=width, keep=keep)
 
     if not keep:
@@ -942,7 +944,7 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
             maxs.append(int(row["Maximum"]))
 
     maxvp = max(valid_points)
-    logging.info(f"Maximum count of valid pixels: {maxvp}")
+    logger.info(f"Maximum count of valid pixels: {maxvp}")
 
     # Original note:
     # # Get the median standard deviation value for all columns that have
@@ -964,7 +966,7 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
 
     std_w_maxvp.sort()
     facstd = std_w_maxvp[int((len(std_w_maxvp) - 1) * 0.95)]
-    logging.info(
+    logger.info(
         "95th percentile standard deviation of all "
         + "columns ({}) that have the ".format(len(std_w_maxvp))
         + "maximum valid pixel count: {}".format(facstd)
@@ -983,7 +985,7 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
     # The original Perl code sorts these min and max_w_maxvp arrays,
     # but then ignores this sorting by not using the sorted arrays.
     # I believe this to be an error:
-    logging.warning(
+    logger.warning(
         "Original Perl issue: ignores sorting of valid points results in "
         "masking the wrong range of pixels if noise-filtering."
     )
@@ -1044,7 +1046,7 @@ def HiGainFx(
         DeprecationWarning,
     )
 
-    logging.info(HiGainFx.__doc__)
+    logger.info(HiGainFx.__doc__)
     binning = isis.getkey_k(cube, "Instrument", "Summing")
     ccd = isis.getkey_k(cube, "Instrument", "CcdId")
     chan = isis.getkey_k(cube, "Instrument", "ChannelNumber")
@@ -1053,7 +1055,7 @@ def HiGainFx(
 
     if not coef_dir.exists() or not coef_dir.is_dir():
         coef_dir = Path(__file__).resolve().parent.parent / "data"
-        logging.warning(
+        logger.warning(
             "The HiGainFx coefficient directory {} could not be "
             "found, using {} instead.".format(coef_path, coef_dir)
         )
@@ -1099,7 +1101,7 @@ def Cubenorm_Filter(
     """Perform a highpass filter on the cubenorm table output of the
     columnar average and median values.
     """
-    logging.info(Cubenorm_Filter.__doc__)
+    logger.info(Cubenorm_Filter.__doc__)
     if boxfilter < 3:
         raise ValueError(f"boxfilter={boxfilter} is less than 3")
 
@@ -1208,7 +1210,7 @@ def Cubenorm_Filter_filter_boxfilter(
                     ori[i] = x[i] = 0
                 else:
                     x[i] = orig
-                # logging.info(
+                # logger.info(
                 # f"frac: {frac[step]}, index: {i}, orig: {orig}, new: {new}, "
                 # f"stored: {x[i]}")
     return x
@@ -1224,7 +1226,7 @@ def Cubenorm_Filter_filter(
     divide: bool,
 ) -> list:
     """This performs highpass filtering on the passed list."""
-    logging.info(Cubenorm_Filter_filter.__doc__)
+    logger.info(Cubenorm_Filter_filter.__doc__)
 
     x = copy.deepcopy(inlist)
     cut = cut_size(chan, len(x))
@@ -1436,7 +1438,7 @@ def NoiseFilter_cubenorm_edit(
     # Pause point locations are 1-based pixel numbers, so -1 to get list index.
     # Width values are the number of pixels to affect, including the pause
     # point pixel.
-    logging.info(NoiseFilter_cubenorm_edit.__doc__)
+    logger.info(NoiseFilter_cubenorm_edit.__doc__)
 
     # pause point sample locations:
     ch_pause = {
@@ -1502,8 +1504,8 @@ def NoiseFilter_zaptrigger(
         for i in range(zap_slice.start, zap_slice.stop):
             if vpnts[i] / max_vpnts < nonvalid_frac:
                 trigger = True
-                logging.info(f"Fraction of non-valid pixels > {nonvalid_frac}")
-                logging.info("Pause point pixels will be zapped.")
+                logger.info(f"Fraction of non-valid pixels > {nonvalid_frac}")
+                logger.info("Pause point pixels will be zapped.")
     return trigger
 
 
@@ -1533,7 +1535,7 @@ def NoiseFilter(
     keep=False,
 ) -> None:
     """NoiseFilter: Perform salt/pepper noise removal."""
-    logging.info(NoiseFilter.__doc__)
+    logger.info(NoiseFilter.__doc__)
     binning = int(isis.getkey_k(in_cube, "Instrument", "Summing"))
     (ccd, chan) = hirise.get_ccdchannel(
         isis.getkey_k(in_cube, "Archive", "ProductId")
