@@ -53,8 +53,8 @@ import numpy as np
 from scipy.signal import medfilt
 from scipy.interpolate import PchipInterpolator
 
-import pyrise.util as util
-from pyrise.FlatFile import FlatFile
+import hiproc.util as util
+from hiproc.FlatFile import FlatFile
 
 
 def main():

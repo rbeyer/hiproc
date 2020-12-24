@@ -11,7 +11,7 @@
 
 import unittest
 
-import pyrise.FlatFile as ff
+import hiproc.FlatFile as ff
 
 class TestFlatFile(unittest.TestCase):
     def setUp(self):

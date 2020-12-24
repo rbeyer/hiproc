@@ -16,8 +16,8 @@ from unittest.mock import mock_open, patch
 import numpy as np
 import numpy.testing as npt
 
-from pyrise.FlatFile import FlatFile
-import pyrise.resolve_jitter as rj
+from hiproc.FlatFile import FlatFile
+import hiproc.resolve_jitter as rj
 
 
 class TestResolveJitter(unittest.TestCase):
@@ -258,7 +258,7 @@ class TestResolveJitter(unittest.TestCase):
             IndexError, rj.overwrite_null_freq, a, s1, wrong_shape
         )
 
-    @patch('pyrise.resolve_jitter.Path')
+    @patch('hiproc.resolve_jitter.Path')
     def test_pixel_smear(self, m_path):
         (
             tdi, nfft, line_rate, tt, et, et_shift, dt, ddt, t, offx, offy,
@@ -278,7 +278,7 @@ class TestResolveJitter(unittest.TestCase):
     #     m = mock_open()
     #     col1 = [1.234, 2.345, 3.456]
     #     col2 = [0.12345, 0.23456, 0.34567, 0.45678]
-    #     with patch('pyrise.resolve_jitter.open', m):
+    #     with patch('hiproc.resolve_jitter.open', m):
     #         self.assertRaises(
     #             IndexError,
     #             rj.write_data_for_plotting, "dummy-file",
