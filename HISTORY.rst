@@ -30,6 +30,7 @@ Unreleased
 
 Added
 +++++
+* lisfix: Added the lisfix module.
 * bitflips: Sometimes the very end of the histogram (although not a formal minima) is the appropriate choice, and
   is now considered.
 * bitflips: Added capability to ignore minor maxima at the ends of the histogram to "roll down" to a better solution.
