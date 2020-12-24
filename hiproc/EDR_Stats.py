@@ -34,9 +34,9 @@ reproduced here:
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This Python program is based on EDR_Stats version 2.16.3 (2020/04/28)
-# and on the Perl EDR_Stats program ($Revision: 1.40 $
-#                                    $Date: 2020/04/28 17:43:18 $)
+# This Python program is based on EDR_Stats version 2.17.0 (2020/08/11)
+# and on the Perl EDR_Stats program ($Revision: 1.41 $
+#                                    $Date: 2020/08/11 14:28:13 $)
 # and on the check_lut.pm program (2.4, 2020/04/28)
 # by Eric Eliason, Audrie Fennema, and R. King as employees of the University
 # of Arizona.
@@ -453,7 +453,52 @@ def lut_check(cube: os.PathLike, histats: dict):
     orbit_number = int(isis.getkey_k(cube, "Archive", "OrbitNumber"))
     threshhold = dict()
     if lut != -9998:
-        if orbit_number > 13057:
+        if orbit_number > 65881:
+            # After orbit 65881, RED1 RED2 RED3 moved to to DN 900-1000 offset
+
+            threshhold["RED0"] = (
+                (6814, 22),
+                (5341, 23),
+                (3869, 24),
+                (3133, 25),
+                (2397, 26),
+                (1200, 27),
+            )
+            threshhold["RED1"] = (
+                (6619, 1),
+                (5116, 2),
+                (3614, 3),
+                (2863, 4),
+                (2112, 5),
+                (900, 6),
+            )
+            threshhold["RED2"] = threshhold["RED1"]
+            threshhold["RED3"] = threshhold["RED1"]
+            threshhold["RED4"] = (
+                (6684, 8),
+                (5191, 9),
+                (3699, 10,),
+                (2953, 11,),
+                (2207, 12,),
+                (1000, 13,)
+            )
+            threshhold["RED5"] = (
+                (6749, 15),
+                (5266, 16),
+                (3784, 17),
+                (3043, 18),
+                (2302, 19),
+                (1100, 20),
+            )
+            threshhold["RED6"] = threshhold["RED4"]
+            threshhold["RED7"] = threshhold["RED4"]
+            threshhold["RED8"] = threshhold["RED0"]
+            threshhold["RED9"] = threshhold["RED4"]
+            threshhold["IR10"] = threshhold["RED1"]
+            threshhold["IR11"] = threshhold["RED4"]
+            threshhold["BG12"] = threshhold["RED1"]
+            threshhold["BG13"] = threshhold["RED1"]
+        elif orbit_number > 13057:
             # After orbit 13057, IR10 moved to DN 900-1000 offset
             threshhold["RED0"] = (
                 (6814, 22),
