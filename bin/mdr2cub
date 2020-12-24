@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import pyrise.mdr2cub as m2c
+import hiproc.mdr2cub as m2c
 
 m2c.main()

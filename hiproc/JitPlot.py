@@ -39,9 +39,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import pvl
-import pyrise.util as util
-import pyrise.HiColorInit as hicolor
-import pyrise.HiJitReg as hjr
+import hiproc.util as util
+import hiproc.HiColorInit as hicolor
+import hiproc.HiJitReg as hjr
 
 
 def main():

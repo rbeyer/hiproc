@@ -39,7 +39,7 @@ from pathlib import Path
 
 import kalasiris as isis
 
-import pyrise.util as util
+import hiproc.util as util
 
 
 def main():

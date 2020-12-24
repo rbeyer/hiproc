@@ -25,7 +25,7 @@ from scipy.signal import find_peaks
 
 import kalasiris as isis
 
-from pyrise import bitflips as bf
+from hiproc import bitflips as bf
 
 # from .utils import resource_check as rc
 
@@ -209,9 +209,9 @@ class TestMock(unittest.TestCase):
             self.cleaned, bf.clean_cal_tables(masked, 1)
         )
 
-    @patch("pyrise.bitflips.shutil.copy")
+    @patch("hiproc.bitflips.shutil.copy")
     @patch(
-        "pyrise.bitflips.pvl.load",
+        "hiproc.bitflips.pvl.load",
         return_value={
             "IsisCube": {
                 "Core": {"Pixels": {"Type": "UnsignedWord"}},
@@ -219,8 +219,8 @@ class TestMock(unittest.TestCase):
             }
         },
     )
-    @patch("pyrise.bitflips.open", new_callable=mock_open)
-    @patch("pyrise.bitflips.isis.cube.overwrite_table")
+    @patch("hiproc.bitflips.open", new_callable=mock_open)
+    @patch("hiproc.bitflips.isis.cube.overwrite_table")
     def test_clean_tables_from_cube(self, m_wtable, m_open, m_pvl, m_copy):
         for notimpl in ("mask_area", "ramp_area", "buffer_area", "dark_area"):
             self.assertRaises(
@@ -232,7 +232,7 @@ class TestMock(unittest.TestCase):
             )
 
         with patch(
-            "pyrise.bitflips.isis.cube.get_table",
+            "hiproc.bitflips.isis.cube.get_table",
             return_value={"Calibration": self.cal},
         ):
             bf.clean_tables_from_cube(
@@ -247,17 +247,17 @@ class TestMock(unittest.TestCase):
             #     self.cleaned, m_wtable.call_args[0][2]["Calibration"]
             # )
 
-    @patch("pyrise.bitflips.clean_tables_from_cube")
+    @patch("hiproc.bitflips.clean_tables_from_cube")
     @patch(
-        "pyrise.bitflips.pvl.load",
+        "hiproc.bitflips.pvl.load",
         return_value={
             "IsisCube": {"Core": {"Pixels": {"Type": "UnsignedWord"}}}
         },
     )
-    @patch("pyrise.bitflips.isis.mask")
+    @patch("hiproc.bitflips.isis.mask")
     def test_clean_cube(self, m_mask, m_load, m_clntbl):
         with patch(
-            "pyrise.bitflips.gdal_array.LoadFile", return_value=self.cal
+            "hiproc.bitflips.gdal_array.LoadFile", return_value=self.cal
         ):
             bf.clean_cube(
                 Path("dummy-in.cub"), Path("dummy-out.cub"), keep=True

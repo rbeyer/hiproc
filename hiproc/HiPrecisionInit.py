@@ -39,8 +39,8 @@ from pathlib import Path
 
 import pvl
 
-import pyrise.SlitherStats as sstats
-import pyrise.util as util
+import hiproc.SlitherStats as sstats
+import hiproc.util as util
 
 
 def main():

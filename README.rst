@@ -1,5 +1,5 @@
 ======
-pyrise
+hiproc
 ======
 
 
@@ -8,7 +8,7 @@ A library to help process HiRISE EDRs with ISIS.
 
 * Free software: Apache 2 License
 
-.. * Documentation: https://pyrise.readthedocs.io.
+.. * Documentation: https://hiproc.readthedocs.io.
 .. * `PlanetaryPy`_ Affiliate Package (someday).
 
 
@@ -113,10 +113,11 @@ environment.
 Naming
 ------
 
-I may need to change the name if I ever want to create a PyPI package
-or make it installable via conda-forge.  Turns out that 'pyrise'
-is already taken on PyPI by a now-abandoned package, but the process
-to commandeer that name is probably more trouble than it is worth.
+The ISIS software has a number of "proc" programs (`mocproc`,
+`thmproc`, etc.) that are meant to be run to process raw images
+to higher-level, more usable versions.  Naming this library `hiproc`
+is an echo to that, and while there is a `hiproc` program that is
+available, this library provides a great deal more.
 
 
 .. _PlanetaryPy: https://github.com/planetarypy

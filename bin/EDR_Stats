@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import pyrise.EDR_Stats as edr
+import hiproc.EDR_Stats as edr
 
 edr.main()

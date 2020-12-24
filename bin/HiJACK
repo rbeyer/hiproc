@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import pyrise.HiJACK as hj
+import hiproc.HiJACK as hj
 
 hj.main()

@@ -36,6 +36,7 @@ Added
 
 Changed
 +++++++
+* name change of project from pyrise to hiproc.
 * bitflips: Changed the default medstd_limit from 300 to 400 DN.
 
 Fixed

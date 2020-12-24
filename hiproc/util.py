@@ -21,7 +21,7 @@ import logging
 import os
 from pathlib import Path
 
-import pyrise.hirise as hirise
+import hiproc.hirise as hirise
 
 
 def parent_parser() -> argparse.ArgumentParser:

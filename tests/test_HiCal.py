@@ -24,9 +24,9 @@ from unittest.mock import patch
 import pvl
 
 import kalasiris as isis
-import pyrise.hirise as hirise
-import pyrise.EDR_Stats as edr
-import pyrise.HiCal as hc
+import hiproc.hirise as hirise
+import hiproc.EDR_Stats as edr
+import hiproc.HiCal as hc
 
 from .utils import resource_check as rc
 
@@ -258,7 +258,7 @@ class TestMock(unittest.TestCase):
         for p in imgs:
             cub = p.with_suffix(".PathOnly.cub")
             cubes.append(cub)
-        with patch("pyrise.HiCal.isis.getkey_k", return_value="2"):
+        with patch("hiproc.HiCal.isis.getkey_k", return_value="2"):
             with patch("pathlib.Path.glob", return_value=cubes):
                 d = hc.get_bins_fromfiles(cubes[0])
                 self.assertEqual(len(cubes) / 2, len(d))
@@ -272,8 +272,8 @@ class TestMock(unittest.TestCase):
         self.assertEqual(False, hc.check_destripe("dummy", 0, True, True))
         self.assertEqual(True, hc.check_destripe("dummy", 2, True, True))
         self.assertEqual(False, hc.check_destripe("dummy", 0, False, False))
-        with patch("pyrise.HiCal.get_bins_fromfiles", return_value=bins):
-            with patch("pyrise.HiCal.isis.getkey_k", return_value=powered):
+        with patch("hiproc.HiCal.get_bins_fromfiles", return_value=bins):
+            with patch("hiproc.HiCal.isis.getkey_k", return_value=powered):
                 self.assertEqual(
                     False, hc.check_destripe("dummy", 2, None, None)
                 )
@@ -306,8 +306,8 @@ class TestNeedCubenormStatsFile(unittest.TestCase):
             (3349.2, 9486.4), hc.analyze_cubenorm_stats(self.statsfile, 2)
         )
 
-    @patch("pyrise.HiCal.isis.cubenormfile.DictWriter")
-    @patch("pyrise.HiCal.NoiseFilter_cubenorm_writer")
+    @patch("hiproc.HiCal.isis.cubenormfile.DictWriter")
+    @patch("hiproc.HiCal.NoiseFilter_cubenorm_writer")
     def test_NoiseFilter_cubenorm_edit(self, m_writer, m_DictWriter):
         conf = dict(
             NoiseFilter_Zap_Fraction=0.4, NoiseFilter_Nonvalid_Fraction=0.90
@@ -336,7 +336,7 @@ class TestNeedCubenormStatsFile(unittest.TestCase):
         )
 
     def test_Cubenorm_Filter(self):
-        with patch("pyrise.HiCal.csv.DictWriter"):
+        with patch("hiproc.HiCal.csv.DictWriter"):
             t = hc.Cubenorm_Filter(
                 self.statsfile, self.output, False, 5, False, 0
             )

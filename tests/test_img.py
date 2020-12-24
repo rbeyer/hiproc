@@ -25,7 +25,7 @@ import numpy as np
 
 # import kalasiris as isis
 
-import pyrise.img as img
+import hiproc.img as img
 
 # from .utils import resource_check as rc
 
@@ -368,16 +368,16 @@ class TestFunctions(unittest.TestCase):
         #     b += i.to_bytes(1, byteorder='big', signed=False)
         b = (1).to_bytes(1, byteorder="big", signed=False)
 
-        with patch("pyrise.img.open", mock_open(read_data=b)):
-            with patch("pyrise.img.pvl.load", return_value=self.label):
+        with patch("hiproc.img.open", mock_open(read_data=b)):
+            with patch("hiproc.img.pvl.load", return_value=self.label):
                 np.testing.assert_array_equal(
                     np.array([[1117, 0, 0, 0, 0], [0, 0, 0, 0, 0]]),
                     img.object_asarray("dummy.img", "foo"),
                 )
 
-    @patch("pyrise.img.open", new_callable=mock_open)
+    @patch("hiproc.img.open", new_callable=mock_open)
     def test_overwrite_object(self, m_open):
-        with patch("pyrise.img.pvl.load", return_value=self.label):
+        with patch("hiproc.img.pvl.load", return_value=self.label):
             arr = [[1111, 0, 1120, 0, 1125], [1126, 1140, -9998, 0, 0]]
             img.overwrite_object("dummy.img", "foo", np.array(arr))
 

@@ -29,8 +29,8 @@ from osgeo import gdal
 import pvl
 import spiceypy
 
-import pyrise.hirise as hirise
-import pyrise.util as util
+import hiproc.hirise as hirise
+import hiproc.util as util
 import kalasiris as isis
 
 

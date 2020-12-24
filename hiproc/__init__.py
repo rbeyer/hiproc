@@ -1,4 +1,4 @@
-"""Top-level package for pyrise."""
+"""Top-level package for hiproc."""
 
 __author__ = """Ross A. Beyer"""
 __email__ = 'rbeyer@seti.org'

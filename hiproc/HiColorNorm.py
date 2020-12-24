@@ -42,8 +42,8 @@ from pathlib import Path
 import pvl
 
 import kalasiris as isis
-import pyrise.hirise as hirise
-import pyrise.util as util
+import hiproc.hirise as hirise
+import hiproc.util as util
 
 
 class ColorCube(hirise.ObservationID):

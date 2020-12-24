@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import pyrise.HiColorInit as hci
+import hiproc.HiColorInit as hci
 
 hci.main()

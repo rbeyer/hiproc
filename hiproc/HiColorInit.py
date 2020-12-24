@@ -34,8 +34,8 @@ from datetime import datetime
 from pathlib import Path
 
 import kalasiris as isis
-import pyrise.hirise as hirise
-import pyrise.util as util
+import hiproc.hirise as hirise
+import hiproc.util as util
 
 
 CCD_Corresponence = {

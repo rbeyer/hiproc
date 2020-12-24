@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
-import pyrise.hirise_proc as proc
+import hiproc.hirise_proc as proc
 
 proc.main()

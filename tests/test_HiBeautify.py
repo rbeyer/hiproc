@@ -19,8 +19,8 @@ import unittest
 from unittest.mock import call, patch
 from pathlib import Path
 
-import pyrise.HiColorNorm as hcn
-import pyrise.HiBeautify as hbeaut
+import hiproc.HiColorNorm as hcn
+import hiproc.HiBeautify as hbeaut
 
 
 def getkey(cube, group, key):
@@ -39,16 +39,16 @@ def getkey(cube, group, key):
 
 
 class TestHiBeautify(unittest.TestCase):
-    @patch("pyrise.HiColorNorm.ColorCube.get_binning", return_value=2)
-    @patch("pyrise.HiColorNorm.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiColorNorm.ColorCube.get_binning", return_value=2)
+    @patch("hiproc.HiColorNorm.isis.getkey_k", side_effect=getkey)
     def setUp(self, m_getkey, m_get_binning):
         c4 = hcn.ColorCube("dummy/PSP_010502_2090_COLOR4.HiColorNorm")
         c5 = hcn.ColorCube("dummy/PSP_010502_2090_COLOR5.HiColorNorm")
         self.cubes = [c4, c5]
 
-    @patch("pyrise.HiBeautify.isis.cubeit_k")
-    @patch("pyrise.HiBeautify.isis.algebra")
-    @patch("pyrise.HiBeautify.isis.handmos")
+    @patch("hiproc.HiBeautify.isis.cubeit_k")
+    @patch("hiproc.HiBeautify.isis.algebra")
+    @patch("hiproc.HiBeautify.isis.handmos")
     def test_HiBeautify(self, m_handmos, m_algebra, m_cubeit_k):
         conf = {
             "Beautify": {

@@ -46,9 +46,9 @@ import numpy as np
 import pvl
 
 import kalasiris as isis
-import pyrise.util as util
-import pyrise.HiJitReg as hjr
-import pyrise.HiNoProj as hnp
+import hiproc.util as util
+import hiproc.HiJitReg as hjr
+import hiproc.HiNoProj as hnp
 
 resolve_jitter_path = (
     "/Users/rbeyer/software/HiPrecision/fromOleg/HiPrecision/resolveJitter"

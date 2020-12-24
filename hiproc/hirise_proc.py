@@ -40,20 +40,20 @@ import argparse
 import itertools
 from pathlib import Path
 
-import pyrise.hirise as hirise
-import pyrise.util as util
-import pyrise.EDR_Stats as EDR_Stats
-import pyrise.HiCal as HiCal
-import pyrise.HiStitch as HiStitch
-import pyrise.HiccdStitch as HiccdStitch
-import pyrise.HiColorInit as HiColorInit
-import pyrise.HiJitReg as HiJitReg
-import pyrise.HiSlither as HiSlither
-import pyrise.HiColorNorm as HiColorNorm
-import pyrise.HiBeautify as HiBeautify
-import pyrise.HiPrecisionInit as HiPrecisionInit
-import pyrise.HiNoProj as HiNoProj
-import pyrise.HiJACK as HiJACK
+import hiproc.hirise as hirise
+import hiproc.util as util
+import hiproc.EDR_Stats as EDR_Stats
+import hiproc.HiCal as HiCal
+import hiproc.HiStitch as HiStitch
+import hiproc.HiccdStitch as HiccdStitch
+import hiproc.HiColorInit as HiColorInit
+import hiproc.HiJitReg as HiJitReg
+import hiproc.HiSlither as HiSlither
+import hiproc.HiColorNorm as HiColorNorm
+import hiproc.HiBeautify as HiBeautify
+import hiproc.HiPrecisionInit as HiPrecisionInit
+import hiproc.HiNoProj as HiNoProj
+import hiproc.HiJACK as HiJACK
 
 
 class ChannelCube(hirise.ChannelID):

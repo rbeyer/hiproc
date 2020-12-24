@@ -13,7 +13,7 @@ import logging
 import unittest
 from pathlib import Path
 
-import pyrise.util as util
+import hiproc.util as util
 
 from .utils import resource_check as rc
 
@@ -65,15 +65,15 @@ class TestUtil(unittest.TestCase):
         self.assertRaises(
             NotADirectoryError, util.get_path, "dummy", "not_a_dir"
         )
-        self.assertRaises(FileNotFoundError, util.get_path, "dummy", "pyrise")
+        self.assertRaises(FileNotFoundError, util.get_path, "dummy", "hiproc")
         self.assertRaises(
-            FileNotFoundError, util.get_path, "dummy", Path("pyrise")
+            FileNotFoundError, util.get_path, "dummy", Path("hiproc")
         )
         self.assertRaises(
-            FileNotFoundError, util.get_path, "dummy", ["pyrise", "tests"]
+            FileNotFoundError, util.get_path, "dummy", ["hiproc", "tests"]
         )
         self.assertEqual(
-            Path("pyrise/util.py"), util.get_path("util.py", "pyrise")
+            Path("hiproc/util.py"), util.get_path("util.py", "hiproc")
         )
 
     def test_conf_check_strings(self):

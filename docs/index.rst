@@ -1,4 +1,4 @@
-Welcome to pyrise's documentation!
+Welcome to hiproc's documentation!
 ======================================
 
 .. toctree::

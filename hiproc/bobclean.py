@@ -31,8 +31,8 @@ from pathlib import Path
 
 import numpy as np
 
-import pyrise.bitflips as bf
-import pyrise.util as util
+import hiproc.bitflips as bf
+import hiproc.util as util
 
 SpecialPixels = collections.namedtuple(
     "SpecialPixels", ["Min", "Null", "Lrs", "Lis", "His", "Hrs", "Max"]

@@ -24,8 +24,8 @@ from unittest.mock import patch
 
 import pvl
 
-import pyrise.hirise as hirise
-import pyrise.HiStitch as hs
+import hiproc.hirise as hirise
+import hiproc.HiStitch as hs
 
 conf_path = Path("data") / "HiStitch.conf"
 
@@ -69,19 +69,19 @@ class TestMock(unittest.TestCase):
         cub0 = "PSP_010502_2090_RED4_0"
         cub1 = "PSP_010502_2090_RED4_1"
         with patch(
-            "pyrise.HiStitch.isis.getkey_k", side_effect=[cub0[-1], cub1[-1]]
+            "hiproc.HiStitch.isis.getkey_k", side_effect=[cub0[-1], cub1[-1]]
         ):
             self.assertEqual((cub0, cub1), hs.sort_input_cubes(cub0, cub1))
 
         with patch(
-            "pyrise.HiStitch.isis.getkey_k", side_effect=[cub1[-1], cub0[-1]]
+            "hiproc.HiStitch.isis.getkey_k", side_effect=[cub1[-1], cub0[-1]]
         ):
             self.assertEqual((cub0, cub1), hs.sort_input_cubes(cub1, cub0))
 
-        with patch("pyrise.HiStitch.isis.getkey_k", return_value=0):
+        with patch("hiproc.HiStitch.isis.getkey_k", return_value=0):
             self.assertRaises(RuntimeError, hs.sort_input_cubes, cub0, cub0)
 
-        with patch("pyrise.HiStitch.isis.getkey_k", side_effect=[0, 2]):
+        with patch("hiproc.HiStitch.isis.getkey_k", side_effect=[0, 2]):
             self.assertRaises(RuntimeError, hs.sort_input_cubes, cub0, cub1)
 
     def test_sort_databases(self):
@@ -91,28 +91,28 @@ class TestMock(unittest.TestCase):
         )
         dbs = ({"PRODUCT_ID": str(chids[0])}, {"PRODUCT_ID": str(chids[1])})
         _ = "dummy_path"
-        with patch("pyrise.HiStitch.open", mock_open(read_data="dummy")):
-            with patch("pyrise.HiStitch.json.load", side_effect=dbs):
+        with patch("hiproc.HiStitch.open", mock_open(read_data="dummy")):
+            with patch("hiproc.HiStitch.json.load", side_effect=dbs):
                 self.assertRaises(
                     IndexError, hs.sort_databases, (_, _, _), chids
                 )
-            # with patch('pyrise.HiStitch.json.load', side_effect=dbs):
+            # with patch('hiproc.HiStitch.json.load', side_effect=dbs):
             self.assertRaises(
                 LookupError, hs.sort_databases, dbs, (chids[0], chids[0])
             )
-            # with patch('pyrise.HiStitch.json.load', side_effect=dbs):
+            # with patch('hiproc.HiStitch.json.load', side_effect=dbs):
             self.assertEqual(dbs, hs.sort_databases(dbs, chids))
-            # with patch('pyrise.HiStitch.json.load', side_effect=reversed(dbs)):
+            # with patch('hiproc.HiStitch.json.load', side_effect=reversed(dbs)):
             self.assertEqual(
                 dbs, hs.sort_databases(list(reversed(dbs)), chids)
             )
 
-    @patch("pyrise.HiStitch.isis.fx")
-    @patch("pyrise.HiStitch.isis.mask")
-    @patch("pyrise.HiStitch.isis.lowpass")
-    @patch("pyrise.HiStitch.isis.highpass")
-    @patch("pyrise.HiStitch.isis.algebra")
-    @patch("pyrise.HiStitch.isis.handmos")
+    @patch("hiproc.HiStitch.isis.fx")
+    @patch("hiproc.HiStitch.isis.mask")
+    @patch("hiproc.HiStitch.isis.lowpass")
+    @patch("hiproc.HiStitch.isis.highpass")
+    @patch("hiproc.HiStitch.isis.algebra")
+    @patch("hiproc.HiStitch.isis.handmos")
     @patch("shutil.copyfile")
     def test_HiFurrow_Fix(
         self,
@@ -124,16 +124,16 @@ class TestMock(unittest.TestCase):
         mock_mask,
         mock_fx,
     ):
-        with patch("pyrise.HiStitch.isis.getkey_k", return_value=1):
+        with patch("hiproc.HiStitch.isis.getkey_k", return_value=1):
             self.assertRaises(
                 ValueError, hs.HiFurrow_Fix, "dum_in", "dum_out", 0
             )
-        with patch("pyrise.HiStitch.isis.getkey_k", side_effect=[2, 1, 1]):
+        with patch("hiproc.HiStitch.isis.getkey_k", side_effect=[2, 1, 1]):
             self.assertRaises(
                 ValueError, hs.HiFurrow_Fix, "dum_in", "dum_out", 0
             )
         with patch(
-            "pyrise.HiStitch.isis.getkey_k", side_effect=["2", "1024", "1024"]
+            "hiproc.HiStitch.isis.getkey_k", side_effect=["2", "1024", "1024"]
         ):
             in_cube = "dummy_in.cub"
             out_cube = "dummy_out.cub"
@@ -319,7 +319,7 @@ class TestHiStitch(unittest.TestCase):
         cubes = ("dummy1.in", "dummy2.in")
         out_c = "dummy.out"
 
-        with patch("pyrise.HiStitch.isis.histitch") as mock:
+        with patch("hiproc.HiStitch.isis.histitch") as mock:
             hs.HiStitchStep(cubes, out_c, 2, 5, self.my_c, False, False)
             mock.assert_called_with(
                 from1=cubes[0], from2=cubes[1], to=out_c, balance=False
@@ -352,14 +352,14 @@ class TestHiStitch(unittest.TestCase):
                 width=1501,
             )
 
-    @patch("pyrise.HiStitch.Path.rename")
-    @patch("pyrise.HiStitch.isis.fx")
-    @patch("pyrise.HiStitch.isis.mask")
-    @patch("pyrise.HiStitch.isis.lowpass")
-    @patch("pyrise.HiStitch.isis.highpass")
-    @patch("pyrise.HiStitch.isis.algebra")
-    @patch("pyrise.HiStitch.isis.handmos")
-    @patch("pyrise.HiStitch.isis.histitch")
+    @patch("hiproc.HiStitch.Path.rename")
+    @patch("hiproc.HiStitch.isis.fx")
+    @patch("hiproc.HiStitch.isis.mask")
+    @patch("hiproc.HiStitch.isis.lowpass")
+    @patch("hiproc.HiStitch.isis.highpass")
+    @patch("hiproc.HiStitch.isis.algebra")
+    @patch("hiproc.HiStitch.isis.handmos")
+    @patch("hiproc.HiStitch.isis.histitch")
     @patch("shutil.copyfile")
     def test_HiStitch(
         self,
@@ -386,7 +386,7 @@ class TestHiStitch(unittest.TestCase):
             }
             return values[key]
 
-        with patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey):
+        with patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey):
             self.assertEqual(
                 (0, 3),
                 hs.HiStitch(
@@ -394,7 +394,7 @@ class TestHiStitch(unittest.TestCase):
                 ),
             )
 
-        with patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey):
+        with patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey):
             self.assertEqual(
                 (None, None),
                 hs.HiStitch(

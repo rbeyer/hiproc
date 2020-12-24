@@ -36,7 +36,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.polynomial.polynomial as P
 
-import pyrise.util as util
+import hiproc.util as util
 
 
 def main():

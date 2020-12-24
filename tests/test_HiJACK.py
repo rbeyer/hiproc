@@ -23,10 +23,10 @@ from unittest.mock import call
 from unittest.mock import patch
 from unittest.mock import Mock
 
-# import pyrise.hirise as hirise
-import pyrise.HiJitReg as hjr
-import pyrise.HiNoProj as hnp
-import pyrise.HiJACK as hjk
+# import hiproc.hirise as hirise
+import hiproc.HiJitReg as hjr
+import hiproc.HiNoProj as hnp
+import hiproc.HiJACK as hjk
 
 hijackconf_path = Path("data") / "HiJACK.conf"
 resjitconf_path = Path("data") / "ResolveJitter.conf"
@@ -51,7 +51,7 @@ def getkey(cube, group, key):
 
 
 class TestHiJACK(unittest.TestCase):
-    @patch("pyrise.HiNoProj.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiNoProj.isis.getkey_k", side_effect=getkey)
     def setUp(self, getkey_k):
         self.r4 = hnp.Cube("dummy/PSP_010502_2090_RED4.HiStitch.balance.cub")
         self.r3 = hnp.Cube("dummy/PSP_010502_2090_RED3.HiStitch.balance.cub")
@@ -65,12 +65,12 @@ class TestHiJACK(unittest.TestCase):
             Alt_3_CCDs="IR10,RED4,RED5,BG12",
         )
 
-    @patch("pyrise.HiJACK.shutil.move")
-    @patch("pyrise.HiJACK.isis.handmos")
-    @patch("pyrise.HiJACK.isis.hijitreg")
-    @patch("pyrise.HiJACK.shutil.copy")
-    @patch("pyrise.HiJACK.isis.reduce")
-    @patch("pyrise.HiJACK.isis.enlarge")
+    @patch("hiproc.HiJACK.shutil.move")
+    @patch("hiproc.HiJACK.isis.handmos")
+    @patch("hiproc.HiJACK.isis.hijitreg")
+    @patch("hiproc.HiJACK.shutil.copy")
+    @patch("hiproc.HiJACK.isis.reduce")
+    @patch("hiproc.HiJACK.isis.enlarge")
     def test_match_red(
         self, m_enlarge, m_reduce, m_copy, m_hjr, m_hand, m_move
     ):
@@ -127,8 +127,8 @@ class TestHiJACK(unittest.TestCase):
         rcubes.sort()
         self.assertEqual(cubes, rcubes)
 
-    @patch("pyrise.HiJitReg.run_HiJitReg")
-    @patch("pyrise.HiNoProj.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiJitReg.run_HiJitReg")
+    @patch("hiproc.HiNoProj.isis.getkey_k", side_effect=getkey)
     def test_make_flats(self, m_get, m_rhjr):
         cubes = [self.r4, self.r3, self.r5, self.i1]
         for c in cubes:
@@ -157,13 +157,13 @@ class TestHiJACK(unittest.TestCase):
             },
         }
 
-        with patch("pyrise.HiJitReg.JitterCube") as m_jit:
+        with patch("hiproc.HiJitReg.JitterCube") as m_jit:
             m_path = Mock(spec_set=Path)
             m_jit().flattab_path = m_path
             s = hjk.make_flats(cubes, self.r5, conf, "tt", keep=True)
             self.assertEqual(s, [m_path] * (len(cubes) - 1))
 
-        with patch("pyrise.HiJitReg.Analyze_Flat", return_value=1):
+        with patch("hiproc.HiJitReg.Analyze_Flat", return_value=1):
             s = hjk.make_flats(cubes, self.r5, conf, "tt", keep=True)
             flat_list = list()
             for x in (self.r3, self.r4, self.i1):
@@ -171,7 +171,7 @@ class TestHiJACK(unittest.TestCase):
                 flat_list.append(self.r5.path.parent / (p + ".flat.tab"))
             self.assertEqual(flat_list, s)
 
-    @patch("pyrise.HiJACK.subprocess.run")
+    @patch("hiproc.HiJACK.subprocess.run")
     def test_ResolveJitter(self, m_run):
         cubes = [self.r4, self.r3, self.r5, self.i1]
         for c in cubes:
@@ -184,9 +184,9 @@ class TestHiJACK(unittest.TestCase):
             flat_list.append(self.r5.path.parent / (p + ".flat.tab"))
 
         with patch(
-            "pyrise.HiJACK.determine_resjit_set", return_value=(cubes, self.r5)
+            "hiproc.HiJACK.determine_resjit_set", return_value=(cubes, self.r5)
         ):
-            with patch("pyrise.HiJACK.make_flats", return_value=flat_list):
+            with patch("hiproc.HiJACK.make_flats", return_value=flat_list):
                 m_path = Mock(spec_set=Path)
                 m_path.parent = self.r5.path.parent
                 conf = dict(
@@ -216,8 +216,8 @@ class TestHiJACK(unittest.TestCase):
                     ],
                 )
 
-    @patch("pyrise.HiNoProj.handmos_side")
-    @patch("pyrise.HiNoProj.fix_labels")
+    @patch("hiproc.HiNoProj.handmos_side")
+    @patch("hiproc.HiNoProj.fix_labels")
     def test_mosaic_dejittered(self, m_fix, m_hand):
         out_p = "output_path"
         prodid = "product_id"
@@ -238,21 +238,21 @@ class TestHiJACK(unittest.TestCase):
             [call([self.r4, self.r5], out_p, str(self.r5), prodid)],
         )
 
-    @patch("pyrise.HiJACK.Path.mkdir")
-    @patch("pyrise.HiJACK.ResolveJitter")
-    @patch("pyrise.HiNoProj.fix_labels")
-    @patch("pyrise.HiJACK.isis.PathSet")
-    @patch("pyrise.HiJACK.plot_flats")
-    @patch("pyrise.HiJACK.isis.fromlist.temp")
-    @patch("pyrise.HiJACK.isis.cubeit")
-    @patch("pyrise.HiJACK.isis.handmos")
-    @patch("pyrise.HiJACK.mosaic_dejittered")
-    @patch("pyrise.HiJACK.shutil.copyfile")
-    @patch("pyrise.HiJACK.isis.hijitter")
-    @patch("pyrise.HiNoProj.copy_and_spice")
-    @patch("pyrise.HiNoProj.conf_check")
-    @patch("pyrise.HiJACK.pvl.load")
-    @patch("pyrise.HiJACK.match_red")
+    @patch("hiproc.HiJACK.Path.mkdir")
+    @patch("hiproc.HiJACK.ResolveJitter")
+    @patch("hiproc.HiNoProj.fix_labels")
+    @patch("hiproc.HiJACK.isis.PathSet")
+    @patch("hiproc.HiJACK.plot_flats")
+    @patch("hiproc.HiJACK.isis.fromlist.temp")
+    @patch("hiproc.HiJACK.isis.cubeit")
+    @patch("hiproc.HiJACK.isis.handmos")
+    @patch("hiproc.HiJACK.mosaic_dejittered")
+    @patch("hiproc.HiJACK.shutil.copyfile")
+    @patch("hiproc.HiJACK.isis.hijitter")
+    @patch("hiproc.HiNoProj.copy_and_spice")
+    @patch("hiproc.HiNoProj.conf_check")
+    @patch("hiproc.HiJACK.pvl.load")
+    @patch("hiproc.HiJACK.match_red")
     def test_HiJACK(
         self,
         m_match,
@@ -274,7 +274,7 @@ class TestHiJACK(unittest.TestCase):
         confd = "confdir"
         outd = "outdir"
         with patch(
-            "pyrise.HiNoProj.add_offsets",
+            "hiproc.HiNoProj.add_offsets",
             side_effect=[
                 (
                     [self.r4, self.r5],

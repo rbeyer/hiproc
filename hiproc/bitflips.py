@@ -101,8 +101,8 @@ from scipy.stats import mstats
 import pvl
 import kalasiris as isis
 
-import pyrise.img as img
-import pyrise.util as util
+import hiproc.img as img
+import hiproc.util as util
 
 logger = logging.getLogger(__name__)
 
@@ -981,7 +981,7 @@ def min_max_ex(
 #     This is now superceded by clean_cube()
 #     """
 #
-#     from pyrise.HiCal import analyze_cubenorm_stats2
+#     from hiproc.HiCal import analyze_cubenorm_stats2
 #
 #     to_del = isis.PathSet()
 #

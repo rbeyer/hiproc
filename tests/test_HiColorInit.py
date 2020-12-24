@@ -19,7 +19,7 @@
 import unittest
 from unittest.mock import patch
 
-import pyrise.HiColorInit as hci
+import hiproc.HiColorInit as hci
 
 
 def getkey(cube, group, key):
@@ -34,14 +34,14 @@ def getkey(cube, group, key):
 
 
 class TestHiColorCube(unittest.TestCase):
-    @patch("pyrise.HiColorInit.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiColorInit.isis.getkey_k", side_effect=getkey)
     def test_init(self, mock_getkey):
         c = hci.HiColorCube("dummy/PSP_010502_2090_RED5_0")
         self.assertTrue(c.tdi, 64)
 
 
 class TestMock(unittest.TestCase):
-    @patch("pyrise.HiColorInit.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiColorInit.isis.getkey_k", side_effect=getkey)
     def test_separate_ccds(self, mock_getkey):
         c04 = hci.HiColorCube("dummy/PSP_010502_2090_RED4")
         c05 = hci.HiColorCube("dummy/PSP_010502_2090_RED5")
@@ -60,12 +60,12 @@ class TestMock(unittest.TestCase):
         self.assertEqual(c12, bg12)
         self.assertEqual(c13, bg13)
 
-    @patch("pyrise.HiColorInit.isis.reduce")
-    @patch("pyrise.HiColorInit.isis.enlarge")
-    @patch("pyrise.HiColorInit.isis.handmos")
-    @patch("pyrise.HiColorInit.isis.editlab")
-    @patch("pyrise.HiColorInit.Path.unlink")
-    @patch("pyrise.HiColorInit.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiColorInit.isis.reduce")
+    @patch("hiproc.HiColorInit.isis.enlarge")
+    @patch("hiproc.HiColorInit.isis.handmos")
+    @patch("hiproc.HiColorInit.isis.editlab")
+    @patch("hiproc.HiColorInit.Path.unlink")
+    @patch("hiproc.HiColorInit.isis.getkey_k", side_effect=getkey)
     def test_HiColorInit_enlarge(
         self, m_getkey, m_unlink, m_editlab, m_handmos, m_enlarge, m_reduce
     ):
@@ -86,12 +86,12 @@ class TestMock(unittest.TestCase):
         self.assertAlmostEqual(200, m_handmos.call_args[1]["outline"])
         m_unlink.assert_not_called()
 
-    @patch("pyrise.HiColorInit.isis.reduce")
-    @patch("pyrise.HiColorInit.isis.enlarge")
-    @patch("pyrise.HiColorInit.isis.handmos")
-    @patch("pyrise.HiColorInit.isis.editlab")
-    @patch("pyrise.HiColorInit.Path.unlink")
-    @patch("pyrise.HiColorInit.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiColorInit.isis.reduce")
+    @patch("hiproc.HiColorInit.isis.enlarge")
+    @patch("hiproc.HiColorInit.isis.handmos")
+    @patch("hiproc.HiColorInit.isis.editlab")
+    @patch("hiproc.HiColorInit.Path.unlink")
+    @patch("hiproc.HiColorInit.isis.getkey_k", side_effect=getkey)
     def test_HiColorInit_reduce(
         self, m_getkey, m_unlink, m_editlab, m_handmos, m_enlarge, m_reduce
     ):

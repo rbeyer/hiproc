@@ -2,6 +2,6 @@
 Usage
 =====
 
-To use pyrise in a project::
+To use hiproc in a project::
 
-    import pyrise
+    import hiproc

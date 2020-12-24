@@ -25,8 +25,8 @@ from unittest.mock import patch
 
 import pvl
 
-# import pyrise.hirise as hirise
-import pyrise.HiccdStitch as hcs
+# import hiproc.hirise as hirise
+import hiproc.HiccdStitch as hcs
 
 conf_path = Path("data") / "HiccdStitch.conf"
 
@@ -43,12 +43,12 @@ def getkey(cube, group, key):
 
 
 class TestHiccdStitchCube(unittest.TestCase):
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_init(self, mock_getkey):
         c = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED5_0")
         self.assertTrue(c.ns, 1024)
 
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_set_cubenorm_lines(self, mock_getkey):
 
         c = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED5_0")
@@ -65,7 +65,7 @@ class TestHiccdStitchCube(unittest.TestCase):
             RuntimeError, c.set_cubenorm_lines, 1, 1, 1000, 800, 2
         )
 
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_set_balance(self, mock_getkey):
         c = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED5_0")
         c.set_balance(1, 1, {2: [1, 1]}, 1)
@@ -76,7 +76,7 @@ class TestHiccdStitchCube(unittest.TestCase):
         self.assertEqual(1, c.sl_balance)
         self.assertEqual(0, c.nl_balance)
 
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_set_ls_path(self, mock_getkey):
         c = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED5_0")
         p = "dummy-path"
@@ -84,7 +84,7 @@ class TestHiccdStitchCube(unittest.TestCase):
         self.assertEqual(p, c.ls_path)
         self.assertEqual(p, c.lm_path)
 
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_set_rs_path(self, mock_getkey):
         c = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED5_0")
         p = "dummy-path"
@@ -92,15 +92,15 @@ class TestHiccdStitchCube(unittest.TestCase):
         self.assertEqual(p, c.rs_path)
         self.assertEqual(p, c.rm_path)
 
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_gather_from_db(self, mock_getkey):
         c = hcs.HiccdStitchCube("tmp/PSP_010502_2090_RED5_0")
         db = {"hical_status": "BadCal", "IMAGE_SIGNAL_TO_NOISE_RATIO": 5}
-        with patch("pyrise.HiccdStitch.json.load", return_value=db):
+        with patch("hiproc.HiccdStitch.json.load", return_value=db):
             with patch(
-                "pyrise.HiccdStitch.Path.glob", return_value=["d", "d"]
+                "hiproc.HiccdStitch.Path.glob", return_value=["d", "d"]
             ):
-                with patch("pyrise.HiccdStitch.open", mock_open()):
+                with patch("hiproc.HiccdStitch.open", mock_open()):
                     c.gather_from_db()
                     self.assertEqual("BadCal", c.hical_status)
                     self.assertListEqual([5.0, 5.0], c.snr_list)
@@ -126,7 +126,7 @@ class TestConf(unittest.TestCase):
 
 
 class TestBasic(unittest.TestCase):
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_set_outpath(self, mock_getkey):
         c1 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED5_0")
         c2 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED3_1")
@@ -140,9 +140,9 @@ class TestBasic(unittest.TestCase):
         truth = Path("dummy/PSP_010502_2090_RED.foo")
         self.assertEqual(truth, hcs.set_outpath(".foo", [c1, c2]))
 
-    @patch("pyrise.HiStitch.isis.enlarge")
-    @patch("pyrise.HiStitch.isis.crop")
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.enlarge")
+    @patch("hiproc.HiStitch.isis.crop")
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_crop_and_scale(self, mock_getkey, mock_crop, moc_enlarge):
         c1 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED5_0")
         c2 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED3_1")
@@ -155,7 +155,7 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(p, new_c[0].ls_path)
         self.assertIn(p, to_del)
 
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_get_group_i(self, mock_getkey):
         c3 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED3")
         c5 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED5")
@@ -173,7 +173,7 @@ class TestBasic(unittest.TestCase):
     # Not testing hcs.get_stats(), because it just straight up calls ISIS
     # routines.
 
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_get_correction(self, mock_getkey):
         c5 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED5")
         c6 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED6")
@@ -184,7 +184,7 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(1, hcs.get_correction(c6, c5, "MULTIPLY", 0))
         self.assertEqual(0, hcs.get_correction(c6, c5, "ADD", 0))
 
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_get_normalization(self, mock_getkey):
         c1 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED1")
         c2 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED2")
@@ -234,7 +234,7 @@ class TestMock(unittest.TestCase):
         }
         self.conf = {"HiccdStitch": hiconf}
 
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_GetImageDims(self, mock_getkey):
         c1 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED5_0")
         c2 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED3_1")
@@ -247,24 +247,24 @@ class TestMock(unittest.TestCase):
         m = mock_open(read_data=self.cubenorm_data)
         m.return_value.__iter__ = lambda self: self
         m.return_value.__next__ = lambda self: next(iter(self.readline, ""))
-        with patch("pyrise.HiccdStitch.open", m):
+        with patch("hiproc.HiccdStitch.open", m):
             self.assertAlmostEqual(
                 2.371842000000029e-06,
                 hcs.AnalyzeStats("dummy_cubenormout", "dummy_filtered"),
                 places=10,
             )
 
-    @patch("pyrise.HiStitch.isis.PathSet.unlink")
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
-    @patch("pyrise.HiStitch.isis.cubenorm")
-    @patch("pyrise.HiStitch.isis.crop")
+    @patch("hiproc.HiStitch.isis.PathSet.unlink")
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.cubenorm")
+    @patch("hiproc.HiStitch.isis.crop")
     def test_CubeNormStep(
         self, mock_crop, mock_cubenorm, mock_getkey, mock_PathSetunlink
     ):
         m = mock_open(read_data=self.cubenorm_data)
         m.return_value.__iter__ = lambda self: self
         m.return_value.__next__ = lambda self: next(iter(self.readline, ""))
-        with patch("pyrise.HiccdStitch.open", m):
+        with patch("hiproc.HiccdStitch.open", m):
             c = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED5_0")
             new_c = hcs.CubeNormStep(c, self.conf["HiccdStitch"])
             self.assertEqual(
@@ -272,8 +272,8 @@ class TestMock(unittest.TestCase):
                 new_c.nextpath,
             )
 
-    @patch("pyrise.HiStitch.isis.algebra")
-    @patch("pyrise.HiStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.algebra")
+    @patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey)
     def test_make_balance(self, mock_getkey, mock_algebra):
         c = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED5_0")
         c.correction = 1
@@ -309,16 +309,16 @@ class TestMock(unittest.TestCase):
         )
 
     @patch(
-        "pyrise.HiccdStitch.pvl.loads",
+        "hiproc.HiccdStitch.pvl.loads",
         return_value={"Results": {"Average": 1}},
     )
-    @patch("pyrise.HiStitch.isis.PathSet.unlink")
-    @patch("pyrise.HiccdStitch.isis.stats")
-    @patch("pyrise.HiccdStitch.isis.enlarge")
-    @patch("pyrise.HiccdStitch.isis.crop")
-    @patch("pyrise.HiccdStitch.isis.algebra")
-    @patch("pyrise.HiccdStitch.isis.mask")
-    @patch("pyrise.HiccdStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiStitch.isis.PathSet.unlink")
+    @patch("hiproc.HiccdStitch.isis.stats")
+    @patch("hiproc.HiccdStitch.isis.enlarge")
+    @patch("hiproc.HiccdStitch.isis.crop")
+    @patch("hiproc.HiccdStitch.isis.algebra")
+    @patch("hiproc.HiccdStitch.isis.mask")
+    @patch("hiproc.HiccdStitch.isis.getkey_k", side_effect=getkey)
     def test_BalanceStep(
         self,
         m_getkey,
@@ -346,8 +346,8 @@ class TestMock(unittest.TestCase):
             Path("dummy/PSP_010502_2090_RED1.balance.cub"), cubes[0].nextpath
         )
 
-    @patch("pyrise.HiccdStitch.isis.editlab")
-    @patch("pyrise.HiccdStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiccdStitch.isis.editlab")
+    @patch("hiproc.HiccdStitch.isis.getkey_k", side_effect=getkey)
     def test_SpecialProcessingFlags(self, m_getkey, m_editlab):
         p = Path("dummy/PSP_010502_2090_RED1")
         c = hcs.HiccdStitchCube(p)
@@ -392,7 +392,7 @@ class TestMock(unittest.TestCase):
             ]
         )
         with patch(
-            "pyrise.HiccdStitch.isis.getkey_k",
+            "hiproc.HiccdStitch.isis.getkey_k",
             side_effect=subprocess.CalledProcessError(cmd="foo", returncode=1),
         ):
             m_editlab.reset_mock()
@@ -409,7 +409,7 @@ class TestMock(unittest.TestCase):
                 ]
             )
 
-    @patch("pyrise.HiccdStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiccdStitch.isis.getkey_k", side_effect=getkey)
     def test_SNR_Check(self, m_getkey):
         c1 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED1")
         c2 = hcs.HiccdStitchCube("dummy/PSP_010502_2090_RED2")
@@ -420,16 +420,16 @@ class TestMock(unittest.TestCase):
         with self.assertLogs(level="WARN"):
             self.assertIsNone(hcs.SNR_Check([c1, c2], 50))
 
-    @patch("pyrise.HiccdStitch.SNR_Check")
-    @patch("pyrise.HiccdStitch.isis.hiccdstitch")
-    @patch("pyrise.HiccdStitch.SpecialProcessingFlags")
+    @patch("hiproc.HiccdStitch.SNR_Check")
+    @patch("hiproc.HiccdStitch.isis.hiccdstitch")
+    @patch("hiproc.HiccdStitch.SpecialProcessingFlags")
     @patch(
-        "pyrise.HiccdStitch.BalanceStep",
+        "hiproc.HiccdStitch.BalanceStep",
         side_effect=lambda a, b, keep=False: a,
     )
-    @patch("pyrise.HiccdStitch.CubeNormStep", side_effect=lambda a, b, c: a)
-    @patch("pyrise.HiStitch.isis.PathSet.unlink")
-    @patch("pyrise.HiccdStitch.isis.getkey_k", side_effect=getkey)
+    @patch("hiproc.HiccdStitch.CubeNormStep", side_effect=lambda a, b, c: a)
+    @patch("hiproc.HiStitch.isis.PathSet.unlink")
+    @patch("hiproc.HiccdStitch.isis.getkey_k", side_effect=getkey)
     def test_HiccdStitch(
         self,
         m_getkey,

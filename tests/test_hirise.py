@@ -23,7 +23,7 @@ from pathlib import Path
 
 import kalasiris as isis
 
-from pyrise import hirise
+from hiproc import hirise
 from .utils import resource_check as rc
 
 # Hardcoding this, but I sure would like a better solution.

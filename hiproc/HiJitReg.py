@@ -46,8 +46,8 @@ from pathlib import Path
 import pvl
 
 import kalasiris as isis
-import pyrise.util as util
-import pyrise.HiColorInit as hicolor
+import hiproc.util as util
+import hiproc.HiColorInit as hicolor
 
 
 def main():

@@ -20,7 +20,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import call, patch
 
-from pyrise import bitunflip as bf
+from hiproc import bitunflip as bf
 
 # from .utils import resource_check as rc
 
@@ -80,10 +80,10 @@ class TestHist(unittest.TestCase):
         self.assertEqual(10, bf.find_min_dn(self.hist, 2, 20))
         self.assertEqual(20, bf.find_min_dn(self.hist, 20, 1))
 
-    @patch("pyrise.bitflips.shutil.copyfile")
-    @patch("pyrise.bitflips.isis.mask")
-    @patch("pyrise.bitflips.isis.algebra")
-    @patch("pyrise.bitflips.isis.handmos")
+    @patch("hiproc.bitflips.shutil.copyfile")
+    @patch("hiproc.bitflips.isis.mask")
+    @patch("hiproc.bitflips.isis.algebra")
+    @patch("hiproc.bitflips.isis.handmos")
     def test_subtract_over_thresh(self, m_hand, m_alg, m_mask, m_copyfile):
         in_p = Path("in.dummy")
         out_p = Path("out.dummy")

@@ -24,5 +24,5 @@ deploy:
     secure: PLEASE_REPLACE_ME
   on:
     tags: true
-    repo: rbeyer/pyrise
+    repo: rbeyer/hiproc
     python: 3.8

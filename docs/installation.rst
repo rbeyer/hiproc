@@ -8,13 +8,13 @@ Installation
 .. Stable release
    --------------
 
-   To install pyrise, run this command in your terminal:
+   To install hiproc, run this command in your terminal:
 
    .. code-block:: console
 
-       $ pip install pyrise
+       $ pip install hiproc
 
-   This is the preferred method to install pyrise, as it will always install the most recent stable release.
+   This is the preferred method to install hiproc, as it will always install the most recent stable release.
 
    If you don't have `pip`_ installed, this `Python installation guide`_ can guide
    you through the process.
@@ -26,19 +26,19 @@ Installation
 From sources
 ------------
 
-The sources for pyrise can be downloaded from the `Github repo`_.
+The sources for hiproc can be downloaded from the `Github repo`_.
 
 You can either clone the public repository:
 
 .. code-block:: console
 
-    $ git clone git://github.com/rbeyer/pyrise
+    $ git clone git://github.com/rbeyer/hiproc
 
 Or download the `tarball`_:
 
 .. code-block:: console
 
-    $ curl -OJL https://github.com/rbeyer/pyrise/tarball/master
+    $ curl -OJL https://github.com/rbeyer/hiproc/tarball/master
 
 Once you have a copy of the source, you can install it with:
 
@@ -47,5 +47,5 @@ Once you have a copy of the source, you can install it with:
     $ python setup.py install
 
 
-.. _Github repo: https://github.com/rbeyer/pyrise
-.. _tarball: https://github.com/rbeyer/pyrise/tarball/master
+.. _Github repo: https://github.com/rbeyer/hiproc
+.. _tarball: https://github.com/rbeyer/hiproc/tarball/master
