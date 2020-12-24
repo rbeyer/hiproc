@@ -22,11 +22,11 @@ file."""
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on HiStitch version 2.20.3 (2020/04/28),
+# This program is based on HiStitch version 2.21.0 (2020/12/21),
 # and on the Perl HiStitch program ($Revision: 1.26 $
 #                                   $Date: 2020/04/28 17:52:53 $)
-# and on the Perl HiFurrow_Fix program ($Revision: 1.11 $
-#                                       $Date: 2020/04/28 17:52:53 $)
+# and on the Perl HiFurrow_Fix program ($Revision: 1.12 $
+#                                       $Date: 2020/10/30 00:48:28 $)
 # by Eric Eliason as an employee of the University of Arizona.
 
 import argparse

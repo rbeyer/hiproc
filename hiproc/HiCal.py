@@ -66,11 +66,11 @@ reproduced here:
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on HiCal version 3.4.5 (2020/04/28),
+# This program is based on HiCal version 3.4.6 (2020/06/02),
 # and on the Perl HiCal program ($Revision: 1.54 $
 #                                $Date: 2020/04/28 17:48:59 $)
-# and on the Perl NoiseFilter program ($Revision: 1.17
-#                                      $ $Date: 2020/04/28 17:48:59 $)
+# and on the Perl NoiseFilter program ($Revision: 1.18
+#                                      $Date: 2020/06/02 17:51:26 $)
 # by Eric Eliason and Richard Leis as employees of the University of Arizona.
 
 import argparse

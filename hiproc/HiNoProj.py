@@ -22,7 +22,7 @@ mosaicks them into a single cube."""
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on HiPrecision version 3.2.1 (2020/02/15),
+# This program is based on HiPrecision version 3.2.3 (2020/06/23),
 # and on the Perl HiNoProj program ($Revision: 1.10 $
 #                                    $Date: 2020/02/15 00:36:19 $)
 # by Audrie Fennema as an employee of the University of Arizona.

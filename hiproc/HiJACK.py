@@ -22,11 +22,11 @@ mosaicks them into a single cube."""
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on HiPrecision version 3.2.1 (2020/02/15),
+# This program is based on HiPrecision version 3.2.3 (2020/06/23),
 # and the following Perl Programs:
 # - HiPrecisionInit ($Revision: 1.28 $ $Date: 2020/02/15 00:36:20 $)
-# - ResolveJitter ($Revision: 1.25 $ $Date: 2020/02/15 00:36:20 $)
-# - HiJACK ($Revision: 1.23 $ $Date: 2020/02/15 00:36:19 $)
+# - ResolveJitter ($Revision: 1.26 $ $Date: 2020/06/22 00:36:20 $)
+# - HiJACK ($Revision: 1.24 $ $Date: 2020/06/23 00:36:19 $)
 # by Audrie Fennema and Sarah Mattson as employees of the University of
 # Arizona.
 
