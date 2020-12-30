@@ -33,6 +33,8 @@ import hiproc.hirise as hirise
 import hiproc.util as util
 import kalasiris as isis
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -70,7 +72,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.log, args.logfile)
 
     edr_path = Path(args.edr)
     mdr_path = Path(args.mdr)
@@ -90,7 +92,7 @@ def main():
 
     # Convert Alan's MDR to a cube file
     mdr_cub_path = to_del.add(mdr_path.with_suffix(".alan.cub"))
-    logging.info(f"Running gdal_translate {mdr_path} -of ISIS3 {mdr_cub_path}")
+    logger.info(f"Running gdal_translate {mdr_path} -of ISIS3 {mdr_cub_path}")
     gdal.Translate(str(mdr_cub_path), str(mdr_path), format="ISIS3")
 
     h2i_s = int(isis.getkey_k(h2i_path, "Dimensions", "Samples"))
@@ -111,14 +113,14 @@ def main():
         rev_mask_tdi_lines = hirise_cal_info["Records"]
 
         if h2i_s + buffer_pixels + dark_pixels == mdr_s:
-            logging.info(
+            logger.info(
                 f"The file {mdr_cub_path} has "
                 f"{buffer_pixels + dark_pixels} more sample pixels "
                 f"than {h2i_path}, assuming those are dark and "
                 "buffer pixels and will crop accordingly."
             )
             if h2i_l + rev_mask_tdi_lines != mdr_l:
-                logging.critical(
+                logger.critical(
                     'Even assuming this is a "full" channel '
                     "image, this has the wrong number of lines. "
                     f"{mdr_cub_path} should have "
@@ -141,7 +143,7 @@ def main():
                 mdr_l = int(isis.getkey_k(mdr_cub_path, "Dimensions", "Lines"))
 
         else:
-            logging.critical(
+            logger.critical(
                 f"The number of samples in {h2i_path} ({h2i_s}) "
                 f"and {mdr_cub_path} ({mdr_s}) are different. "
                 "Exiting."
@@ -149,7 +151,7 @@ def main():
             sys.exit()
 
     if h2i_l != mdr_l:
-        logging.critical(
+        logger.critical(
             f"The number of lines in {h2i_path} ({h2i_l}) "
             f"and {mdr_cub_path} ({mdr_l}) are different. "
             "Exiting."
@@ -183,7 +185,7 @@ def main():
         pvl.loads(isis.stats(mdr_cub_path).stdout)["Results"]["Maximum"]
     )
     if maximum_pxl < 1.5:
-        logging.info("MDR is already in I/F units.")
+        logger.info("MDR is already in I/F units.")
         mdr_16b_p = to_del.add(mdr_cub_path.with_suffix(".16bit.cub"))
         isis.bit2bit(
             mdr_cub_path,
@@ -195,7 +197,7 @@ def main():
         )
         isis.handmos(mdr_16b_p, mosaic=out_path)
     else:
-        logging.info("MDR is in DN units and will be converted to I/F.")
+        logger.info("MDR is in DN units and will be converted to I/F.")
 
         fpa_t = statistics.mean(
             [
