@@ -22,6 +22,10 @@ calibration.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# Parts of this were inspired by fix_74.pro, find_zero2REV.pro
+# by Alan Delamere, Dec 2020, but the implementation
+# here was written from scratch.
 
 
 import argparse
@@ -125,21 +129,25 @@ def fix(
 
     # Get the average slope of the dark ramp
     hca_dict = isis.cube.get_table(in_path, "HiRISE Calibration Ancillary")
-    calbufdark_vals = np.array(hca_dict["DarkPixels"])
-    calbufdark = np.ma.masked_outside(
-        calbufdark_vals, specialpix.Min, specialpix.Max
+    caldark_vals = np.array(hca_dict["DarkPixels"])
+    caldark = np.ma.masked_outside(
+        caldark_vals, specialpix.Min, specialpix.Max
     )
+    # print(caldark.shape)
     dark_slopes = np.ma.apply_along_axis(
-        get_ramp_slope, 0, calbufdark, mask_lines
+        get_ramp_slope, 0, caldark[:,1:], mask_lines
     )
+    # print(dark_slopes.shape)
+    # print(dark_slopes)
 
     # CORRECT FOR MASKED LINES
     # ASSUME SLOPE IS DEFINED BY DARK COLUMNS
     dark_slope_mean = np.mean(dark_slopes)
+    logger.info(f"Dark Ramp mean slope: {dark_slope_mean}")
     # FOR # J = 12, SZ(1) - 1 # DO
     # zero.line(j) = zero.line(j) - SL_D * (
     #         ystart(j) + 1 + 20. / info.bin * 103. / 89)
-    zero_correction = dark_slope_mean * (1 + 20 / binning * 103 / 89)
+    zero_correction = dark_slope_mean * (20 / binning * 103 / 89)
 
     revclk_lisfrac = np.ma.count_masked(
         cal_image[:20, :]
@@ -149,32 +157,74 @@ def fix(
     )
 
     # Fix the reverse-clock lines.
+    logger.info("Fixing Reverse-Clock pixels.")
     fixed_cal = np.ma.apply_along_axis(
         fix_rev_clock, 0, cal_image, mask_lines, zero_correction
     )
 
     # write the table back out
+    logger.info("Writing out Reverse-Clock pixels.")
     hci_dict["Calibration"] = apply_special_pixels(
         fixed_cal, specialpix
     ).data.tolist()
     isis.cube.overwrite_table(out_p, t_name, hci_dict)
 
-    # if any((buffer_area, dark_area)):
-    #     t_name = 'HiRISE Ancillary'
-    #     HA_dict = isis.cube.get_table(cube, t_name)
-    #     buffer_image = np.array(HA_dict['BufferPixels'])
-    #     dark_image = np.array(HA_dict['DarkPixels'])
-    #
-    #     clean_buffer = clean_buffer_table()
-    #     clean_dark = clean_dark_table()
-    #
-    #     # write the table back out into outcube
-    #     if not dryrun:
-    #         HA_dict['BufferPixels'] = mask_listoflists(
-    #             HA_dict['BufferPixels'], buffer_image, specialpix)
-    #         HA_dict['DarkPixels'] = mask_listoflists(
-    #             HA_dict['DarkPixels'], buffer_image, specialpix)
-    #         isis.cube.overwrite_table(outcube, t_name, HA_dict)
+    ######################
+    # Fix the buffer area:
+    calbuf_vals = np.array(hca_dict["BufferPixels"])
+    calbuf = np.ma.masked_outside(
+        calbuf_vals, specialpix.Min, specialpix.Max
+    )
+
+    ha_dict = isis.cube.get_table(in_path, "HiRISE Ancillary")
+    dark_vals = np.array(ha_dict["DarkPixels"])
+    dark = np.ma.masked_outside(
+        dark_vals, specialpix.Min, specialpix.Max
+    )
+    # print(dark.shape)
+    buffer_vals = np.array(ha_dict["BufferPixels"])
+    buffer = np.ma.masked_outside(
+        buffer_vals, specialpix.Min, specialpix.Max
+    )
+    # print(buffer)
+    # print(buffer.dtype)
+    # print(buffer.shape)
+
+    # first_im_line = 19+(20+label["IsisCube"]["Instrument"]["Tdi"])/binning
+
+    refr = int(np.ma.median(calbuf))
+    logger.info(f"Median of Calibration Buffer Pixels: {refr}")
+    refd = int(np.ma.median(dark[:20]))
+    logger.info(f"Median of first 20 lines of Dark Pixels: {refd}")
+
+    model_buffer = dark[:, 2:14] - refd + refr
+    # print(model_buffer)
+    # print(model_buffer.dtype)
+    # print(model_buffer.shape)
+
+    # for each line in the buffer:
+    # if pixel is masked, replace with p, where
+    # p = d[bindex + 2] - refd + refr
+    # where d[] is the array of pixels from the dark corresponding to
+    # the same line in the buffer, and bindex is the pixel index in
+    # that line.
+    logger.info("Fixing Buffer pixels.")
+    fixed_buf = np.ma.apply_along_axis(
+        fix_buffer,
+        1,
+        np.ma.concatenate((buffer, model_buffer), 1),
+        buffer.shape[1]
+    )
+    # print(fixed_buf)
+    # print(fixed_buf.dtype)
+    # print(fixed_buf.shape)
+
+    # write the table back out
+    ha_dict["BufferPixels"] = apply_special_pixels(
+        fixed_buf, specialpix
+    ).data.tolist()
+    logger.info("Writing out Buffer pixels.")
+    isis.cube.overwrite_table(out_p, "HiRISE Ancillary", ha_dict)
 
     return
 
@@ -198,7 +248,7 @@ def fix_rev_clock(
     zero_correction=0,
     lis_fraction=0.2,
 ):
-    """Returns a np.masked_masked array where the LIS pixels in the
+    """Returns a np.masked array where the LIS pixels in the
     reverse-clock area are replaced with a fit from the ramp area, if
     the percent of LIS pixels is greater than or equal to *lis_fraction*.
 
@@ -217,6 +267,33 @@ def fix_rev_clock(
             fill_value=fit[1] - zero_correction
         )
     return cal_image_col
+
+
+def fix_buffer(
+    buf_row: np.ma.array,
+    stop,
+    lis_fraction=0.5,
+):
+    """Returns a np.masked array the length of *buf_row[:stop]* with those
+    same values, but with the masked pixels in the [:stop] part the row
+    replaced with pixels from the [stop:] part, if the percent of masked
+    pixels in [stop:] is greater than or equal to *lis_fraction*."""
+    if np.ma.count_masked(buf_row[:stop]) / stop >= lis_fraction:
+        # print(f"row: {buf_row[:stop]} {buf_row[stop:]}")
+        # print(buf_row.data[:stop])
+        for i in range(stop):
+            # print(f"masks: {buf_row.mask[i]}, {buf_row.mask[i + stop]}")
+            # print(f"mask type: {type(buf_row.mask[i])} ")
+            # print(f"values: {buf_row[i]}, {buf_row[i + stop]}")
+            # The mask values are really np.bool_ values, so compare
+            # to ints, not Python True, False objects.
+            if buf_row.mask[i] == 1 and buf_row.mask[i + stop] == 0:
+                buf_row[i] = buf_row[i + stop]
+            # print(f"values: {buf_row[i]}, {buf_row[i + stop]}")
+        # print(buf_row.data[:stop])
+        # print(buf_row[:stop])
+
+    return buf_row[:stop]
 
 
 if __name__ == "__main__":
