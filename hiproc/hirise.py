@@ -50,11 +50,12 @@ ccd_numbers = dict(
 phase_re = re.compile("|".join(phase_names))
 orbit_re = re.compile(r"\d{1,6}")
 lat_re = re.compile(r"[0-3]?\d?\d?[05]")
+target_re = re.compile(fr"{lat_re.pattern}|9(?:[0-2]\d\d|30[0-3])")
 
 obsid_core_re = re.compile(
     fr"(?P<phase>{phase_re.pattern})?_?"
     fr"(?P<orbit>{orbit_re.pattern})_"
-    fr"(?P<latesque>{lat_re.pattern})"
+    fr"(?P<target>{target_re.pattern})"
 )
 obsid_re = re.compile(fr"(?<!\w){obsid_core_re.pattern}(?!\d)")
 
@@ -84,8 +85,15 @@ class ObservationID:
     of this Observation ID.
     :ivar orbit_number: The six-digit orbit number (with leading zeros)
     as a string.
-    :ivar latesque: The four digit code (with leading zeroes) as a string,
-    which indicates where in the circle of an orbit the observation lies.
+    :ivar target: The four digit code (with leading zeroes) is defined as
+    follows: Values between 0000 and 3595, inclusive, reflect the central
+    latitude of the observation to within a half-degree, multiplied by 10.
+    (0905, for example, is thus a latitude of 90.5 degrees.) 0.0 degrees is the
+    night-side equator, which is where the orbit number increments. 90.0 south
+    pole on the ascending pass. 180.0 is the day-side equator on the ascending
+    pass. 270.0 is the north pole on the descending pass. Text values between
+    9000 and 9303, inclusive, represent off-planet targets
+    such as Phobos, Deimos, or stars.
     """
 
     def __init__(self, *args):
@@ -93,27 +101,27 @@ class ObservationID:
             if isinstance(args[0], ObservationID):
                 phase = args[0].phase
                 orbit = args[0].orbit_number
-                lat = args[0].latesque
+                target = args[0].target
             else:
                 match = obsid_re.search(str(args[0]))
                 if match:
                     parsed = match.groupdict()
                     phase = parsed["phase"]
                     orbit = parsed["orbit"]
-                    lat = parsed["latesque"]
+                    target = parsed["target"]
                 else:
                     raise ValueError(
                         f"{args[0]} did not match regex: {obsid_re.pattern}"
                     )
         elif len(args) == 2:
-            (phase, orbit, lat) = None, *args
+            (phase, orbit, target) = None, *args
         elif len(args) == 3:
-            (phase, orbit, lat) = args
+            (phase, orbit, target) = args
         else:
             raise IndexError("accepts 1 to 3 arguments")
 
         self.orbit_number = self.format_orbit(orbit)
-        self.latesque = self.format_latesque(lat)
+        self.target = self.format_target(target)
 
         if phase is not None:
             if phase in phase_names:
@@ -139,12 +147,12 @@ class ObservationID:
             self.phase = get_phase(orbit)
 
     def __str__(self):
-        return f"{self.phase}_{self.orbit_number}_{self.latesque}"
+        return f"{self.phase}_{self.orbit_number}_{self.target}"
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}("
-            f"'{self.phase}_{self.orbit_number}_{self.latesque}')"
+            f"'{self.phase}_{self.orbit_number}_{self.target}')"
         )
 
     def __eq__(self, other):
@@ -152,7 +160,7 @@ class ObservationID:
             return (
                 self.phase == other.phase
                 and self.orbit_number == other.orbit_number
-                and self.latesque == other.latesque
+                and self.target == other.target
             )
         return False
 
@@ -161,17 +169,17 @@ class ObservationID:
             return (
                 phase_names.index(self.phase),
                 int(self.orbit_number),
-                int(self.latesque),
+                int(self.target),
             ) < (
                 phase_names.index(other.phase),
                 int(other.orbit_number),
-                int(other.latesque),
+                int(other.target),
             )
         else:
             return NotImplemented
 
     def __hash__(self):
-        return hash((self.phase, self.orbit_number, self.latesque))
+        return hash((self.phase, self.orbit_number, self.target))
 
     @staticmethod
     def format_orbit(orbit) -> str:
@@ -184,13 +192,13 @@ class ObservationID:
             )
 
     @staticmethod
-    def format_latesque(lat) -> str:
-        if lat_re.fullmatch(str(lat)):
-            return "{:0>4}".format(lat)
+    def format_target(val) -> str:
+        if target_re.fullmatch(str(val)):
+            return "{:0>4}".format(val)
         else:
             raise ValueError(
-                f"latitude argument, {lat}, did not match "
-                f"regex: {lat_re.pattern}"
+                f"target argument, {val}, did not match "
+                f"regex: {target_re.pattern}"
             )
 
 
@@ -206,7 +214,7 @@ class CCDID(ObservationID):
 
         if len(items) == 1:
             if isinstance(args[0], CCDID):
-                items = (args[0].phase, args[0].orbit_number, args[0].latesque)
+                items = (args[0].phase, args[0].orbit_number, args[0].target)
                 ccdname = args[0].ccdname
                 ccdnumber = args[0].ccdnumber
             else:
@@ -216,7 +224,7 @@ class CCDID(ObservationID):
                     items = (
                         parsed["phase"],
                         parsed["orbit"],
-                        parsed["latesque"],
+                        parsed["target"],
                     )
                     (ccdname, ccdnumber) = get_ccdnamenumber(parsed["ccd"])
                 else:
@@ -281,7 +289,7 @@ class CCDID(ObservationID):
         return self.ccdname + self.ccdnumber
 
     def get_obsid(self) -> ObservationID:
-        return ObservationID(self.phase, self.orbit_number, self.latesque)
+        return ObservationID(self.phase, self.orbit_number, self.target)
 
 
 class ChannelID(CCDID):
@@ -297,7 +305,7 @@ class ChannelID(CCDID):
             match = chanid_re.search(str(items[0]))
             if match:
                 parsed = match.groupdict()
-                items = (parsed["phase"], parsed["orbit"], parsed["latesque"])
+                items = (parsed["phase"], parsed["orbit"], parsed["target"])
                 items += get_ccdnamenumber(parsed["ccd"])
                 chan = parsed["channel"]
             else:
@@ -317,7 +325,7 @@ class ChannelID(CCDID):
                     items = [
                         items[0].phase,
                         items[0].orbit_number,
-                        items[0].latesque,
+                        items[0].target,
                         items[0].ccdname,
                         items[0].ccdnumber,
                     ]
@@ -332,7 +340,7 @@ class ChannelID(CCDID):
                     items = [
                         items[0].phase,
                         items[0].orbit_number,
-                        items[0].latesque,
+                        items[0].target,
                         ccdname,
                         ccdnumber,
                     ]

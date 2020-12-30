@@ -652,10 +652,10 @@ def get_bins_fromfiles(cube: os.PathLike) -> dict:
     for path in Path(cube).parent.glob("*.cub"):
         try:
             p = hirise.get_ChannelID_fromfile(path)
-            if (oid.phase, oid.orbit_number, oid.latesque) == (
+            if (oid.phase, oid.orbit_number, oid.target) == (
                 p.phase,
                 p.orbit_number,
-                p.latesque,
+                p.target,
             ):
                 ccd = p.get_ccd()
                 if ccd in bins:

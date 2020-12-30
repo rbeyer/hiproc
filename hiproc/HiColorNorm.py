@@ -114,7 +114,7 @@ class ColorCube(hirise.ObservationID):
 
     def get_obsid(self) -> hirise.ObservationID:
         return hirise.ObservationID(
-            self.phase, self.orbit_number, self.latesque
+            self.phase, self.orbit_number, self.target
         )
 
     def set_crop_lines(self, conf):

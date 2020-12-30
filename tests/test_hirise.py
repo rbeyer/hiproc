@@ -134,7 +134,7 @@ class TestObsID(unittest.TestCase):
             with self.subTest():
                 oid = hirise.ObservationID(*t)
                 self.assertTupleEqual(
-                    truth, (oid.phase, oid.orbit_number, oid.latesque)
+                    truth, (oid.phase, oid.orbit_number, oid.target)
                 )
 
     def test_init_string(self):
@@ -249,7 +249,7 @@ class TestCCDID(unittest.TestCase):
                     (
                         cid.phase,
                         cid.orbit_number,
-                        cid.latesque,
+                        cid.target,
                         cid.ccdname,
                         cid.ccdnumber,
                     ),
@@ -359,7 +359,7 @@ class TestChannelID(unittest.TestCase):
                     (
                         cid.phase,
                         cid.orbit_number,
-                        cid.latesque,
+                        cid.target,
                         cid.ccdname,
                         cid.ccdnumber,
                         cid.channel,
