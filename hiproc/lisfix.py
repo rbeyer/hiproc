@@ -86,9 +86,14 @@ def main():
 def fix(
     in_path: os.PathLike,
     out_path: os.PathLike,
+    tolerance=0.4
 ):
     """The ISIS cube file at *out_path* will be the result of running lis-fix
     processing of the file at *in-path*.
+
+    If the fraction of LIS pixels in the Calibration Buffer Pixel area or
+    the first 20 lines of Dark Pixels is greater than *tolerance* a ValueError
+    is raised.
 
     This function anticipates a HiRISE cube that has the following
     table objects in its label: HiRISE Calibration Ancillary,
@@ -116,6 +121,7 @@ def fix(
 
     shutil.copy(in_path, out_path)
 
+    #############################
     # Fix the reverse-clock area:
     t_name = "HiRISE Calibration Image"
     hci_dict = isis.cube.get_table(in_path, t_name)
@@ -156,13 +162,11 @@ def fix(
         f"Fraction of LIS pixels in Reverse-Clock area: {revclk_lisfrac}"
     )
 
-    # Fix the reverse-clock lines.
     logger.info("Fixing Reverse-Clock pixels.")
     fixed_cal = np.ma.apply_along_axis(
         fix_rev_clock, 0, cal_image, mask_lines, zero_correction
     )
 
-    # write the table back out
     logger.info("Writing out Reverse-Clock pixels.")
     hci_dict["Calibration"] = apply_special_pixels(
         fixed_cal, specialpix
@@ -192,22 +196,29 @@ def fix(
 
     # first_im_line = 19+(20+label["IsisCube"]["Instrument"]["Tdi"])/binning
 
-    refr = int(np.ma.median(calbuf))
-    logger.info(f"Median of Calibration Buffer Pixels: {refr}")
-    refd = int(np.ma.median(dark[:20]))
-    logger.info(f"Median of first 20 lines of Dark Pixels: {refd}")
+    if np.ma.count_masked(calbuf) / calbuf.size <= tolerance:
+        raise ValueError(
+            "Less than 40% of the Calibration Buffer Pixels have a "
+            "real value, using zero as the median."
+        )
+    else:
+        refr = int(np.ma.median(calbuf))
+        logger.info(f"Median of Calibration Buffer Pixels: {refr}")
+
+    if np.ma.count_masked(dark[:20]) / dark[:20].size <= tolerance:
+        raise ValueError(
+            "Less than 40% of the first 20 lines of Dark Pixels have a "
+            "real value, using zero as the median."
+        )
+    else:
+        refd = int(np.ma.median(dark[:20]))
+        logger.info(f"Median of first 20 lines of Dark Pixels: {refd}")
 
     model_buffer = dark[:, 2:14] - refd + refr
     # print(model_buffer)
     # print(model_buffer.dtype)
     # print(model_buffer.shape)
 
-    # for each line in the buffer:
-    # if pixel is masked, replace with p, where
-    # p = d[bindex + 2] - refd + refr
-    # where d[] is the array of pixels from the dark corresponding to
-    # the same line in the buffer, and bindex is the pixel index in
-    # that line.
     logger.info("Fixing Buffer pixels.")
     fixed_buf = np.ma.apply_along_axis(
         fix_buffer,
@@ -219,7 +230,6 @@ def fix(
     # print(fixed_buf.dtype)
     # print(fixed_buf.shape)
 
-    # write the table back out
     ha_dict["BufferPixels"] = apply_special_pixels(
         fixed_buf, specialpix
     ).data.tolist()
