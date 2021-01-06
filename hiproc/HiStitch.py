@@ -22,7 +22,7 @@ file."""
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on HiStitch version 2.21.0 (2020/12/21),
+# This program is based on HiStitch version 2.21.1 (2021/01/01),
 # and on the Perl HiStitch program ($Revision: 1.26 $
 #                                   $Date: 2020/04/28 17:52:53 $)
 # and on the Perl HiFurrow_Fix program ($Revision: 1.12 $
