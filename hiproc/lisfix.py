@@ -195,24 +195,27 @@ def fix(
     # print(buffer.shape)
 
     # first_im_line = 19+(20+label["IsisCube"]["Instrument"]["Tdi"])/binning
-
     if np.ma.count_masked(calbuf) / calbuf.size <= tolerance:
-        raise ValueError(
-            "Less than 40% of the Calibration Buffer Pixels have a "
-            "real value, using zero as the median."
-        )
-    else:
         refr = int(np.ma.median(calbuf))
         logger.info(f"Median of Calibration Buffer Pixels: {refr}")
+    else:
+        refr = int(np.ma.median(calbuf))
+        # raise ValueError(
+        logger.error(
+            "Less than 40% of the Calibration Buffer Pixels have a"
+            f"real value: {np.ma.count_masked(calbuf) / calbuf.size}"
+        )
 
     if np.ma.count_masked(dark[:20]) / dark[:20].size <= tolerance:
-        raise ValueError(
-            "Less than 40% of the first 20 lines of Dark Pixels have a "
-            "real value, using zero as the median."
-        )
-    else:
         refd = int(np.ma.median(dark[:20]))
         logger.info(f"Median of first 20 lines of Dark Pixels: {refd}")
+    else:
+        refd = int(np.ma.median(dark[:20]))
+        # raise ValueError(
+        logger.error(
+            "Less than 40% of the first 20 lines of Dark Pixels have a "
+            f"real value: {np.ma.count_masked(dark[:20]) / dark[:20].size}"
+        )
 
     model_buffer = dark[:, 2:14] - refd + refr
     # print(model_buffer)
