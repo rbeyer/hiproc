@@ -43,7 +43,7 @@ setup(
             'JitPlot=hiproc.JitPlot:main',
             'SlitherStats=hiproc.SlitherStats:main',
             'bitflips=hiproc.bitflips:main',
-            'hirise_proc=hiproc.hirise_proc:main',
+            'hiproc=hiproc.hirise_proc:main',
             'mdr2cub=hiproc.mdr2cub:main',
         ],
     },
