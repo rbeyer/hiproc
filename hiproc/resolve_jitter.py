@@ -200,12 +200,12 @@ def start(
         stackedx = np.stack((overxxx1, overxxx2, overxxx3))
         stackedy = np.stack((overyyy1, overyyy2, overyyy3))
 
-        overxxx = stackedx.mean(axis=2)
-        overyyy = stackedy.mean(axis=2)
+        overxxx = stackedx.mean(axis=0)
+        overyyy = stackedy.mean(axis=0)
 
         # take the sum of each row
-        overx = overxxx.sum(axis=1)
-        overy = overyyy.sum(axis=1)
+        overx = overxxx.sum(axis=0)
+        overy = overyyy.sum(axis=0)
 
         jitterx = overx - overx[0]
         jittery = overy - overy[0]
@@ -233,12 +233,12 @@ def start(
         ) - jittery
 
         error_vec = 1.0/6.0*(
-            abs(xinterp1 - (jittercheckx1 + x1(0).real()/2.0)) +
-            abs(xinterp2 - (jittercheckx2 + x2(0).real()/2.0)) +
-            abs(xinterp3 - (jittercheckx3 + x3(0).real()/2.0)) +
-            abs(yinterp1 - (jitterchecky1 + y1(0).real()/2.0)) +
-            abs(yinterp2 - (jitterchecky2 + y2(0).real()/2.0)) +
-            abs(yinterp3 - (jitterchecky3 + y3(0).real()/2.0))
+            abs(xinterp1 - (jittercheckx1 + np.real(x1[0])/2.0)) +
+            abs(xinterp2 - (jittercheckx2 + np.real(x2[0])/2.0)) +
+            abs(xinterp3 - (jittercheckx3 + np.real(x3[0])/2.0)) +
+            abs(yinterp1 - (jitterchecky1 + np.real(y1[0])/2.0)) +
+            abs(yinterp2 - (jitterchecky2 + np.real(y2[0])/2.0)) +
+            abs(yinterp3 - (jitterchecky3 + np.real(y3[0])/2.0))
         )
 
         error = error_vec.mean()
@@ -300,12 +300,12 @@ def start(
             tt + dt3/duration, tt, jitteryy, left=0, right=0
         ) - jitteryy
 
-        error_vec = 1.0/6.0*(abs(xinterp1 - (jittercheckx1 + x1(0).real/2.0)) +
-                             abs(xinterp2 - (jittercheckx2 + x2(0).real/2.0)) +
-                             abs(xinterp3 - (jittercheckx3 + x3(0).real/2.0)) +
-                             abs(yinterp1 - (jitterchecky1 + y1(0).real/2.0)) +
-                             abs(yinterp2 - (jitterchecky2 + y2(0).real/2.0)) +
-                             abs(yinterp3 - (jitterchecky3 + y3(0).real/2.0))
+        error_vec = 1.0/6.0*(abs(xinterp1 - (jittercheckx1 + np.real(x1[0])/2.0)) +
+                             abs(xinterp2 - (jittercheckx2 + np.real(x2[0])/2.0)) +
+                             abs(xinterp3 - (jittercheckx3 + np.real(x3[0])/2.0)) +
+                             abs(yinterp1 - (jitterchecky1 + np.real(y1[0])/2.0)) +
+                             abs(yinterp2 - (jitterchecky2 + np.real(y2[0])/2.0)) +
+                             abs(yinterp3 - (jitterchecky3 + np.real(y3[0])/2.0))
                              )
 
         error = error_vec.mean()
