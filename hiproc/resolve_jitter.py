@@ -351,55 +351,55 @@ def start(
     jitter_p.write_text("\n".join(jitter_text))
 
     # I think we could re-do this for matplotlib.  Let's defer it for now.
-    # # Writing the data we will plot later in gnuplot
-    # data_p = image_location / (image_id + "_jitter_plot_py.txt")
-    # t1_shift = t1 - t1[0]
-    # t2_shift = t2 - t2[0]
-    # t3_shift = t3 - t3[0]
-    # jittercheckx1_shift = min_jitter_check_x1 + x1(0).real/2.0
-    # jitterchecky1_shift = min_jitter_check_y1 + y1(0).real/2.0
-    # jittercheckx2_shift = min_jitter_check_x2 + x2(0).real/2.0
-    # jitterchecky2_shift = min_jitter_check_y2 + y2(0).real/2.0
-    # jittercheckx3_shift = min_jitter_check_x3 + x3(0).real/2.0
-    # jitterchecky3_shift = min_jitter_check_y3 + y3(0).real/2.0
-    # # ArrayXd* Data[] =
-    # #   {&ET_shift, &Sample, &Line,
-    # #    &t1_shift,
-    # #    &offx1, &xinterp1, &jittercheckx1_shift,
-    # #    &offy1, &yinterp1, &jitterchecky1_shift,
-    # #    &t2_shift,
-    # #    &offx2, &xinterp2, &jittercheckx2_shift,
-    # #    &offy2, &yinterp2, &jitterchecky2_shift,
-    # #    &t3_shift,
-    # #    &offx3, &xinterp3, &jittercheckx3_shift,
-    # #    &offy3, &yinterp3, &jitterchecky3_shift
-    # #   };
+    # Writing the data we will plot later in gnuplot
+    data_p = image_location / (image_id + "_jitter_plot_py.txt")
+    t1_shift = t1 - t1[0]
+    t2_shift = t2 - t2[0]
+    t3_shift = t3 - t3[0]
+    jittercheckx1_shift = min_jitter_check_x1 + np.real(x1[0])/2.0
+    jitterchecky1_shift = min_jitter_check_y1 + np.real(y1[0])/2.0
+    jittercheckx2_shift = min_jitter_check_x2 + np.real(x2[0])/2.0
+    jitterchecky2_shift = min_jitter_check_y2 + np.real(y2[0])/2.0
+    jittercheckx3_shift = min_jitter_check_x3 + np.real(x3[0])/2.0
+    jitterchecky3_shift = min_jitter_check_y3 + np.real(y3[0])/2.0
+    # ArrayXd* Data[] =
+    #   {&ET_shift, &Sample, &Line,
+    #    &t1_shift,
+    #    &offx1, &xinterp1, &jittercheckx1_shift,
+    #    &offy1, &yinterp1, &jitterchecky1_shift,
+    #    &t2_shift,
+    #    &offx2, &xinterp2, &jittercheckx2_shift,
+    #    &offy2, &yinterp2, &jitterchecky2_shift,
+    #    &t3_shift,
+    #    &offx3, &xinterp3, &jittercheckx3_shift,
+    #    &offy3, &yinterp3, &jitterchecky3_shift
+    #   };
 
-    # # Note the comment before the first label
-    # string_labels = [
-    #     "# ET_shift", "Sample", "Line",
-    #     "t1_shift", "offx1", "xinterp1", "jittercheckx1_shift",
-    #     "offy1", "yinterp1", "jitterchecky1_shift",
-    #     "t2_shift", "offx2", "xinterp2", "jittercheckx2_shift",
-    #     "offy2", "yinterp2", "jitterchecky2_shift",
-    #     "t3_shift", "offx3", "xinterp3", "jittercheckx3_shift",
-    #     "offy3", "yinterp3", "jitterchecky3_shift"
-    # ]
+    # Note the comment before the first label
+    string_labels = [
+        "# ET_shift", "Sample", "Line",
+        "t1_shift", "offx1", "xinterp1", "jittercheckx1_shift",
+        "offy1", "yinterp1", "jitterchecky1_shift",
+        "t2_shift", "offx2", "xinterp2", "jittercheckx2_shift",
+        "offy2", "yinterp2", "jitterchecky2_shift",
+        "t3_shift", "offx3", "xinterp3", "jittercheckx3_shift",
+        "offy3", "yinterp3", "jitterchecky3_shift"
+    ]
 
-    # # int numData = sizeof(Data)/sizeof(ArrayXd*);
-    # write_data_for_plotting(
-    #     data_p, string_labels, et_shift, sample, line, t1_shift,
-    #     offx1, xinterp1, jittercheckx1_shift, offy1, yinterp1,
-    #     jitterchecky1_shift, t2_shift, offx2, xinterp2, jittercheckx2_shift,
-    #     offy2, yinterp2, jitterchecky2_shift, t3_shift, offx3, xinterp3,
-    #     jittercheckx3_shift, offy3, yinterp3, jitterchecky3_shift
-    # )
+    # int numData = sizeof(Data)/sizeof(ArrayXd*);
+    write_data_for_plotting(
+        data_p, string_labels, et_shift, sample, line, t1_shift,
+        offx1, xinterp1, jittercheckx1_shift, offy1, yinterp1,
+        jitterchecky1_shift, t2_shift, offx2, xinterp2, jittercheckx2_shift,
+        offy2, yinterp2, jitterchecky2_shift, t3_shift, offx3, xinterp3,
+        jittercheckx3_shift, offy3, yinterp3, jitterchecky3_shift
+    )
 
-    # gnuplot_p = image_location / (image_id + "_jitter_plot_cpp.plt")
-    # img_file_name = image_location / (image_id + "_jitter_plot_cpp.png")
-    # write_gnuplot_file(
-    #     gnuplot_p, data_p, img_file_name, file_path1, file_path2, file_path3
-    # )
+    gnuplot_p = image_location / (image_id + "_jitter_plot_py.plt")
+    img_file_name = image_location / (image_id + "_jitter_plot_py.png")
+    write_gnuplot_file(
+        gnuplot_p, data_p, img_file_name, file_path1, file_path2, file_path3
+    )
 
     return
 
@@ -840,11 +840,11 @@ def write_gnuplot_file(
     file_path1: Path, file_path2: Path, file_path3: Path
 ):
     logging.info(f"Writing: {gnuplot_path}")
-    gnuplot_path.write_text(f"""dataFile  = {data_path}
-imgFile   = {img_path}
-filePath1 = {file_path1}
-filePath2 = {file_path2}
-filePath3 = {file_path3}
+    gnuplot_path.write_text(f"""dataFile  = '{data_path}'
+imgFile   = '{img_path}'
+filePath1 = '{file_path1}'
+filePath2 = '{file_path2}'
+filePath3 = '{file_path3}'
 
 set terminal png size 1200, 900; set output imgFile
 #set terminal pdfcairo;           set output 'fig.pdf'
