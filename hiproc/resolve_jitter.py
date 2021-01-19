@@ -97,17 +97,20 @@ def start(
     window_size = 11
     window_width = 2
 
-    (tdi1, nfft1, linerate1, tt1, et1, et_shift1, dt1, ddt1, t1, offx1, offy1,
+    # The first file to be parsed sets et and et_shift
+    (tdi1, nfft1, linerate1, tt1, et, et_shift, dt1, ddt1, t1, offx1, offy1,
      xinterp1, yinterp1, x1, y1, overxx1, overyy1) = parse_file(
         fp1, which1, line_interval, window_size, window_width
     )
-    (tdi2, nfft2, linerate2, tt2, et2, et_shift2, dt2, ddt2, t2, offx2, offy2,
+    (tdi2, nfft2, linerate2, tt2, _, _, dt2, ddt2, t2, offx2, offy2,
      xinterp2, yinterp2, x2, y2, overxx2, overyy2) = parse_file(
-        fp2, which2, line_interval, window_size, window_width
+        fp2, which2, line_interval, window_size, window_width,
+        et, et_shift
     )
-    (tdi3, nfft3, linerate3, tt3, et3, et_shift3, dt3, ddt3, t3, offx3, offy3,
+    (tdi3, nfft3, linerate3, tt3, _, _, dt3, ddt3, t3, offx3, offy3,
      xinterp3, yinterp3, x3, y3, overxx3, overyy3) = parse_file(
-        fp3, which3, line_interval, window_size, window_width
+        fp3, which3, line_interval, window_size, window_width,
+        et, et_shift
     )
 
     if np.array_equal(tt1, tt2) and np.array_equal(tt2, tt3):
@@ -115,19 +118,20 @@ def start(
     else:
         raise ValueError("The values of tt are not identical.")
 
-    # if np.array_equal(et1, et2) and np.array_equal(et2, et3):
-    if np.allclose(et1, et2) and np.allclose(et2, et3):
-        et = et3
-    else:
-        raise ValueError("The values of et are not close.")
+    # # if np.array_equal(et1, et2) and np.array_equal(et2, et3):
+    # if np.allclose(et1, et2) and np.allclose(et2, et3):
+    #     et = et3
+    # else:
+    #     raise ValueError("The values of et are not close.")
+    # print(f"in start et[0]: {et[0]}")
 
-    if np.allclose(et_shift1, et_shift2) and np.allclose(et_shift2, et_shift3, atol=0.1):
-        # There is no such check in the original code, but is a tenth of a
-        # second difference in these values okay?  Not sure.
-        # TODO: track this down, wait, is et_shift even used?
-        et_shift = et_shift3
-    else:
-        raise ValueError("The values of et_shift are not close.")
+    # if np.allclose(et_shift1, et_shift2) and np.allclose(et_shift2, et_shift3, atol=0.1):
+    #     # There is no such check in the original code, but is a tenth of a
+    #     # second difference in these values okay?  Not sure.
+    #     # TODO: track this down, wait, is et_shift even used?
+    #     et_shift = et_shift3
+    # else:
+    #     raise ValueError("The values of et_shift are not close.")
 
     if t1[-1] - t1[0] == t2[-1] - t2[0] and math.isclose(t2[-1] - t2[0], t3[-1] - t3[0], abs_tol=0.1):
         # Again, no previous checks for this
@@ -403,18 +407,21 @@ def start(
 
     return
 
+def get_time_arrays(nfft, time_start, time_stop):
+    # making time regularly spaced and interpolate offx and offy
+    # into this time
+    duration = time_stop - time_start
+    nfft_arr = np.linspace(0, nfft - 1, nfft)
+    et = nfft_arr * duration / (nfft - 1.0) + time_start
+    et_shift = et - time_start
+    return et, et_shift
+
 
 def create_matrices(
     nfft: int, dt: float, time: np.array, tt: abc.Sequence,
-    offx: np.array, offy: np.array
+    offx: np.array, offy: np.array, et_shift
 ):
-    # making time regularly spaced and interpolate offx and offy
-    # into this time
-
     duration = time[-1] - time[0]
-    nfft_arr = np.linspace(0, nfft - 1, nfft)
-    et = nfft_arr * duration / (nfft - 1.0) + time[0]
-    et_shift = et - time[0]
 
     t_shift = time - time[0]
 
@@ -466,7 +473,7 @@ def create_matrices(
     # ArrayXd & xinterp, ArrayXd & yinterp,
     # ArrayXcd & X, ArrayXcd & Y, MatrixXd & overxx, MatrixXd & overyy
     #
-    return ddt, overxx, overyy, xinterp, yinterp, x, y, et
+    return ddt, overxx, overyy, xinterp, yinterp, x, y
 
 
 def upper_power_of_two(value) -> int:
@@ -582,7 +589,7 @@ def overwrite_null_freq(
 
 def parse_file(
     file_path: os.PathLike, which: int, line_interval: float,
-    window_size: int, window_width: int
+    window_size: int, window_width: int, et=None, et_shift=None
 ):
     """Parse the current text file, then extract and process the data into a
     matrix."""
@@ -665,11 +672,12 @@ def parse_file(
 
     tt = np.linspace(0, nfft - 1, nfft) / nfft
 
-    ddt, overxx, overyy, xinterp, yinterp, x, y, et = create_matrices(
-        nfft, dt, t_arr, tt, filtered_x, filtered_y
-    )
+    if et is None:
+        et, et_shift = get_time_arrays(nfft, t_arr[0], t_arr[-1])
 
-    et_shift = et - t[0]
+    ddt, overxx, overyy, xinterp, yinterp, x, y, = create_matrices(
+        nfft, dt, t_arr, tt, filtered_x, filtered_y, et_shift
+    )
 
     return (tdi, nfft, line_rate,
             # t[0], t[-1] - t[0],
