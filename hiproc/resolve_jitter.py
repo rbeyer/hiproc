@@ -40,6 +40,7 @@ written to a file.
 # limitations under the License.
 
 import argparse
+import csv
 import itertools
 import logging
 import math
@@ -393,6 +394,16 @@ def start(
     # int numData = sizeof(Data)/sizeof(ArrayXd*);
     write_data_for_plotting(
         data_p, string_labels, et_shift, sample, line, t1_shift,
+        offx1, xinterp1, jittercheckx1_shift, offy1, yinterp1,
+        jitterchecky1_shift, t2_shift, offx2, xinterp2, jittercheckx2_shift,
+        offy2, yinterp2, jitterchecky2_shift, t3_shift, offx3, xinterp3,
+        jittercheckx3_shift, offy3, yinterp3, jitterchecky3_shift
+    )
+
+    write_csv(
+        image_location / (image_id + "_jitter_plot_py.csv"),
+        string_labels,
+        et_shift, sample, line, t1_shift,
         offx1, xinterp1, jittercheckx1_shift, offy1, yinterp1,
         jitterchecky1_shift, t2_shift, offx2, xinterp2, jittercheckx2_shift,
         offy2, yinterp2, jitterchecky2_shift, t3_shift, offx3, xinterp3,
@@ -828,7 +839,7 @@ def write_data_for_plotting(path: os.PathLike, labels: list, *cols):
 
     if len(labels) != len(cols):
         raise IndexError(
-            "There is a different number of column labels that columns."
+            "There is a different number of column labels than columns."
         )
 
     logging.info(f"Writing: {path}")
@@ -837,10 +848,19 @@ def write_data_for_plotting(path: os.PathLike, labels: list, *cols):
 
         # Print the data columns
         for zipped in itertools.zip_longest(*cols, fillvalue="nan"):
-            f.write("".join(map(lambda z: "{:25.16}".format(z), zipped)) + "\n")
+            f.write("".join(map(lambda z: "{:>25.16}".format(z), zipped)) + "\n")
 
         f.write("\n")
     return
+
+
+def write_csv(path: os.PathLike, labels: list, *cols):
+    logging.info(f"Writing: {path}")
+    with open(path, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(labels)
+        for zipped in itertools.zip_longest(*cols, fillvalue="nan"):
+            writer.writerow(zipped)
 
 
 def write_gnuplot_file(
