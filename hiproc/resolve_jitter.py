@@ -98,48 +98,27 @@ def start(
     window_size = 11
     window_width = 2
 
-    # The first file to be parsed sets et and et_shift
-    (tdi1, nfft1, linerate1, tt1, et, et_shift, dt1, ddt1, t1, offx1, offy1,
+    # The first file to be parsed sets et, et_shift, t0, and duration
+    (tdi1, nfft1, linerate1, tt1, et, et_shift, t0, duration, dt1, ddt1, t1,
+     offx1, offy1,
      xinterp1, yinterp1, x1, y1, overxx1, overyy1) = parse_file(
         fp1, which1, line_interval, window_size, window_width
     )
-    (tdi2, nfft2, linerate2, tt2, _, _, dt2, ddt2, t2, offx2, offy2,
+    (tdi2, nfft2, linerate2, tt2, _, _, _, _, dt2, ddt2, t2, offx2, offy2,
      xinterp2, yinterp2, x2, y2, overxx2, overyy2) = parse_file(
         fp2, which2, line_interval, window_size, window_width,
-        et, et_shift
+        et, et_shift, t0, duration
     )
-    (tdi3, nfft3, linerate3, tt3, _, _, dt3, ddt3, t3, offx3, offy3,
+    (tdi3, nfft3, linerate3, tt3, _, _, _, _, dt3, ddt3, t3, offx3, offy3,
      xinterp3, yinterp3, x3, y3, overxx3, overyy3) = parse_file(
         fp3, which3, line_interval, window_size, window_width,
-        et, et_shift
+        et, et_shift, t0, duration
     )
 
     if np.array_equal(tt1, tt2) and np.array_equal(tt2, tt3):
         tt = tt3
     else:
         raise ValueError("The values of tt are not identical.")
-
-    # # if np.array_equal(et1, et2) and np.array_equal(et2, et3):
-    # if np.allclose(et1, et2) and np.allclose(et2, et3):
-    #     et = et3
-    # else:
-    #     raise ValueError("The values of et are not close.")
-    # print(f"in start et[0]: {et[0]}")
-
-    # if np.allclose(et_shift1, et_shift2) and np.allclose(et_shift2, et_shift3, atol=0.1):
-    #     # There is no such check in the original code, but is a tenth of a
-    #     # second difference in these values okay?  Not sure.
-    #     # TODO: track this down, wait, is et_shift even used?
-    #     et_shift = et_shift3
-    # else:
-    #     raise ValueError("The values of et_shift are not close.")
-
-    if t1[-1] - t1[0] == t2[-1] - t2[0] and math.isclose(t2[-1] - t2[0], t3[-1] - t3[0], abs_tol=0.1):
-        # Again, no previous checks for this
-        # TODO: is a 0.1 s tolerance okay here?
-        duration = t3[-1] - t3[0]
-    else:
-        raise ValueError("The values of duration are not close.")
 
     if nfft1 == nfft2 == nfft3:
         nfft = nfft3
@@ -305,13 +284,14 @@ def start(
             tt + dt3/duration, tt, jitteryy, left=0, right=0
         ) - jitteryy
 
-        error_vec = 1.0/6.0*(abs(xinterp1 - (jittercheckx1 + np.real(x1[0])/2.0)) +
-                             abs(xinterp2 - (jittercheckx2 + np.real(x2[0])/2.0)) +
-                             abs(xinterp3 - (jittercheckx3 + np.real(x3[0])/2.0)) +
-                             abs(yinterp1 - (jitterchecky1 + np.real(y1[0])/2.0)) +
-                             abs(yinterp2 - (jitterchecky2 + np.real(y2[0])/2.0)) +
-                             abs(yinterp3 - (jitterchecky3 + np.real(y3[0])/2.0))
-                             )
+        error_vec = 1.0/6.0*(
+            abs(xinterp1 - (jittercheckx1 + np.real(x1[0])/2.0)) +
+            abs(xinterp2 - (jittercheckx2 + np.real(x2[0])/2.0)) +
+            abs(xinterp3 - (jittercheckx3 + np.real(x3[0])/2.0)) +
+            abs(yinterp1 - (jitterchecky1 + np.real(y1[0])/2.0)) +
+            abs(yinterp2 - (jitterchecky2 + np.real(y2[0])/2.0)) +
+            abs(yinterp3 - (jitterchecky3 + np.real(y3[0])/2.0))
+        )
 
         error = error_vec.mean()
         logging.info(f"error 2: {error}")
@@ -358,9 +338,9 @@ def start(
     # I think we could re-do this for matplotlib.  Let's defer it for now.
     # Writing the data we will plot later in gnuplot
     data_p = image_location / (image_id + "_jitter_plot_py.txt")
-    t1_shift = t1 - t1[0]
-    t2_shift = t2 - t2[0]
-    t3_shift = t3 - t3[0]
+    t1_shift = t1 - t0
+    t2_shift = t2 - t0
+    t3_shift = t3 - t0
     jittercheckx1_shift = min_jitter_check_x1 + np.real(x1[0])/2.0
     jitterchecky1_shift = min_jitter_check_y1 + np.real(y1[0])/2.0
     jittercheckx2_shift = min_jitter_check_x2 + np.real(x2[0])/2.0
@@ -418,6 +398,7 @@ def start(
 
     return
 
+
 def get_time_arrays(nfft, time_start, time_stop):
     # making time regularly spaced and interpolate offx and offy
     # into this time
@@ -430,16 +411,17 @@ def get_time_arrays(nfft, time_start, time_stop):
 
 def create_matrices(
     nfft: int, dt: float, time: np.array, tt: abc.Sequence,
-    offx: np.array, offy: np.array, et_shift
+    offx: np.array, offy: np.array, et_shift, t0, duration
 ):
-    duration = time[-1] - time[0]
+    t_shift = time - t0
 
-    t_shift = time - time[0]
-
-    fx = PchipInterpolator(t_shift, offx)
-    fy = PchipInterpolator(t_shift, offy)
+    fx = PchipInterpolator(t_shift, offx, extrapolate=False)
+    fy = PchipInterpolator(t_shift, offy, extrapolate=False)
     xinterp = fx(et_shift)
     yinterp = fy(et_shift)
+
+    np.nan_to_num(xinterp, copy=False, nan=np.mean(offx))
+    np.nan_to_num(yinterp, copy=False, nan=np.mean(offy))
 
     # getting the frequencies of the Fourier transform
     freq = np.linspace(0, nfft / 2 - 1, int(nfft / 2))
@@ -600,7 +582,8 @@ def overwrite_null_freq(
 
 def parse_file(
     file_path: os.PathLike, which: int, line_interval: float,
-    window_size: int, window_width: int, et=None, et_shift=None
+    window_size: int, window_width: int, et=None, et_shift=None,
+    t0=None, duration=None
 ):
     """Parse the current text file, then extract and process the data into a
     matrix."""
@@ -638,8 +621,12 @@ def parse_file(
 
     for row in flat:
         time.append(float(row[column]))
-        offset_x.append(which * (float(row["RegSamp"]) - float(row["FromSamp"])))
-        offset_y.append(which * (float(row["RegLine"]) - float(row["FromLine"])))
+        offset_x.append(
+            which * (float(row["RegSamp"]) - float(row["FromSamp"]))
+        )
+        offset_y.append(
+            which * (float(row["RegLine"]) - float(row["FromLine"]))
+        )
 
     offx_arr = np.array(offset_x)
     offy_arr = np.array(offset_y)
@@ -686,15 +673,19 @@ def parse_file(
     if et is None:
         et, et_shift = get_time_arrays(nfft, t_arr[0], t_arr[-1])
 
+    if t0 is None:
+        t0 = t_arr[0]
+        duration = t_arr[-1] - t0
+
     ddt, overxx, overyy, xinterp, yinterp, x, y, = create_matrices(
-        nfft, dt, t_arr, tt, filtered_x, filtered_y, et_shift
+        nfft, dt, t_arr, tt, filtered_x, filtered_y, et_shift, t0, duration
     )
 
     return (tdi, nfft, line_rate,
             # t[0], t[-1] - t[0],
-            tt, et, et_shift,
+            tt, et, et_shift, t0, duration,
             dt, ddt,
-            t_arr, offx, offy,
+            t_arr, filtered_x, filtered_y,
             xinterp, yinterp, x, y, overxx, overyy)
     # Outputs
     # TDI, nfft, linerate, t0, duration, tt, ET, ET_shift, dt, ddt,
@@ -737,10 +728,13 @@ def pixel_smear(
     xi = np.linspace(0, n-1, n) * linerate + shifted_t[0]
 
     # Interpolate the jitter function at intervals equivalent to the linerate
-    f_samp = PchipInterpolator(shifted_t, sample)
-    f_line = PchipInterpolator(shifted_t, line)
+    f_samp = PchipInterpolator(shifted_t, sample, extrapolate=False)
+    f_line = PchipInterpolator(shifted_t, line, extrapolate=False)
     yis = f_samp(xi)
     yil = f_line(xi)
+
+    np.nan_to_num(yis, copy=False, nan=0)
+    np.nan_to_num(yil, copy=False, nan=0)
 
     # Undo the earlier shift
     xi += t[0]
@@ -765,11 +759,14 @@ def pixel_smear(
 
     # Make a text file of the smear data
     smear_p = Path(image_location) / (image_id + "_smear_py.txt")
-    smear_text = [f"""# Smear values are calculated from the derived jitter function for {image_id}.
+    smear_text = [
+        f"""\
+# Smear values are calculated from the derived jitter function for {image_id}.
 # Maximum Cross-track pixel smear {max_smear_s}
 # Maximum Down-track pixel smear {max_smear_l}
 # Maximum Pixel Smear Magnitude {max_smear_mag}
-# Sample                 Line                   EphemerisTime"""]
+# Sample                 Line                   EphemerisTime"""
+    ]
 
     for ess, ell, exi in zip(dysdx, dyldx, xi):
         smear_text.append(f"{ess}     {ell}     {exi}")
@@ -848,7 +845,9 @@ def write_data_for_plotting(path: os.PathLike, labels: list, *cols):
 
         # Print the data columns
         for zipped in itertools.zip_longest(*cols, fillvalue="nan"):
-            f.write("".join(map(lambda z: "{:>25.16}".format(z), zipped)) + "\n")
+            f.write(
+                "".join(map(lambda z: "{:>25.16}".format(z), zipped)) + "\n"
+            )
 
         f.write("\n")
     return
@@ -868,7 +867,9 @@ def write_gnuplot_file(
     file_path1: Path, file_path2: Path, file_path3: Path
 ):
     logging.info(f"Writing: {gnuplot_path}")
-    gnuplot_path.write_text(f"""dataFile  = '{data_path}'
+    gnuplot_path.write_text(
+        f"""\
+dataFile  = '{data_path}'
 imgFile   = '{img_path}'
 filePath1 = '{file_path1}'
 filePath2 = '{file_path2}'
@@ -934,5 +935,6 @@ set origin w2,    0
 plot dataFile using 1:3 with lines lc rgb 'blue'
 
 unset multiplot # exit multiplot mode
-""")
+"""
+    )
     return

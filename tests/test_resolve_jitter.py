@@ -203,9 +203,16 @@ class TestResolveJitter(unittest.TestCase):
             offy_list.append(float(row["RegLine"]) - float(row["FromLine"]))
         tt = np.linspace(0, nfft - 1, nfft) / nfft
 
-        ddt, overxx, overyy, xinterp, yinterp, x, y, et = rj.create_matrices(
-            nfft, dt, np.array(time_list), tt,
-            np.array(offx_list), np.array(offy_list)
+        t_arr = np.array(time_list)
+        t0 = t_arr[0]
+
+        et, et_shift = rj.get_time_arrays(nfft, t0, t_arr[-1])
+        duration = t_arr[-1] - t0
+
+        ddt, overxx, overyy, xinterp, yinterp, x, y = rj.create_matrices(
+            nfft, dt, t_arr, tt,
+            np.array(offx_list), np.array(offy_list),
+            et_shift, t0, duration
         )
         # This runs, but I'm not sure what the right values are.  Maybe this
         # will become clear later?
@@ -226,7 +233,8 @@ class TestResolveJitter(unittest.TestCase):
 
     def test_parse_file(self):
         (
-            tdi, nfft, line_rate, tt, et, et_shift, dt, ddt, t, offx, offy,
+            tdi, nfft, line_rate, tt, et, et_shift, t0, duration,
+            dt, ddt, t, offx, offy,
             xinterp, yinterp, x, y, overxx, overyy
         ) = rj.parse_file(self.flat_text, -1, 20, 11, 2)
         self.assertEqual(128, tdi)
@@ -237,7 +245,8 @@ class TestResolveJitter(unittest.TestCase):
 
     def test_make_null_problematic_frequencies(self):
         (
-            tdi, nfft, line_rate, tt, et, et_shift, dt, ddt, t, offx, offy,
+            tdi, nfft, line_rate, tt, et, et_shift, t0, duration,
+            dt, ddt, t, offx, offy,
             xinterp, yinterp, x, y, overxx, overyy
         ) = rj.parse_file(self.flat_text, -1, 20, 11, 2)
         rj.make_null_problematic_frequencies(0.01, ddt, overxx, overyy)
@@ -261,7 +270,8 @@ class TestResolveJitter(unittest.TestCase):
     @patch('hiproc.resolve_jitter.Path')
     def test_pixel_smear(self, m_path):
         (
-            tdi, nfft, line_rate, tt, et, et_shift, dt, ddt, t, offx, offy,
+            tdi, nfft, line_rate, tt, et, et_shift, t0, duration,
+            dt, ddt, t, offx, offy,
             xinterp, yinterp, x, y, overxx, overyy
         ) = rj.parse_file(self.flat_text, -1, 20, 11, 2)
 
@@ -270,9 +280,9 @@ class TestResolveJitter(unittest.TestCase):
             "dummy_path", "dummy_id"
         )
 
-        self.assertAlmostEqual(0.8805170850767965, max_smear_s)
-        self.assertAlmostEqual(1.7513810694982794, max_smear_l)
-        self.assertAlmostEqual(1.7513811752259931, max_smear_mag)
+        self.assertAlmostEqual(0.34293872479407383, max_smear_s)
+        self.assertAlmostEqual(0.585173051485981, max_smear_l)
+        self.assertAlmostEqual(0.5953484180785305, max_smear_mag)
 
     # def test_write_data_for_plotting(self):
     #     m = mock_open()
