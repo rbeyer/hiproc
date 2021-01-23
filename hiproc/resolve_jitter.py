@@ -487,28 +487,30 @@ def create_matrices(
     yb = -1 * y[:int(nfft / 2)].imag
 
     # calculates the phase difference
-    # ddt = mod(dt / duration * 2 * pi. * freq, 2 * pi);
     twopi = math.pi * 2
-    ddt = (dt / duration * twopi) * freq
-    for i, s in enumerate(ddt):
-        ddt[i] -= twopi * math.floor(s / twopi)
+    ddt_temp = (dt / duration * twopi) * freq
+    ddt = ddt_temp - twopi * np.floor(ddt_temp / twopi)
 
     # the coeficients for the frequencies
-    aaax = -0.5 * (-1 * xa * np.cos(ddt) + np.sin(ddt) * xb - xa) / np.sin(ddt)
-    aaay = -0.5 * (-1 * ya * np.cos(ddt) + np.sin(ddt) * yb - ya) / np.sin(ddt)
-    bbbx = -0.5 * (xb * np.cos(ddt) + np.sin(ddt) * xa + xb) / np.sin(ddt)
-    bbby = -0.5 * (yb * np.cos(ddt) + np.sin(ddt) * ya + yb) / np.sin(ddt)
+    with np.errstate(divide="ignore"):
+        aaax = -0.5 * (-1 * xa * np.cos(ddt) + np.sin(ddt) * xb - xa) / np.sin(ddt)
+        aaay = -0.5 * (-1 * ya * np.cos(ddt) + np.sin(ddt) * yb - ya) / np.sin(ddt)
+
+    with np.errstate(invalid="ignore"):
+        bbbx = -0.5 * (xb * np.cos(ddt) + np.sin(ddt) * xa + xb) / np.sin(ddt)
+        bbby = -0.5 * (yb * np.cos(ddt) + np.sin(ddt) * ya + yb) / np.sin(ddt)
 
     # create series of sines and cosines
-    overxx = np.empty([len(freq), len(tt)])
-    overyy = np.empty([len(freq), len(tt)])
-    for col, t in enumerate(tt):
-        for row, f in enumerate(freq):
-            ft = twopi * f * t
-            sn = math.sin(ft)
-            cn = math.cos(ft)
-            overxx[row, col] = aaax[row] * sn + bbbx[row] * cn
-            overyy[row, col] = aaay[row] * sn + bbby[row] * cn
+    ft = freq.reshape(-1, 1) * tt.reshape(1, -1) * twopi
+    sn = np.sin(ft)
+    cn = np.cos(ft)
+    aaax_rep = np.repeat(aaax.reshape(-1, 1), tt.size, axis=1)
+    bbbx_rep = np.repeat(bbbx.reshape(-1, 1), tt.size, axis=1)
+    aaay_rep = np.repeat(aaay.reshape(-1, 1), tt.size, axis=1)
+    bbby_rep = np.repeat(bbby.reshape(-1, 1), tt.size, axis=1)
+    with np.errstate(invalid="ignore"):
+        overxx = aaax_rep * sn + bbbx_rep * cn
+        overyy = aaay_rep * sn + bbby_rep * cn
 
     # Outputs
     # ArrayXd & tt, ArrayXd & ET, ArrayXd & ET_shift,
@@ -678,6 +680,7 @@ def parse_file(
             which * (float(row["RegLine"]) - float(row["FromLine"]))
         )
 
+    time_arr = np.array(time)
     offx_arr = np.array(offset_x)
     offy_arr = np.array(offset_y)
 
@@ -685,38 +688,39 @@ def parse_file(
     avemag = medfilt(magnitude, window_size)
 
     # Throw out the out-of-range values:
-    good_data = list()
-    for the_t, the_x, the_y, mag, ave in zip(
-        time, offset_x, offset_y, magnitude, avemag
-    ):
-        high = ave + window_width
-        low = ave - window_width
-        if low < mag < high:
-            good_data.append((the_t, the_x, the_y))
+    high_window = avemag + window_width
+    low_window = avemag - window_width
+    good_idxs = np.nonzero(
+        np.logical_and(low_window < magnitude, magnitude < high_window)
+    )
 
     # Some flat files have more than one measurement for the same timestamp.
-    # For flat files that do not, this groupby loop is just a fancy copy.
-    # However, for those that do, the multiple x and y offsets for the same
+    # For those that do, the multiple x and y offsets for the same
     # timestamp are averaged together.
     #
     # Also, the original MatLab code had no functions, but repeated code,
     # and there was a transcription error on the third pass of this averaging
     # such that the very first row was never included in the averaging.
     # The C++ code allowed for that broken behavior, but we won't here.
-    t = list()
-    offx = list()
-    offy = list()
-    for k, g in itertools.groupby(good_data, lambda val: val[0]):
-        t.append(k)
-        _, exes, whys = zip(*g)
-        offx.append(statistics.mean(exes))
-        offy.append(statistics.mean(whys))
+    t_arr, unique_idxs = np.unique(time_arr[good_idxs], return_index=True)
 
-    t_arr = np.array(t)
+    if unique_idxs.size == time_arr[good_idxs].size:
+        offx = offx_arr[good_idxs]
+        offy = offy_arr[good_idxs]
+    else:
+        x_means = list()
+        for a in np.split(offx_arr[good_idxs], unique_idxs[1:]):
+            x_means.append(np.mean(a))
+        offx = np.array(x_means)
+
+        y_means = list()
+        for a in np.split(offy_arr[good_idxs], unique_idxs[1:]):
+            y_means.append(np.mean(a))
+        offy = np.array(y_means)
 
     nfft = upper_power_of_two(int(flat["FROM"]["Lines"]) / line_interval)
-    filtered_x = filter_data(nfft, 2 / nfft, np.array(offx))
-    filtered_y = filter_data(nfft, 2 / nfft, np.array(offy))
+    filtered_x = filter_data(nfft, 2 / nfft, offx)
+    filtered_y = filter_data(nfft, 2 / nfft, offy)
 
     tt = np.linspace(0, nfft - 1, nfft) / nfft
 
