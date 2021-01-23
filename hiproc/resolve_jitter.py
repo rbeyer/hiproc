@@ -54,6 +54,9 @@ import numpy as np
 from scipy.signal import medfilt
 from scipy.interpolate import PchipInterpolator
 
+import pvl
+
+import hiproc.hirise as hirise
 import hiproc.util as util
 from hiproc.FlatFile import FlatFile
 
@@ -61,6 +64,14 @@ from hiproc.FlatFile import FlatFile
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      parents=[util.parent_parser()])
+    parser.add_argument(
+        "-c",
+        "--conf",
+        required=False,
+        default=Path(__file__).resolve().parent.parent /
+                "data" / "ResolveJitter.conf",
+        help="Path to a ResolveJitter.conf file.",
+    )
     parser.add_argument('image_location', type=Path)
     parser.add_argument("image_id", type=str)
     parser.add_argument("line_interval", type=float)
@@ -79,24 +90,63 @@ def main():
         raise ValueError("The parameter 'line_interval' must be positive.")
 
     start(
-        args.image_location, args.image_id, args.line_interval,
         args.file_path1, args.which1, args.file_path2, args.which2,
-        args.file_path3, args.which3
+        args.file_path3, args.which3, imgdir=args.image_location,
+        obsid=args.image_id, lineint=args.line_interval, confpath=args.conf
     )
     return
 
 
 def start(
-    image_location: Path, image_id: str, line_interval: float,
     file_path1: Path, which1: int, file_path2: Path, which2: int,
-    file_path3: Path, which3: int
+    file_path3: Path, which3: int, window_size=11, window_width=2,
+    imgdir=None, obsid=None, lineint=None, confpath=None
 ):
-    fp1 = set_file_path(image_location, file_path1)
-    fp2 = set_file_path(image_location, file_path2)
-    fp3 = set_file_path(image_location, file_path3)
+    if imgdir is None:
+        fp1 = file_path1
+        fp2 = file_path2
+        fp3 = file_path3
+        image_location = fp1.parent
+    else:
+        fp1 = set_file_path(imgdir, file_path1)
+        fp2 = set_file_path(imgdir, file_path2)
+        fp3 = set_file_path(imgdir, file_path3)
+        image_location = imgdir
 
-    window_size = 11
-    window_width = 2
+    if lineint is None:
+        if confpath is None:
+            raise ValueError(
+                f"lineint was None and so was confpath, so can't look up value."
+            )
+        else:
+            line_interval = pvl.load(
+                confpath
+            )["AutoRegistration"]["ControlNet"]["Control_Lines"]
+    else:
+        line_interval = lineint
+
+    oid1 = hirise.get_ObsID_fromfile(fp1)
+    oid2 = hirise.get_ObsID_fromfile(fp2)
+    oid3 = hirise.get_ObsID_fromfile(fp3)
+
+    if oid1 == oid2 == oid3:
+        oid = oid1
+    else:
+        raise ValueError(
+            f"The observation IDs from the three file"
+            f"paths ({file_path1}, {file_path2}, {file_path3}) do not match."
+        )
+
+    if obsid is None:
+        image_id = str(oid)
+    else:
+        if obsid == str(oid):
+            image_id = obsid
+        else:
+            raise ValueError(
+                f"The provided obsid ({obsid}) does not match"
+                f"the Observation IDs dervied from the images ({oid})."
+            )
 
     # The first file to be parsed sets et, et_shift, t0, and duration
     (tdi1, nfft1, linerate1, tt1, et, et_shift, t0, duration, dt1, ddt1, t1,
