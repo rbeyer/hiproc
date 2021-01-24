@@ -623,13 +623,17 @@ def overwrite_null_freq(
             f"must be the same."
         )
 
-    stacked = np.ma.stack((support1, support2))
-    smean = np.ma.mean(stacked, axis=0)
-    # We put the original values into the smean array because if the input
-    # array is int, then the averages do not carry through.  Instead we
-    # put the "original" values into the smean array where they belong.
-    smean[~array.mask] = array[~array.mask]
-    return smean
+    if array.dtype.kind == "i":
+        overwritten = array.astype(float)
+    else:
+        overwritten = array.copy()
+
+    # Given the size of the arrays, and the small percentage of masked
+    # values, taking the mean of only those values that are needed
+    # speeds this up.
+    stacked = np.ma.stack((support1[array.mask], support2[array.mask]))
+    overwritten[array.mask] = np.ma.mean(stacked, axis=0)
+    return overwritten
 
 
 def parse_file(
