@@ -8,6 +8,8 @@ between the derived jitter function and the original data, linerate
 (line time read from flat files), and TDI. These outputs are
 written to a text file. Another output is the pixel smear, also
 written to a file.
+
+The C++ version of this runs ~5x faster, FYI.
 """
 
 # Copyright (C) 2013-2020 Arizona Board of Regents on behalf of the Lunar and
@@ -38,6 +40,13 @@ written to a file.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# The only write-up that I could find for the pre-cursor was:
+#   S. Mattson, A. Boyd, R. L. Kirk, D. A. Cook, and E. Howington-Kraus,
+#   HiJACK: Correcting spacecraft jitter in HiRISE images of Mars,
+#   European Planetary Science Congress 2009, #604
+#   https://ui.adsabs.harvard.edu/abs/2009epsc.conf..604M}
+# However, that's really only a high-level description.
 
 import argparse
 import csv
@@ -45,7 +54,6 @@ import itertools
 import logging
 import math
 import os
-import statistics
 import sys
 from collections import abc
 from pathlib import Path
@@ -98,8 +106,10 @@ def main():
 
 
 def start(
-    file_path1: Path, which1: int, file_path2: Path, which2: int,
-    file_path3: Path, which3: int, window_size=11, window_width=2,
+    file_path1: Path, which1: int,
+    file_path2: Path, which2: int,
+    file_path3: Path, which3: int,
+    window_size=11, window_width=2,
     imgdir=None, obsid=None, lineint=None, confpath=None
 ):
     if imgdir is None:
@@ -186,6 +196,14 @@ def start(
         raise ValueError("The values of linerate are not identical.")
 
     # starting a loop to find correct phase tol
+    # For the test data, the following while loop will *always* run the full
+    # number of repetitions.  If it were guaranteed that there was only
+    # one minima in the changing value of *error*, then we could exit
+    # this loop early, once the error starts going back up, or adopt
+    # strategies to divide and conquer the phasetol parameter space.
+    # A better understanding of the error behavior could allow us to speed
+    # these loops up.
+
     # int      k           = 0;
     # double   minAvgError = numeric_limits<double>::max();
     # int      minK        = 0;
@@ -204,6 +222,16 @@ def start(
     error = error_tol
     min_avg_error = sys.float_info.max
     # min_k = 0
+
+    # No need to calculate these during every loop:
+    rh0 = dict(
+        x1=np.real(x1[0]) / 2.0,
+        x2=np.real(x2[0]) / 2.0,
+        x3=np.real(x3[0]) / 2.0,
+        y1=np.real(y1[0]) / 2.0,
+        y2=np.real(y2[0]) / 2.0,
+        y3=np.real(y3[0]) / 2.0,
+    )
     while error >= error_tol and k < repetitions:
         k += 1
 
@@ -270,17 +298,17 @@ def start(
             tt + dt3/duration, tt, jittery, left=0, right=0
         ) - jittery
 
-        error_vec = 1.0/6.0*(
-            abs(xinterp1 - (jittercheckx1 + np.real(x1[0])/2.0)) +
-            abs(xinterp2 - (jittercheckx2 + np.real(x2[0])/2.0)) +
-            abs(xinterp3 - (jittercheckx3 + np.real(x3[0])/2.0)) +
-            abs(yinterp1 - (jitterchecky1 + np.real(y1[0])/2.0)) +
-            abs(yinterp2 - (jitterchecky2 + np.real(y2[0])/2.0)) +
-            abs(yinterp3 - (jitterchecky3 + np.real(y3[0])/2.0))
-        )
+        error_vec = (
+            np.abs(xinterp1 - (jittercheckx1 + rh0["x1"])) +
+            np.abs(xinterp2 - (jittercheckx2 + rh0["x2"])) +
+            np.abs(xinterp3 - (jittercheckx3 + rh0["x3"])) +
+            np.abs(yinterp1 - (jitterchecky1 + rh0["y1"])) +
+            np.abs(yinterp2 - (jitterchecky2 + rh0["y2"])) +
+            np.abs(yinterp3 - (jitterchecky3 + rh0["y3"]))
+        ) / 6.0
 
         error = error_vec.mean()
-        logging.info(f"Error 1: {error}")
+        logging.info(f"Error for phasetol {phasetol}: {error}")
 
         if error < min_avg_error:
             min_avg_error = error
@@ -289,6 +317,7 @@ def start(
             min_jittery = jittery
 
     # end while
+    logging.info(f"Minimum Error after phase filtering: {min_avg_error}")
 
     k = 0
     min_k = 0
@@ -339,16 +368,16 @@ def start(
         ) - jitteryy
 
         error_vec = 1.0/6.0*(
-            abs(xinterp1 - (jittercheckx1 + np.real(x1[0])/2.0)) +
-            abs(xinterp2 - (jittercheckx2 + np.real(x2[0])/2.0)) +
-            abs(xinterp3 - (jittercheckx3 + np.real(x3[0])/2.0)) +
-            abs(yinterp1 - (jitterchecky1 + np.real(y1[0])/2.0)) +
-            abs(yinterp2 - (jitterchecky2 + np.real(y2[0])/2.0)) +
-            abs(yinterp3 - (jitterchecky3 + np.real(y3[0])/2.0))
+            np.abs(xinterp1 - (jittercheckx1 + rh0["x1"])) +
+            np.abs(xinterp2 - (jittercheckx2 + rh0["x2"])) +
+            np.abs(xinterp3 - (jittercheckx3 + rh0["x3"])) +
+            np.abs(yinterp1 - (jitterchecky1 + rh0["y1"])) +
+            np.abs(yinterp2 - (jitterchecky2 + rh0["y2"])) +
+            np.abs(yinterp3 - (jitterchecky3 + rh0["y3"]))
         )
 
         error = error_vec.mean()
-        logging.info(f"error 2: {error}")
+        logging.info(f"Erorr for omega {omega}: {error}")
 
         if error < min_avg_error:
             min_k = k
@@ -395,12 +424,12 @@ def start(
     t1_shift = t1 - t0
     t2_shift = t2 - t0
     t3_shift = t3 - t0
-    jittercheckx1_shift = min_jitter_check_x1 + np.real(x1[0])/2.0
-    jitterchecky1_shift = min_jitter_check_y1 + np.real(y1[0])/2.0
-    jittercheckx2_shift = min_jitter_check_x2 + np.real(x2[0])/2.0
-    jitterchecky2_shift = min_jitter_check_y2 + np.real(y2[0])/2.0
-    jittercheckx3_shift = min_jitter_check_x3 + np.real(x3[0])/2.0
-    jitterchecky3_shift = min_jitter_check_y3 + np.real(y3[0])/2.0
+    jittercheckx1_shift = min_jitter_check_x1 + rh0["x1"]
+    jitterchecky1_shift = min_jitter_check_y1 + rh0["y1"]
+    jittercheckx2_shift = min_jitter_check_x2 + rh0["x2"]
+    jitterchecky2_shift = min_jitter_check_y2 + rh0["y2"]
+    jittercheckx3_shift = min_jitter_check_x3 + rh0["x3"]
+    jitterchecky3_shift = min_jitter_check_y3 + rh0["y3"]
     # ArrayXd* Data[] =
     #   {&ET_shift, &Sample, &Line,
     #    &t1_shift,
@@ -572,13 +601,6 @@ def make_null_problematic_frequencies(
     """Returns *x* and *y* as numpy masked arrays with 'problematic frequencies'
     masked.  It is assumed that *ddt* is a 1-D array which is the same
     size as axis 0 of *x* and *y*."""
-    # Original function also returned a set of the indexes that were zeroed,
-    # but I don't think we need that.  This could also use masked arrays
-    # maybe?
-
-    # TODO: x and y are 2d arrays.  Yes I want to use masked arrays, need to
-    # figure out how to create the right kind of mask.
-
     if x.shape != y.shape:
         raise ValueError(
             f"The shape of x {x.shape} and y {y.shape} must be the same."
@@ -591,11 +613,8 @@ def make_null_problematic_frequencies(
         )
 
     # null the frequencies that cause a problem
-
-    twopi = 2 * math.pi
-
     a = np.less(np.abs(ddt), phasetol)
-    b = np.greater(np.abs(ddt), twopi - phasetol)
+    b = np.greater(np.abs(ddt), (2 * math.pi) - phasetol)
     null_positions = np.logical_or(a, b)
 
     # The assumption is that since ddt was a 1D array that
