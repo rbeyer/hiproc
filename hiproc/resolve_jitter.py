@@ -221,25 +221,29 @@ def start(
             phasetol, ddt3, overxx3, overyy3
         )
 
-        # Overwrite null frequencies.
-        overxxx1 = overwrite_null_freq(overxxx1, overxxx2, overxxx3)
-        overxxx2 = overwrite_null_freq(overxxx2, overxxx1, overxxx3)
-        overxxx3 = overwrite_null_freq(overxxx3, overxxx1, overxxx2)
+        # Turns out that since we need to take the mean of the stackedx
+        # and stackedy arrays, and we're working with masked arrays,
+        # and the masked versions of stack and mean, the overwrite_null_freq()
+        # process is unneeded.
+        # # Overwrite null frequencies.
+        # overxxx1 = overwrite_null_freq(overxxx1, overxxx2, overxxx3)
+        # overxxx2 = overwrite_null_freq(overxxx2, overxxx1, overxxx3)
+        # overxxx3 = overwrite_null_freq(overxxx3, overxxx1, overxxx2)
 
-        overyyy1 = overwrite_null_freq(overyyy1, overyyy2, overyyy3)
-        overyyy2 = overwrite_null_freq(overyyy2, overyyy1, overyyy3)
-        overyyy3 = overwrite_null_freq(overyyy3, overyyy1, overyyy2)
+        # overyyy1 = overwrite_null_freq(overyyy1, overyyy2, overyyy3)
+        # overyyy2 = overwrite_null_freq(overyyy2, overyyy1, overyyy3)
+        # overyyy3 = overwrite_null_freq(overyyy3, overyyy1, overyyy2)
 
         # Adding all frequencies together
-        stackedx = np.stack((overxxx1, overxxx2, overxxx3))
-        stackedy = np.stack((overyyy1, overyyy2, overyyy3))
+        stackedx = np.ma.stack((overxxx1, overxxx2, overxxx3))
+        stackedy = np.ma.stack((overyyy1, overyyy2, overyyy3))
 
-        overxxx = stackedx.mean(axis=0)
-        overyyy = stackedy.mean(axis=0)
+        overxxx = np.ma.mean(stackedx, axis=0)
+        overyyy = np.ma.mean(stackedy, axis=0)
 
         # take the sum of each row
-        overx = overxxx.sum(axis=0)
-        overy = overyyy.sum(axis=0)
+        overx = np.ma.sum(overxxx, axis=0)
+        overy = np.ma.sum(overyyy, axis=0)
 
         jitterx = overx - overx[0]
         jittery = overy - overy[0]
