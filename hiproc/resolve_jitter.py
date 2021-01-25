@@ -547,7 +547,8 @@ def create_matrices(
 
 
 def upper_power_of_two(value) -> int:
-    """Returns the smallest power of 2 which is >= *value*."""
+    """Returns the value of 2 raised to some power which is the smallest
+     such value that is >= *value*."""
     result = 1
     while result < value:
         result <<= 1
@@ -656,8 +657,37 @@ def parse_file(
     window_size: int, window_width: int, whichfrom=True, et=None, et_shift=None,
     t0=None, duration=None
 ):
-    """Parse the current text file, then extract and process the data into a
-    matrix."""
+    """Returns a variety of information from the Flat file at *file_path*.
+
+    The *line_interval* is divided into the number of lines in the
+    *file_path*'s FROM file to help determine the number of positions
+    to return in the nfft parameter.
+
+    *window_size* is the kernel size for median filtering the offsets, should
+    be an odd integer.
+
+    *window_width* determines the boundaries above and below the filtered
+    average magnitude beyond which to exclude outliers.
+
+    The optional *whichfrom* parameter determines the sense of the offsets.
+    The default value of True makes the offsets relative to the From cube,
+    and False makes the offsets relative to the Match cube.
+
+    The optional *et* and *et_shift* parameters are witchcraft, and if not
+    defined, will be determined.
+
+    The optional *t0* will be used as the starting time.  If not specified,
+    it will be determined.
+
+    The optional *duration* specifies the length of time from *t0* to the
+    last time value.
+
+    Since this function runs for multiple files, the values of *et*,
+    *et_shift*, *t0*, and *duration* should be the same, so they are
+    typically left unspecified on the first run, and since they are
+    returned by this function, their values should be provided as givens
+    for subsequent runs.
+    """
     logging.info(f"Reading: {file_path}")
 
     flat = FlatFile(file_path)
