@@ -484,16 +484,6 @@ def start(
     return
 
 
-def get_time_arrays(nfft, time_start, time_stop):
-    # making time regularly spaced and interpolate offx and offy
-    # into this time
-    duration = time_stop - time_start
-    nfft_arr = np.linspace(0, nfft - 1, nfft)
-    et = nfft_arr * duration / (nfft - 1.0) + time_start
-    et_shift = et - time_start
-    return et, et_shift
-
-
 def create_matrices(
     nfft: int, dt: float, time: np.array, tt: abc.Sequence,
     offx: np.array, offy: np.array, et_shift, t0, duration
@@ -756,7 +746,8 @@ def parse_file(
     tt = np.linspace(0, nfft - 1, nfft) / nfft
 
     if et is None:
-        et, et_shift = get_time_arrays(nfft, t_arr[0], t_arr[-1])
+        et = np.linspace(t_arr[0], t_arr[-1], nfft)
+        et_shift = et - t_arr[0]
 
     if t0 is None:
         t0 = t_arr[0]
