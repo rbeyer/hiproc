@@ -98,17 +98,19 @@ def main():
         raise ValueError("The parameter 'line_interval' must be positive.")
 
     start(
-        args.file_path1, args.which1, args.file_path2, args.which2,
-        args.file_path3, args.which3, imgdir=args.image_location,
+        args.file_path1, True if args.which1 != 1 else False,
+        args.file_path2, True if args.which2 != 1 else False,
+        args.file_path3, True if args.which3 != 1 else False,
+        imgdir=args.image_location,
         obsid=args.image_id, lineint=args.line_interval, confpath=args.conf
     )
     return
 
 
 def start(
-    file_path1: Path, which1: int,
-    file_path2: Path, which2: int,
-    file_path3: Path, which3: int,
+    file_path1: Path, whichfrom1: bool,
+    file_path2: Path, whichfrom2: bool,
+    file_path3: Path, whichfrom3: bool,
     window_size=11, window_width=2,
     imgdir=None, obsid=None, lineint=None, confpath=None
 ):
@@ -162,17 +164,17 @@ def start(
     (tdi1, nfft1, linerate1, tt1, et, et_shift, t0, duration, dt1, ddt1, t1,
      offx1, offy1,
      xinterp1, yinterp1, x1, y1, overxx1, overyy1) = parse_file(
-        fp1, which1, line_interval, window_size, window_width
+        fp1, line_interval, window_size, window_width, whichfrom=whichfrom1
     )
     (tdi2, nfft2, linerate2, tt2, _, _, _, _, dt2, ddt2, t2, offx2, offy2,
      xinterp2, yinterp2, x2, y2, overxx2, overyy2) = parse_file(
-        fp2, which2, line_interval, window_size, window_width,
-        et, et_shift, t0, duration
+        fp2, line_interval, window_size, window_width, whichfrom=whichfrom2,
+        et=et, et_shift=et_shift, t0=t0, duration=duration
     )
     (tdi3, nfft3, linerate3, tt3, _, _, _, _, dt3, ddt3, t3, offx3, offy3,
      xinterp3, yinterp3, x3, y3, overxx3, overyy3) = parse_file(
-        fp3, which3, line_interval, window_size, window_width,
-        et, et_shift, t0, duration
+        fp3, line_interval, window_size, window_width, whichfrom=whichfrom3,
+        et=et, et_shift=et_shift, t0=t0, duration=duration
     )
 
     if np.array_equal(tt1, tt2) and np.array_equal(tt2, tt3):
@@ -660,8 +662,8 @@ def overwrite_null_freq(
 
 
 def parse_file(
-    file_path: os.PathLike, which: int, line_interval: float,
-    window_size: int, window_width: int, et=None, et_shift=None,
+    file_path: os.PathLike, line_interval: float,
+    window_size: int, window_width: int, whichfrom=True, et=None, et_shift=None,
     t0=None, duration=None
 ):
     """Parse the current text file, then extract and process the data into a
@@ -686,10 +688,12 @@ def parse_file(
             f"and MATCH ({flat['MATCH']['LineRate']}) in {file_path}"
         )
 
-    if which == 1:
-        column = "MatchTime"
-    else:
+    if whichfrom == 1:
         column = "FromTime"
+        which = -1
+    else:
+        column = "MatchTime"
+        which = 1
 
     # dt = which * (data[0][0] - data[0][3]);
     dt = which * (float(flat[0]["FromTime"]) - float(flat[0]["MatchTime"]))
