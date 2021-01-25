@@ -160,32 +160,22 @@ def start(
                 f"the Observation IDs dervied from the images ({oid})."
             )
 
-    # The first file to be parsed sets et, et_shift, t0, and duration
-    (tdi1, nfft1, linerate1, tt1, et, et_shift, t0, duration, dt1, ddt1, t1,
-     offx1, offy1,
-     xinterp1, yinterp1, x1, y1, overxx1, overyy1) = parse_file(
-        fp1, line_interval, window_size, window_width, whichfrom=whichfrom1
+    t1, offx1, offy1, lines1, dt1, tdi1, linerate1 = parse_file(
+        fp1, window_size, window_width, whichfrom1
     )
-    (tdi2, nfft2, linerate2, tt2, _, _, _, _, dt2, ddt2, t2, offx2, offy2,
-     xinterp2, yinterp2, x2, y2, overxx2, overyy2) = parse_file(
-        fp2, line_interval, window_size, window_width, whichfrom=whichfrom2,
-        et=et, et_shift=et_shift, t0=t0, duration=duration
+    t2, offx2, offy2, lines2, dt2, tdi2, linerate2 = parse_file(
+        fp2, window_size, window_width, whichfrom2
     )
-    (tdi3, nfft3, linerate3, tt3, _, _, _, _, dt3, ddt3, t3, offx3, offy3,
-     xinterp3, yinterp3, x3, y3, overxx3, overyy3) = parse_file(
-        fp3, line_interval, window_size, window_width, whichfrom=whichfrom3,
-        et=et, et_shift=et_shift, t0=t0, duration=duration
+    t3, offx3, offy3, lines3, dt3, tdi3, linerate3 = parse_file(
+        fp3, window_size, window_width, whichfrom3
     )
 
-    if np.array_equal(tt1, tt2) and np.array_equal(tt2, tt3):
-        tt = tt3
+    if lines1 == lines2 == lines3:
+        nfft = upper_power_of_two(lines1 / line_interval)
     else:
-        raise ValueError("The values of tt are not identical.")
-
-    if nfft1 == nfft2 == nfft3:
-        nfft = nfft3
-    else:
-        raise ValueError("The values of nfft are not identical.")
+        raise ValueError(
+            "The number of lines in the three images is not identical."
+        )
 
     if tdi1 == tdi2 == tdi3:
         tdi = tdi3
@@ -196,6 +186,34 @@ def start(
         linerate = linerate3
     else:
         raise ValueError("The values of linerate are not identical.")
+
+    offx1_filtered = filter_data(nfft, 2 / nfft, offx1)
+    offy1_filtered = filter_data(nfft, 2 / nfft, offy1)
+    offx2_filtered = filter_data(nfft, 2 / nfft, offx2)
+    offy2_filtered = filter_data(nfft, 2 / nfft, offy2)
+    offx3_filtered = filter_data(nfft, 2 / nfft, offx3)
+    offy3_filtered = filter_data(nfft, 2 / nfft, offy3)
+
+    tt = np.linspace(0, 1, nfft, endpoint=False)
+
+    # The first file to be parsed sets et, et_shift, t0, and duration
+    et = np.linspace(t1[0], t1[-1], nfft)
+    et_shift = et - t1[0]
+    t0 = t1[0]
+    duration = t1[-1] - t0
+
+    ddt1, overxx1, overyy1, xinterp1, yinterp1, x1, y1, = create_matrices(
+        nfft, dt1, t1, tt, offx1_filtered, offy1_filtered,
+        et_shift, t0, duration
+    )
+    ddt2, overxx2, overyy2, xinterp2, yinterp2, x2, y2, = create_matrices(
+        nfft, dt2, t2, tt, offx2_filtered, offy2_filtered,
+        et_shift, t0, duration
+    )
+    ddt3, overxx3, overyy3, xinterp3, yinterp3, x3, y3, = create_matrices(
+        nfft, dt3, t3, tt, offx3_filtered, offy3_filtered,
+        et_shift, t0, duration
+    )
 
     # starting a loop to find correct phase tol
     # For the test data, the following while loop will *always* run the full
@@ -459,20 +477,22 @@ def start(
     # int numData = sizeof(Data)/sizeof(ArrayXd*);
     write_data_for_plotting(
         data_p, string_labels, et_shift, sample, line, t1_shift,
-        offx1, xinterp1, jittercheckx1_shift, offy1, yinterp1,
-        jitterchecky1_shift, t2_shift, offx2, xinterp2, jittercheckx2_shift,
-        offy2, yinterp2, jitterchecky2_shift, t3_shift, offx3, xinterp3,
-        jittercheckx3_shift, offy3, yinterp3, jitterchecky3_shift
+        offx1_filtered, xinterp1, jittercheckx1_shift, offy1_filtered, yinterp1,
+        jitterchecky1_shift, t2_shift, offx2_filtered, xinterp2,
+        jittercheckx2_shift, offy2_filtered, yinterp2, jitterchecky2_shift,
+        t3_shift, offx3_filtered, xinterp3,
+        jittercheckx3_shift, offy3_filtered, yinterp3, jitterchecky3_shift
     )
 
     write_csv(
         image_location / (image_id + "_jitter_plot_py.csv"),
         string_labels,
         et_shift, sample, line, t1_shift,
-        offx1, xinterp1, jittercheckx1_shift, offy1, yinterp1,
-        jitterchecky1_shift, t2_shift, offx2, xinterp2, jittercheckx2_shift,
-        offy2, yinterp2, jitterchecky2_shift, t3_shift, offx3, xinterp3,
-        jittercheckx3_shift, offy3, yinterp3, jitterchecky3_shift
+        offx1_filtered, xinterp1, jittercheckx1_shift, offy1_filtered, yinterp1,
+        jitterchecky1_shift, t2_shift, offx2_filtered, xinterp2,
+        jittercheckx2_shift, offy2_filtered, yinterp2, jitterchecky2_shift,
+        t3_shift, offx3_filtered, xinterp3, jittercheckx3_shift,
+        offy3_filtered, yinterp3, jitterchecky3_shift
     )
 
     gnuplot_p = image_location / (image_id + "_jitter_plot_py.plt")
@@ -653,9 +673,7 @@ def overwrite_null_freq(
 
 
 def parse_file(
-    file_path: os.PathLike, line_interval: float,
-    window_size: int, window_width: int, whichfrom=True, et=None, et_shift=None,
-    t0=None, duration=None
+    file_path: os.PathLike, window_size: int, window_width: int, whichfrom=True
 ):
     """Returns a variety of information from the Flat file at *file_path*.
 
@@ -769,34 +787,7 @@ def parse_file(
             y_means.append(np.mean(a))
         offy = np.array(y_means)
 
-    nfft = upper_power_of_two(int(flat["FROM"]["Lines"]) / line_interval)
-    filtered_x = filter_data(nfft, 2 / nfft, offx)
-    filtered_y = filter_data(nfft, 2 / nfft, offy)
-
-    tt = np.linspace(0, 1, nfft, endpoint=False)
-
-    if et is None:
-        et = np.linspace(t_arr[0], t_arr[-1], nfft)
-        et_shift = et - t_arr[0]
-
-    if t0 is None:
-        t0 = t_arr[0]
-        duration = t_arr[-1] - t0
-
-    ddt, overxx, overyy, xinterp, yinterp, x, y, = create_matrices(
-        nfft, dt, t_arr, tt, filtered_x, filtered_y, et_shift, t0, duration
-    )
-
-    return (tdi, nfft, line_rate,
-            # t[0], t[-1] - t[0],
-            tt, et, et_shift, t0, duration,
-            dt, ddt,
-            t_arr, filtered_x, filtered_y,
-            xinterp, yinterp, x, y, overxx, overyy)
-    # Outputs
-    # TDI, nfft, linerate, t0, duration, tt, ET, ET_shift, dt, ddt,
-    # t, offx, offy, xinterp, yinterp, X, Y, overxx, overyy
-    # );
+    return t_arr, offx, offy, int(flat["FROM"]["Lines"]), dt, tdi, line_rate
 
 
 def pixel_smear(
