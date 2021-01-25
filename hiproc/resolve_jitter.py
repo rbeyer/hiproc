@@ -499,7 +499,7 @@ def create_matrices(
     np.nan_to_num(yinterp, copy=False, nan=np.mean(offy))
 
     # getting the frequencies of the Fourier transform
-    freq = np.linspace(0, nfft / 2 - 1, int(nfft / 2))
+    freq = np.linspace(0, nfft / 2, int(nfft / 2), endpoint=False)
 
     # taking the fourier transform of the offsets
     x = 2 * np.fft.fft(xinterp) / nfft
@@ -743,7 +743,7 @@ def parse_file(
     filtered_x = filter_data(nfft, 2 / nfft, offx)
     filtered_y = filter_data(nfft, 2 / nfft, offy)
 
-    tt = np.linspace(0, nfft - 1, nfft) / nfft
+    tt = np.linspace(0, 1, nfft, endpoint=False)
 
     if et is None:
         et = np.linspace(t_arr[0], t_arr[-1], nfft)
