@@ -170,6 +170,10 @@ def start(
         fp3, window_size, window_width, whichfrom3
     )
 
+    # nfft is the number of "steps" that we will be using for our
+    # fourier transforms.  These steps represent a certain number of
+    # image lines, but also represent the number of "time steps" that
+    # we will use.
     if lines1 == lines2 == lines3:
         nfft = upper_power_of_two(lines1 / line_interval)
     else:
@@ -194,28 +198,33 @@ def start(
     offx3_filtered = filter_data(nfft, 2 / nfft, offx3)
     offy3_filtered = filter_data(nfft, 2 / nfft, offy3)
 
+    # The values in tt are the fractional points in [0:1]
+    # that correspond to the nfft number.
     tt = np.linspace(0, 1, nfft, endpoint=False)
 
-    # The first file to be parsed sets et, et_shift, t0, and duration
-    et = np.linspace(t1[0], t1[-1], nfft)
-    et_shift = et - t1[0]
+    # The first file to be parsed sets nfftime, t0, and duration
+    nfftime = np.linspace(t1[0], t1[-1], nfft)
+    # et_shift = et - t1[0]
     t0 = t1[0]
     duration = t1[-1] - t0
 
-    ddt1, overxx1, overyy1, xinterp1, yinterp1, x1, y1, = create_matrices(
-        nfft, dt1, t1, tt, offx1_filtered, offy1_filtered,
-        et_shift, t0, duration
+    xinterp1, yinterp1, x1, y1, ddt1, overxx1, overyy1 = create_matrices(
+        t1, offx1_filtered, offy1_filtered,
+        dt1, duration, t0,
+        nfft, nfftime, tt
     )
-    ddt2, overxx2, overyy2, xinterp2, yinterp2, x2, y2, = create_matrices(
-        nfft, dt2, t2, tt, offx2_filtered, offy2_filtered,
-        et_shift, t0, duration
+    xinterp2, yinterp2, x2, y2, ddt2, overxx2, overyy2 = create_matrices(
+        t2, offx2_filtered, offy2_filtered,
+        dt2, duration, t0,
+        nfft, nfftime, tt
     )
-    ddt3, overxx3, overyy3, xinterp3, yinterp3, x3, y3, = create_matrices(
-        nfft, dt3, t3, tt, offx3_filtered, offy3_filtered,
-        et_shift, t0, duration
+    xinterp3, yinterp3, x3, y3, ddt3, overxx3, overyy3 = create_matrices(
+        t3, offx3_filtered, offy3_filtered,
+        dt3, duration, t0,
+        nfft, nfftime, tt
     )
 
-    # starting a loop to find correct phase tol
+    logging.info("Searching for correct phasetol")
     # For the test data, the following while loop will *always* run the full
     # number of repetitions.  If it were guaranteed that there was only
     # one minima in the changing value of *error*, then we could exit
@@ -259,28 +268,15 @@ def start(
         phasetol = k * tolcoef
 
         # null the frequencies that cause a problem (really zero them out)
-        overxxx1, overyyy1 = make_null_problematic_frequencies(
+        overxxx1, overyyy1 = mask_frequencies(
             phasetol, ddt1, overxx1, overyy1
         )
-        overxxx2, overyyy2 = make_null_problematic_frequencies(
+        overxxx2, overyyy2 = mask_frequencies(
             phasetol, ddt2, overxx2, overyy2
         )
-        overxxx3, overyyy3 = make_null_problematic_frequencies(
+        overxxx3, overyyy3 = mask_frequencies(
             phasetol, ddt3, overxx3, overyy3
         )
-
-        # Turns out that since we need to take the mean of the stackedx
-        # and stackedy arrays, and we're working with masked arrays,
-        # and the masked versions of stack and mean, the overwrite_null_freq()
-        # process is unneeded.
-        # # Overwrite null frequencies.
-        # overxxx1 = overwrite_null_freq(overxxx1, overxxx2, overxxx3)
-        # overxxx2 = overwrite_null_freq(overxxx2, overxxx1, overxxx3)
-        # overxxx3 = overwrite_null_freq(overxxx3, overxxx1, overxxx2)
-
-        # overyyy1 = overwrite_null_freq(overyyy1, overyyy2, overyyy3)
-        # overyyy2 = overwrite_null_freq(overyyy2, overyyy1, overyyy3)
-        # overyyy3 = overwrite_null_freq(overyyy3, overyyy1, overyyy2)
 
         # Adding all frequencies together
         stackedx = np.ma.stack((overxxx1, overxxx2, overxxx3))
@@ -339,6 +335,7 @@ def start(
     # end while
     logging.info(f"Minimum Error after phase filtering: {min_avg_error}")
 
+    logging.info("Searching for correct filter size.")
     k = 0
     min_k = 0
     error = error_tol
@@ -418,7 +415,8 @@ def start(
     print(f"TDI = {tdi}")
 
     max_smear_sample, max_smear_line, max_smear_mag = pixel_smear(
-        sample, line, et, linerate, tdi, image_location, image_id
+        nfftime, sample, line, linerate, tdi,
+        path=(image_location / (image_id + "_smear_py.txt"))
     )
 
     # To do: Remove the py suffix from jitter and smear!
@@ -432,7 +430,7 @@ def start(
 # Maximum Pixel Smear Magnitude {max_smear_mag}
 #
 # Sample                 Line                   ET"""]
-    for s, l, e in zip(sample, line, et):
+    for s, l, e in zip(sample, line, nfftime):
         jitter_text.append(f"""{s}     {l}     {e}""")
 
     logging.info(f"Writing: {jitter_p}")
@@ -476,7 +474,7 @@ def start(
 
     # int numData = sizeof(Data)/sizeof(ArrayXd*);
     write_data_for_plotting(
-        data_p, string_labels, et_shift, sample, line, t1_shift,
+        data_p, string_labels, nfftime - t0, sample, line, t1_shift,
         offx1_filtered, xinterp1, jittercheckx1_shift, offy1_filtered, yinterp1,
         jitterchecky1_shift, t2_shift, offx2_filtered, xinterp2,
         jittercheckx2_shift, offy2_filtered, yinterp2, jitterchecky2_shift,
@@ -487,7 +485,7 @@ def start(
     write_csv(
         image_location / (image_id + "_jitter_plot_py.csv"),
         string_labels,
-        et_shift, sample, line, t1_shift,
+        nfftime - t0, sample, line, t1_shift,
         offx1_filtered, xinterp1, jittercheckx1_shift, offy1_filtered, yinterp1,
         jitterchecky1_shift, t2_shift, offx2_filtered, xinterp2,
         jittercheckx2_shift, offy2_filtered, yinterp2, jitterchecky2_shift,
@@ -505,15 +503,37 @@ def start(
 
 
 def create_matrices(
-    nfft: int, dt: float, time: np.array, tt: abc.Sequence,
-    offx: np.array, offy: np.array, et_shift, t0, duration
+    time: np.array, offx: np.array, offy: np.array,
+    dt: float, duration: float, t0: float,
+    nfft: int, nfftime: np.array, tt: abc.Sequence
 ):
+    """Returns a tuple of numpy arrays.
+
+    :param time: Time values in seconds (numpy array).
+    :param offx: Sample offsets (numpy array).
+    :param offy: Line offsets (numpy array).
+    :param dt: Time difference between the FROM and MATCH times (float).
+    :param duration: The total time duration (float).
+    :param t0: Zero time to start the Fourier Transform steps (float).
+    :param nfft: Number of divisions to use for the Fourier Transform (int).
+    :param nfftime: *nfft* time values starting at *t0* (numpy array).
+    :param tt: Fractional values in [0:1] that correspond to the nfft number
+        (numpy array).
+    :return: There are seven elements in the tuple:
+        0: Interpolation of *offx* at the values of *nfftime*
+        1: Interpolation of *offy* at the values of *nfftime*
+        2: Fourier transform of xinterp * (2 / *nfft*)
+        3: Fourier transform of yinterp * (2 / *nfft*)
+        4: phase difference
+        5: overxx: ?
+        6: overyy: ?
+    """
     t_shift = time - t0
 
     fx = PchipInterpolator(t_shift, offx, extrapolate=False)
     fy = PchipInterpolator(t_shift, offy, extrapolate=False)
-    xinterp = fx(et_shift)
-    yinterp = fy(et_shift)
+    xinterp = fx(nfftime - t0)
+    yinterp = fy(nfftime - t0)
 
     np.nan_to_num(xinterp, copy=False, nan=np.mean(offx))
     np.nan_to_num(yinterp, copy=False, nan=np.mean(offy))
@@ -563,12 +583,12 @@ def create_matrices(
     # ArrayXd & xinterp, ArrayXd & yinterp,
     # ArrayXcd & X, ArrayXcd & Y, MatrixXd & overxx, MatrixXd & overyy
     #
-    return ddt, overxx, overyy, xinterp, yinterp, x, y
+    return xinterp, yinterp, x, y, ddt, overxx, overyy
 
 
 def upper_power_of_two(value) -> int:
     """Returns the value of 2 raised to some power which is the smallest
-     such value that is >= *value*."""
+     such value that is just >= *value*."""
     result = 1
     while result < value:
         result <<= 1
@@ -576,7 +596,12 @@ def upper_power_of_two(value) -> int:
 
 
 def filter_data(nfft: int, c: float, data: np.array) -> np.array:
-    # Apply a Gaussian filter to the data in the frequency domain.
+    """Apply a Gaussian filter to the data in the frequency domain.
+
+    :param nfft: The number of steps in the Fourier Transform (int).
+    :param c: ?
+    :param data: An array of data to be filtered (numpy array).
+    """
 
     if len(data.shape) > 1:
         raise IndexError("The data array can only be 1D.")
@@ -608,12 +633,20 @@ def filter_data(nfft: int, c: float, data: np.array) -> np.array:
     return filtered[front_padding:front_padding + len(data)].real
 
 
-def make_null_problematic_frequencies(
+def mask_frequencies(
     phasetol: float, ddt: np.array, x: np.array, y: np.array
 ):
     """Returns *x* and *y* as numpy masked arrays with 'problematic frequencies'
-    masked.  It is assumed that *ddt* is a 1-D array which is the same
-    size as axis 0 of *x* and *y*."""
+    masked.
+
+    :param phasetol: Phase values from zero to *phasetol* and 2*pi - phasetol
+        will be masked.
+    :param ddt: phase difference
+    :param x: overxx from create_matrices()
+    :param y: overyy from create_matrices()
+
+    It is assumed that *ddt* has the same size as axis 0 of *x* and *y*.
+    """
     if x.shape != y.shape:
         raise ValueError(
             f"The shape of x {x.shape} and y {y.shape} must be the same."
@@ -625,15 +658,13 @@ def make_null_problematic_frequencies(
             f"of the x and y arrays {x.shape}"
         )
 
-    # null the frequencies that cause a problem
+    # mask the frequencies that cause a problem
     a = np.less(np.abs(ddt), phasetol)
     b = np.greater(np.abs(ddt), (2 * math.pi) - phasetol)
     null_positions = np.logical_or(a, b)
 
-    # The assumption is that since ddt was a 1D array that
-    # null_positions will be too, so we must reshape to a 2D
-    # column, and then tile that across, so that each row
-    # of the 2D matrix has the same value for all positions.
+    # We must reshape to a 2D column, and then tile that across, so that each
+    # row of the 2D matrix has the same value for all positions.
     null_2d = np.tile(null_positions.reshape(-1, 1), (1, x.shape[1]))
 
     x_masked = np.ma.array(x, mask=null_2d, fill_value=0)
@@ -642,69 +673,29 @@ def make_null_problematic_frequencies(
     return x_masked, y_masked
 
 
-def overwrite_null_freq(
-    array: np.ma.array, support1: np.ma.array, support2: np.ma.array
-):
-    """Returns a version of *array* with some masked values corrected
-    by the average of *support1* and *support2*.
-
-    For each masked value in *arr1*, an average of the non-null
-    values in *arr2* and *arr3* are substituted.  If both *arr2*
-    and *arr3* are also masked at that location, the mask will remain.
-    """
-    if not (array.shape == support1.shape == support2.shape):
-        raise IndexError(
-            f"The shape of the input array {array.shape}, and the shapes of"
-            f"the support1 {support1.shape} and support2 {support2.shape}"
-            f"must be the same."
-        )
-
-    if array.dtype.kind == "i":
-        overwritten = array.astype(float)
-    else:
-        overwritten = array.copy()
-
-    # Given the size of the arrays, and the small percentage of masked
-    # values, taking the mean of only those values that are needed
-    # speeds this up.
-    stacked = np.ma.stack((support1[array.mask], support2[array.mask]))
-    overwritten[array.mask] = np.ma.mean(stacked, axis=0)
-    return overwritten
-
-
 def parse_file(
     file_path: os.PathLike, window_size: int, window_width: int, whichfrom=True
 ):
-    """Returns a variety of information from the Flat file at *file_path*.
+    """Returns a tuple of information from the Flat file at *file_path*.
 
-    The *line_interval* is divided into the number of lines in the
-    *file_path*'s FROM file to help determine the number of positions
-    to return in the nfft parameter.
+    There are seven elements in the tuple:
+    0: unique time values (numpy array)
+    1: sample offsets for each time (numpy array)
+    2: line offsets for each time (numpy array)
+    3: number of lines listed for the FROM file (int)
+    4: seconds between the times in the FROM and MATCH files (float)
+    5: The TDI for the FROM and MATCH files (int)
+    6: The LineRate from the FROM and MATCH files (float)
 
     *window_size* is the kernel size for median filtering the offsets, should
     be an odd integer.
 
     *window_width* determines the boundaries above and below the filtered
-    average magnitude beyond which to exclude outliers.
+    average beyond which to exclude outliers.
 
     The optional *whichfrom* parameter determines the sense of the offsets.
     The default value of True makes the offsets relative to the From cube,
     and False makes the offsets relative to the Match cube.
-
-    The optional *et* and *et_shift* parameters are witchcraft, and if not
-    defined, will be determined.
-
-    The optional *t0* will be used as the starting time.  If not specified,
-    it will be determined.
-
-    The optional *duration* specifies the length of time from *t0* to the
-    last time value.
-
-    Since this function runs for multiple files, the values of *et*,
-    *et_shift*, *t0*, and *duration* should be the same, so they are
-    typically left unspecified on the first run, and since they are
-    returned by this function, their values should be provided as givens
-    for subsequent runs.
     """
     logging.info(f"Reading: {file_path}")
 
@@ -791,30 +782,32 @@ def parse_file(
 
 
 def pixel_smear(
-    sample: np.array, line: np.array, t: np.array, linerate: float,
-    tdi: int, image_location: os.PathLike, image_id: str
+    t: np.array,
+    sample: np.array,
+    line: np.array,
+    linerate: float,
+    tdi: int,
+    path=None,
+    image_id=None
 ):
-    # Inputs
-    # ArrayXd const& Sample, ArrayXd const& Line, ArrayXd const& T,
-    # double linerate, int TDI, string imageLocation, string imageId,
-    # Outputs
-    # double & maxSmearS, double & maxSmearL, double & maxSmearMag
+    """Returns the smear values from the derived jitter function.
 
-    #  pixelSmear finds max smeared pixel amount in the image from derived
-    #  jitter function.
-    #
-    #  Sample is the sample offsets from the jitter function
-    #  Line is the line offsets from the jitter function
-    #  T is the ephemeris time from the jitter function
-    #  linerate is read from the flat file, equivalent to TDI
-    #
-    #  Pixel smear due to jitter is calculated by interpolating the jitter
-    #  function at intervals equivalent to the linerate.  Then the
-    #  difference is taken over that interval and multiplied by the TDI.
-    #  This provides an estimated minimum for pixel smear. If the motion
-    #  that caused the smear is not captured in the jitter derivation,
-    #  then it cannot be plotted here.
+    Pixel smear due to jitter is calculated by interpolating the jitter
+    function at intervals equivalent to the linerate.  Then the
+    difference is taken over that interval and multiplied by the TDI.
+    This provides an estimated minimum for pixel smear. If the motion
+    that caused the smear is not captured in the jitter derivation,
+    then it cannot be plotted here.
 
+    :param t: Time values (numpy array).
+    :param sample: Pixel offsets in the sample direction (numpy array).
+    :param line: Pixel offsest in the line direction (numpy array).
+    :param linerate: The image line rate (float).
+    :param tdi: The image TDI value (int).
+    :param path: Optional path to write out smear details to (Path).
+    :param image_id: Optional Observation ID (string).
+    :return:
+    """
     # The array T has large values. Use a shifted version of it when
     # interpolating to reduce the effect of those values on numerical
     # accuracy.
@@ -855,21 +848,22 @@ def pixel_smear(
     max_smear_mag = max(mag_smear)
 
     # Make a text file of the smear data
-    smear_p = Path(image_location) / (image_id + "_smear_py.txt")
-    smear_text = [
-        f"""\
-# Smear values are calculated from the derived jitter function for {image_id}.
+    if path is not None:
+        id_str = f" for {image_id}"
+        smear_text = [
+            f"""\
+# Smear values are calculated from the derived jitter function{id_str}.
 # Maximum Cross-track pixel smear {max_smear_s}
 # Maximum Down-track pixel smear {max_smear_l}
 # Maximum Pixel Smear Magnitude {max_smear_mag}
 # Sample                 Line                   EphemerisTime"""
-    ]
+        ]
 
-    for ess, ell, exi in zip(dysdx, dyldx, xi):
-        smear_text.append(f"{ess}     {ell}     {exi}")
+        for ess, ell, exi in zip(dysdx, dyldx, xi):
+            smear_text.append(f"{ess}     {ell}     {exi}")
 
-    logging.info(f"Writing: {smear_p}")
-    smear_p.write_text("\n".join(smear_text))
+        logging.info(f"Writing: {path}")
+        path.write_text("\n".join(smear_text))
 
     # Outputs
     return max_smear_s, max_smear_l, max_smear_mag
@@ -881,55 +875,30 @@ def set_file_path(location: Path, file_path: Path):
     else:
         return location / file_path.name
 
-# def uniform_interp(x, y, xi, extrapval):
-#
-#   I think this is just:
-#       np.interp(xi, x, y, left=extrapval, right=extrapval)
-#
-#     # const ArrayXd & x, const ArrayXd & y, const ArrayXd & xi,
-#     # double extrapval){
-#
-#     # Linear interpolation.
-#     # We assume here that x is increasing and uniformly spaced.
-#
-#     # The value extrapval replaces the values outside of the interval
-#     # spanned by X.
-#
-#     n  = len(x)
-#     ni = len(xi)
-#
-#     if len(x) <= 1:
-#         raise IndexError(
-#             "Expecting at least two points in the input vector for "
-#             "interpolation."
-#         )
-#
-#     for x1, x2 in pairwise(x):
-#         if x2 <= x1:
-#             raise ValueError(
-#             "Expecting an increasing vector in interpolation."
-#             )
-#
-#     for (int s = 0; s < ni; s++){
-#         if ( xi(s) < x(0) || xi(s) > x(n - 1) ){
-#           yi(s) = extrapval;
-#         }else{
-#
-#           int j  = (int)floor((xi(s) - x(0))/dx); if (j  <  0) j  = 0;
-#           int jn = j + 1;                         if (jn >= n) jn = n - 1;
-#
-#           double slope = (y(jn) - y(j))/(x(jn) - x(j));
-#           if ( x(jn) == x(j) ) slope = 0.0;
-#           yi(s) = slope*(xi(s) - x(j)) + y(j);
-#         }
-#
-#   return yi;
+
+def write_csv(path: os.PathLike, labels: list, *cols, fillvalue="nan"):
+    """Identical to write_data_for_plotting(), but writes a CSV file
+    instead of a fixed-width text file.
+    """
+    logging.info(f"Writing: {path}")
+    with open(path, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(labels)
+        for zipped in itertools.zip_longest(*cols, fillvalue=fillvalue):
+            writer.writerow(zipped)
 
 
-def write_data_for_plotting(path: os.PathLike, labels: list, *cols):
-    # Given a collection of arrays of data, print those arrays as
-    # columns in a text file. The columns need not have the same
-    # number of elements.
+def write_data_for_plotting(
+    path: os.PathLike, labels: list, *cols, fillvalue="nan"
+):
+    """Given a collection of arrays of data (*cols*), write those arrays as
+    fixed-width columns (25 characters wide) in a text file at *path*, prefixed
+    by the *labels* in the first row. The columns need not have the same number
+    of elements as each other, and any short columns will be filled with
+    *fillvalue*.
+
+    This is mostly historic to provide a text file that gnuplot can use.
+    """
 
     if len(labels) != len(cols):
         raise IndexError(
@@ -941,28 +910,27 @@ def write_data_for_plotting(path: os.PathLike, labels: list, *cols):
         f.write("".join(map(lambda s: s.ljust(25), labels)) + "\n")
 
         # Print the data columns
-        for zipped in itertools.zip_longest(*cols, fillvalue="nan"):
+        for zipped in itertools.zip_longest(*cols, fillvalue=fillvalue):
             f.write(
                 "".join(map(lambda z: "{:>25.16}".format(z), zipped)) + "\n"
             )
 
         f.write("\n")
-    return
-
-
-def write_csv(path: os.PathLike, labels: list, *cols):
-    logging.info(f"Writing: {path}")
-    with open(path, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(labels)
-        for zipped in itertools.zip_longest(*cols, fillvalue="nan"):
-            writer.writerow(zipped)
 
 
 def write_gnuplot_file(
     gnuplot_path: Path, data_path: Path, img_path: Path,
     file_path1: Path, file_path2: Path, file_path3: Path
 ):
+    """Writes a gnuplot file that will plot the contents of a file
+    written by write_data_for_plotting().
+
+    The file will be written to *gnuplot_path*.  *data_path* should be the
+    file written by write_data_for_plotting().  The *img_path* is the png
+    file that will be created when the file at *gnuplot_path* is run by
+    gnuplot.  *file_path1*, *file_path2*, and *file_path3* are just used
+    to provide titles to the plots.
+    """
     logging.info(f"Writing: {gnuplot_path}")
     gnuplot_path.write_text(
         f"""\
