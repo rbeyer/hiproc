@@ -3,7 +3,7 @@
 Perform the jitter derivation for a HiRISE observation.
 
 Outputs are the jitter in the x (sample) and y (line) directions in
-pixels, realt (ephemeris time at that translation), average error
+pixels, and the time (ephemeris time at that translation), average error
 between the derived jitter function and the original data, linerate
 (line time read from flat files), and TDI. These outputs are
 written to a text file. Another output is the pixel smear, also
@@ -25,7 +25,7 @@ The C++ version of this runs ~5x faster, FYI.
 #   - C++ version written by Oleg Alexandrov based on the above MatLab
 #     program, resolveJitter4HiJACK.m version 1.4
 #
-# Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
+# Copyright 2020-2021, Ross A. Beyer (rbeyer@seti.org)
 #   - Elements of this Python program are are based on the C++ version but
 #     the logic here is rewritten from scratch to emulate functionality.
 #
@@ -58,6 +58,7 @@ import sys
 from collections import abc
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import medfilt
 from scipy.interpolate import PchipInterpolator
@@ -67,6 +68,8 @@ import pvl
 import hiproc.hirise as hirise
 import hiproc.util as util
 from hiproc.FlatFile import FlatFile
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -80,6 +83,22 @@ def main():
                 "data" / "ResolveJitter.conf",
         help="Path to a ResolveJitter.conf file.",
     )
+    parser.add_argument(
+        "-p",
+        "--plot",
+        required=False,
+        action="store_true",
+        help="Displays interactive plot.",
+    )
+    parser.add_argument(
+        "--saveplot",
+        required=False,
+        nargs="?",
+        default=False,
+        const=True,
+        help="Saves plot to a default filename in the output directory."
+             "If a filename is provided it will be used to save the plot.",
+    )
     parser.add_argument('image_location', type=Path)
     parser.add_argument("image_id", type=str)
     parser.add_argument("line_interval", type=float)
@@ -92,7 +111,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.log, args.logfile)
 
     if args.line_interval <= 0:
         raise ValueError("The parameter 'line_interval' must be positive.")
@@ -102,7 +121,8 @@ def main():
         args.file_path2, True if args.which2 != 1 else False,
         args.file_path3, True if args.which3 != 1 else False,
         imgdir=args.image_location,
-        obsid=args.image_id, lineint=args.line_interval, confpath=args.conf
+        obsid=args.image_id, lineint=args.line_interval, confpath=args.conf,
+        plotshow=args.plot, plotsave=args.saveplot
     )
     return
 
@@ -112,7 +132,8 @@ def start(
     file_path2: Path, whichfrom2: bool,
     file_path3: Path, whichfrom3: bool,
     window_size=11, window_width=2,
-    imgdir=None, obsid=None, lineint=None, confpath=None
+    imgdir=None, obsid=None, lineint=None, confpath=None,
+    plotshow=False, plotsave=False
 ):
     if imgdir is None:
         fp1 = file_path1
@@ -159,6 +180,12 @@ def start(
                 f"The provided obsid ({obsid}) does not match"
                 f"the Observation IDs dervied from the images ({oid})."
             )
+
+    if plotsave:
+        try:
+            plotsave = Path(plotsave)
+        except TypeError:
+            plotsave = image_location / (image_id + "_jitter_plot_py.pdf")
 
     t1, offx1, offy1, lines1, dt1, tdi1, linerate1 = parse_file(
         fp1, window_size, window_width, whichfrom1
@@ -224,7 +251,7 @@ def start(
         nfft, nfftime, tt
     )
 
-    logging.info("Searching for correct phasetol")
+    logger.info("Searching for correct phasetol")
     # For the test data, the following while loop will *always* run the full
     # number of repetitions.  If it were guaranteed that there was only
     # one minima in the changing value of *error*, then we could exit
@@ -324,7 +351,7 @@ def start(
         ) / 6.0
 
         error = error_vec.mean()
-        logging.info(f"Error for phasetol {phasetol}: {error}")
+        logger.info(f"Error for phasetol {phasetol}: {error}")
 
         if error < min_avg_error:
             min_avg_error = error
@@ -333,9 +360,9 @@ def start(
             min_jittery = jittery
 
     # end while
-    logging.info(f"Minimum Error after phase filtering: {min_avg_error}")
+    logger.info(f"Minimum Error after phase filtering: {min_avg_error}")
 
-    logging.info("Searching for correct filter size.")
+    logger.info("Searching for correct filter size.")
     k = 0
     min_k = 0
     error = error_tol
@@ -394,7 +421,7 @@ def start(
         )
 
         error = error_vec.mean()
-        logging.info(f"Erorr for omega {omega}: {error}")
+        logger.info(f"Erorr for omega {omega}: {error}")
 
         if error < min_avg_error:
             min_k = k
@@ -433,7 +460,7 @@ def start(
     for s, l, e in zip(sample, line, nfftime):
         jitter_text.append(f"""{s}     {l}     {e}""")
 
-    logging.info(f"Writing: {jitter_p}")
+    logger.info(f"Writing: {jitter_p}")
     jitter_p.write_text("\n".join(jitter_text))
 
     # I think we could re-do this for matplotlib.  Let's defer it for now.
@@ -498,6 +525,20 @@ def start(
     write_gnuplot_file(
         gnuplot_p, data_p, img_file_name, file_path1, file_path2, file_path3
     )
+
+    if plotshow or plotsave:
+        plot(
+            t1_shift, offx1_filtered, offy1_filtered,
+            xinterp1, yinterp1, jittercheckx1_shift, jitterchecky1_shift,
+            file_path1.stem,
+            t2_shift, offx2_filtered, offy2_filtered,
+            xinterp2, yinterp2, jittercheckx2_shift, jitterchecky2_shift,
+            file_path2.stem,
+            t3_shift, offx3_filtered, offy3_filtered,
+            xinterp3, yinterp3, jittercheckx3_shift, jitterchecky3_shift,
+            file_path3.stem,
+            nfftime - t0, sample, line, show=plotshow, save=plotsave
+        )
 
     return
 
@@ -697,7 +738,7 @@ def parse_file(
     The default value of True makes the offsets relative to the From cube,
     and False makes the offsets relative to the Match cube.
     """
-    logging.info(f"Reading: {file_path}")
+    logger.info(f"Reading: {file_path}")
 
     flat = FlatFile(file_path)
 
@@ -862,7 +903,7 @@ def pixel_smear(
         for ess, ell, exi in zip(dysdx, dyldx, xi):
             smear_text.append(f"{ess}     {ell}     {exi}")
 
-        logging.info(f"Writing: {path}")
+        logger.info(f"Writing: {path}")
         path.write_text("\n".join(smear_text))
 
     # Outputs
@@ -876,11 +917,86 @@ def set_file_path(location: Path, file_path: Path):
         return location / file_path.name
 
 
+def plot(
+    t1, x1, y1, xinterp1, yinterp1, jittercheckx1, jitterchecky1, title1,
+    t2, x2, y2, xinterp2, yinterp2, jittercheckx2, jitterchecky2, title2,
+    t3, x3, y3, xinterp3, yinterp3, jittercheckx3, jitterchecky3, title3,
+    et, sample, line, show=True, save=False
+):
+    plt.ioff()
+    fig = plt.figure(constrained_layout=True)
+    gs = fig.add_gridspec(3, 6)
+
+    fig.suptitle("Resolve Jitter Results")
+
+    ax00 = fig.add_subplot(gs[0, 0:2])
+    ax00.set_title(title1)
+    ax00.set_ylabel("Sample Offset")
+
+    ax01 = fig.add_subplot(gs[0, 2:4])
+    ax01.set_title(title2)
+
+    ax02 = fig.add_subplot(gs[0, 4:])
+    ax02.set_title(title3)
+
+    ax10 = fig.add_subplot(gs[1, 0:2])
+    ax10.set_ylabel("Line Offset")
+    ax10.set_xlabel("Seconds")
+    ax11 = fig.add_subplot(gs[1, 2:4])
+    ax11.set_xlabel("Seconds")
+    ax12 = fig.add_subplot(gs[1, 4:])
+    ax12.set_xlabel("Seconds")
+
+    ax20 = fig.add_subplot(gs[2, 0:3])
+    ax20.set_title("Cross-Track Jitter")
+    ax20.set_ylabel("Sample Offset")
+    ax20.set_xlabel("Seconds")
+
+    ax21 = fig.add_subplot(gs[2, 3:])
+    ax21.set_title("Down-Track Jitter")
+    ax21.set_ylabel("Line Offset")
+    ax21.set_xlabel("Seconds")
+
+    ax00.plot(t1, x1, "o", c="red")
+    ax00.plot(et, xinterp1, c="green")
+    ax00.plot(et, jittercheckx1, c="yellow")
+
+    ax01.plot(t2, x2, "o", c="red")
+    ax01.plot(et, xinterp2, c="green")
+    ax01.plot(et, jittercheckx2, c="yellow")
+
+    ax02.plot(t3, x3, "o", c="red")
+    ax02.plot(et, xinterp3, c="green")
+    ax02.plot(et, jittercheckx3, c="yellow")
+
+    ax10.plot(t1, y1, "o", c="red")
+    ax10.plot(et, yinterp1, c="green")
+    ax10.plot(et, jitterchecky1, c="yellow")
+
+    ax11.plot(t2, y2, "o", c="red")
+    ax11.plot(et, yinterp2, c="green")
+    ax11.plot(et, jitterchecky2, c="yellow")
+
+    ax12.plot(t3, y3, "o", c="red")
+    ax12.plot(et, yinterp3, c="green")
+    ax12.plot(et, jitterchecky3, c="yellow")
+
+    ax20.plot(et, sample, c="blue")
+    ax21.plot(et, line, c="blue")
+
+    if save:
+        logger.info(f"Writing: {save}")
+        plt.savefig(save)
+
+    if show:
+        plt.show()
+
+
 def write_csv(path: os.PathLike, labels: list, *cols, fillvalue="nan"):
     """Identical to write_data_for_plotting(), but writes a CSV file
     instead of a fixed-width text file.
     """
-    logging.info(f"Writing: {path}")
+    logger.info(f"Writing: {path}")
     with open(path, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(labels)
@@ -905,7 +1021,7 @@ def write_data_for_plotting(
             "There is a different number of column labels than columns."
         )
 
-    logging.info(f"Writing: {path}")
+    logger.info(f"Writing: {path}")
     with open(path, "w") as f:
         f.write("".join(map(lambda s: s.ljust(25), labels)) + "\n")
 
@@ -931,7 +1047,7 @@ def write_gnuplot_file(
     gnuplot.  *file_path1*, *file_path2*, and *file_path3* are just used
     to provide titles to the plots.
     """
-    logging.info(f"Writing: {gnuplot_path}")
+    logger.info(f"Writing: {gnuplot_path}")
     gnuplot_path.write_text(
         f"""\
 dataFile  = '{data_path}'
