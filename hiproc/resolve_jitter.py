@@ -78,50 +78,133 @@ def main():
     parser.add_argument(
         "-c",
         "--conf",
-        required=False,
         default=Path(__file__).resolve().parent.parent /
                 "data" / "ResolveJitter.conf",
-        help="Path to a ResolveJitter.conf file.",
+        help="Path to a ResolveJitter.conf file, only needed if "
+             "--lineinterval isn't given.",
+    )
+    parser.add_argument(
+        "--lineinterval",
+        type=float,
+        help="The number of lines to use to set the number of Fourier "
+             "transform intervals, defaults to Control_Lines in the "
+             "ResolveJitter.conf file."
+    )
+    parser.add_argument(
+        "--outdir",
+        type=Path,
+        help="Output directory.  Defaults to the directory of the first "
+             "input file."
+    )
+    parser.add_argument(
+        "--outprefix",
+        help="Prefix string for output files.  If not given, will default "
+             "to the Observation ID of the images."
     )
     parser.add_argument(
         "-p",
         "--plot",
-        required=False,
         action="store_true",
         help="Displays interactive plot.",
     )
     parser.add_argument(
         "--saveplot",
-        required=False,
         nargs="?",
         default=False,
         const=True,
-        help="Saves plot to a default filename in the output directory."
+        help="Saves plot to a default filename in the output directory. "
              "If a filename is provided it will be used to save the plot.",
     )
-    parser.add_argument('image_location', type=Path)
-    parser.add_argument("image_id", type=str)
-    parser.add_argument("line_interval", type=float)
-    parser.add_argument("file_path1", type=Path)
-    parser.add_argument("which1", type=int, choices=[-1, 1])
-    parser.add_argument("file_path2", type=Path)
-    parser.add_argument("which2", type=int, choices=[-1, 1])
-    parser.add_argument("file_path3", type=Path)
-    parser.add_argument("which3", type=int, choices=[-1, 1])
+    parser.add_argument(
+        "--whichmatch1",
+        action="store_false",
+        dest="which1",
+        help="If specified, the sense of the offsets for the first "
+             "file will be relative to the MATCH cube, rather than the FROM "
+             "cube."
+    )
+    parser.add_argument(
+        "--whichmatch2",
+        action="store_false",
+        dest="which2",
+        help="If specified, the sense of the offsets for the second "
+             "file will be relative to the MATCH cube, rather than the FROM "
+             "cube."
+    )
+    parser.add_argument(
+        "--whichmatch3",
+        action="store_false",
+        dest="which3",
+        help="If specified, the sense of the offsets for the third "
+             "file will be relative to the MATCH cube, rather than the FROM "
+             "cube."
+    )
+    parser.add_argument(
+        "files",
+        nargs="*",
+        help="Three flat.txt files that are the output of ISIS hijitreg."
+    )
 
     args = parser.parse_args()
 
     util.set_logger(logger, args.log, args.logfile)
 
-    if args.line_interval <= 0:
-        raise ValueError("The parameter 'line_interval' must be positive.")
+    if len(args.files) == 3:
+        # With just three arguments, these are the expected flat files.
+        fp1, fp2, fp3 = map(Path, args.files)
+        which1 = args.which1
+        which2 = args.which2
+        which3 = args.which3
+    elif len(args.files) == 9:
+        # This is the old-style positional calling
+        oldparser = argparse.ArgumentParser()
+        oldparser.add_argument('outdir', type=Path)
+        oldparser.add_argument("outprefix", type=str)
+        oldparser.add_argument("lineinterval", type=float)
+        oldparser.add_argument("file_path1", type=Path)
+        oldparser.add_argument("which1", type=int, choices=[-1, 1])
+        oldparser.add_argument("file_path2", type=Path)
+        oldparser.add_argument("which2", type=int, choices=[-1, 1])
+        oldparser.add_argument("file_path3", type=Path)
+        oldparser.add_argument("which3", type=int, choices=[-1, 1])
+        args = oldparser.parse_args(args.files, namespace=args)
+        fp1 = args.file_path1
+        fp2 = args.file_path2
+        fp3 = args.file_path3
+        which1 = True if args.which1 != 1 else False
+        which2 = True if args.which2 != 1 else False
+        which3 = True if args.which2 != 1 else False
+    else:
+        # This is the wrong number of positional arguments
+        parser.error("Only takes 3 or 9 positional arguments.")
+
+    if args.lineinterval is None:
+        if args.conf is None:
+            raise ValueError(
+                f"--lineinterval was None and so was --conf, so can't look "
+                f"up value for --lineinterval."
+            )
+        else:
+            args.lineinterval = pvl.load(
+                args.conf
+            )["AutoRegistration"]["ControlNet"]["Control_Lines"]
+    elif args.lineinterval <= 0:
+        raise ValueError("--lineinterval must be positive.")
+
+    if args.outdir is None:
+        outdir = fp1.parent
+    else:
+        outdir = args.outdir
+        fp1 = set_file_path(outdir, fp1)
+        fp2 = set_file_path(outdir, fp2)
+        fp3 = set_file_path(outdir, fp3)
 
     start(
-        args.file_path1, True if args.which1 != 1 else False,
-        args.file_path2, True if args.which2 != 1 else False,
-        args.file_path3, True if args.which3 != 1 else False,
-        imgdir=args.image_location,
-        obsid=args.image_id, lineint=args.line_interval, confpath=args.conf,
+        fp1, which1,
+        fp2, which2,
+        fp3, which3,
+        line_interval=args.lineinterval,
+        outdir=outdir, outprefix=args.outprefix,
         plotshow=args.plot, plotsave=args.saveplot
     )
     return
@@ -131,36 +214,14 @@ def start(
     file_path1: Path, whichfrom1: bool,
     file_path2: Path, whichfrom2: bool,
     file_path3: Path, whichfrom3: bool,
+    line_interval: float,
+    outdir: Path, outprefix=None,
     window_size=11, window_width=2,
-    imgdir=None, obsid=None, lineint=None, confpath=None,
     plotshow=False, plotsave=False
 ):
-    if imgdir is None:
-        fp1 = file_path1
-        fp2 = file_path2
-        fp3 = file_path3
-        image_location = fp1.parent
-    else:
-        fp1 = set_file_path(imgdir, file_path1)
-        fp2 = set_file_path(imgdir, file_path2)
-        fp3 = set_file_path(imgdir, file_path3)
-        image_location = imgdir
-
-    if lineint is None:
-        if confpath is None:
-            raise ValueError(
-                f"lineint was None and so was confpath, so can't look up value."
-            )
-        else:
-            line_interval = pvl.load(
-                confpath
-            )["AutoRegistration"]["ControlNet"]["Control_Lines"]
-    else:
-        line_interval = lineint
-
-    oid1 = hirise.get_ObsID_fromfile(fp1)
-    oid2 = hirise.get_ObsID_fromfile(fp2)
-    oid3 = hirise.get_ObsID_fromfile(fp3)
+    oid1 = hirise.get_ObsID_fromfile(file_path1)
+    oid2 = hirise.get_ObsID_fromfile(file_path2)
+    oid3 = hirise.get_ObsID_fromfile(file_path3)
 
     if oid1 == oid2 == oid3:
         oid = oid1
@@ -170,31 +231,23 @@ def start(
             f"paths ({file_path1}, {file_path2}, {file_path3}) do not match."
         )
 
-    if obsid is None:
-        image_id = str(oid)
-    else:
-        if obsid == str(oid):
-            image_id = obsid
-        else:
-            raise ValueError(
-                f"The provided obsid ({obsid}) does not match"
-                f"the Observation IDs dervied from the images ({oid})."
-            )
+    if outprefix is None:
+        outprefix = str(oid)
 
     if plotsave:
         try:
             plotsave = Path(plotsave)
         except TypeError:
-            plotsave = image_location / (image_id + "_jitter_plot_py.pdf")
+            plotsave = outdir / (outprefix + "_jitter_plot_py.pdf")
 
     t1, offx1, offy1, lines1, dt1, tdi1, linerate1 = parse_file(
-        fp1, window_size, window_width, whichfrom1
+        file_path1, window_size, window_width, whichfrom1
     )
     t2, offx2, offy2, lines2, dt2, tdi2, linerate2 = parse_file(
-        fp2, window_size, window_width, whichfrom2
+        file_path2, window_size, window_width, whichfrom2
     )
     t3, offx3, offy3, lines3, dt3, tdi3, linerate3 = parse_file(
-        fp3, window_size, window_width, whichfrom3
+        file_path3, window_size, window_width, whichfrom3
     )
 
     # nfft is the number of "steps" that we will be using for our
@@ -443,14 +496,15 @@ def start(
 
     max_smear_sample, max_smear_line, max_smear_mag = pixel_smear(
         nfftime, sample, line, linerate, tdi,
-        path=(image_location / (image_id + "_smear_py.txt"))
+        path=(outdir / (outprefix + "_smear_py.txt")),
+        image_id=oid
     )
 
     # To do: Remove the py suffix from jitter and smear!
 
     # Make a text file of the jitter data
-    jitter_p = image_location / (image_id + "_jitter_py.txt")
-    jitter_text = [f"""# Using image {image_id} the jitter was found with an
+    jitter_p = outdir / (outprefix+ "_jitter_py.txt")
+    jitter_text = [f"""# Using image {oid} the jitter was found with an
 # Average Error of {min_avg_error}
 # Maximum Cross-track pixel smear {max_smear_sample}
 # Maximum Down-track pixel smear {max_smear_line}
@@ -465,7 +519,7 @@ def start(
 
     # I think we could re-do this for matplotlib.  Let's defer it for now.
     # Writing the data we will plot later in gnuplot
-    data_p = image_location / (image_id + "_jitter_plot_py.txt")
+    data_p = outdir / (outprefix + "_jitter_plot_py.txt")
     t1_shift = t1 - t0
     t2_shift = t2 - t0
     t3_shift = t3 - t0
@@ -510,7 +564,7 @@ def start(
     )
 
     write_csv(
-        image_location / (image_id + "_jitter_plot_py.csv"),
+        outdir / (outprefix + "_jitter_plot_py.csv"),
         string_labels,
         nfftime - t0, sample, line, t1_shift,
         offx1_filtered, xinterp1, jittercheckx1_shift, offy1_filtered, yinterp1,
@@ -520,8 +574,8 @@ def start(
         offy3_filtered, yinterp3, jitterchecky3_shift
     )
 
-    gnuplot_p = image_location / (image_id + "_jitter_plot_py.plt")
-    img_file_name = image_location / (image_id + "_jitter_plot_py.png")
+    gnuplot_p = outdir / (outprefix + "_jitter_plot_py.plt")
+    img_file_name = outdir / (outprefix + "_jitter_plot_py.png")
     write_gnuplot_file(
         gnuplot_p, data_p, img_file_name, file_path1, file_path2, file_path3
     )
