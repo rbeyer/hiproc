@@ -54,7 +54,9 @@ import itertools
 import logging
 import math
 import os
+import subprocess
 import sys
+import traceback
 from collections import abc
 from pathlib import Path
 
@@ -73,39 +75,45 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     parents=[util.parent_parser()])
+    parser = argparse.ArgumentParser(
+        description=__doc__, parents=[util.parent_parser()]
+    )
     parser.add_argument(
         "-c",
         "--conf",
-        default=Path(__file__).resolve().parent.parent /
-                "data" / "ResolveJitter.conf",
+        default=Path(__file__).resolve().parent.parent
+        / "data"
+        / "ResolveJitter.conf",
         help="Path to a ResolveJitter.conf file, only needed if "
-             "--lineinterval isn't given.",
+        "--lineinterval isn't given.",
+    )
+    parser.add_argument(
+        "--csv",
+        action="store_true",
+        help="This program writes out a fixed-width data file with extra "
+        "information for plotting.  This also writes out a "
+        "comma-separated version.",
     )
     parser.add_argument(
         "--lineinterval",
         type=float,
         help="The number of lines to use to set the number of Fourier "
-             "transform intervals, defaults to Control_Lines in the "
-             "ResolveJitter.conf file."
+        "transform intervals, defaults to Control_Lines in the "
+        "ResolveJitter.conf file.",
     )
     parser.add_argument(
         "--outdir",
         type=Path,
         help="Output directory.  Defaults to the directory of the first "
-             "input file."
+        "input file.",
     )
     parser.add_argument(
         "--outprefix",
         help="Prefix string for output files.  If not given, will default "
-             "to the Observation ID of the images."
+        "to the Observation ID of the images.",
     )
     parser.add_argument(
-        "-p",
-        "--plot",
-        action="store_true",
-        help="Displays interactive plot.",
+        "-p", "--plot", action="store_true", help="Displays interactive plot.",
     )
     parser.add_argument(
         "--saveplot",
@@ -113,36 +121,36 @@ def main():
         default=False,
         const=True,
         help="Saves plot to a default filename in the output directory. "
-             "If a filename is provided it will be used to save the plot.",
+        "If a filename is provided it will be used to save the plot.",
     )
     parser.add_argument(
         "--whichmatch1",
         action="store_false",
         dest="which1",
         help="If specified, the sense of the offsets for the first "
-             "file will be relative to the MATCH cube, rather than the FROM "
-             "cube."
+        "file will be relative to the MATCH cube, rather than the FROM "
+        "cube.",
     )
     parser.add_argument(
         "--whichmatch2",
         action="store_false",
         dest="which2",
         help="If specified, the sense of the offsets for the second "
-             "file will be relative to the MATCH cube, rather than the FROM "
-             "cube."
+        "file will be relative to the MATCH cube, rather than the FROM "
+        "cube.",
     )
     parser.add_argument(
         "--whichmatch3",
         action="store_false",
         dest="which3",
         help="If specified, the sense of the offsets for the third "
-             "file will be relative to the MATCH cube, rather than the FROM "
-             "cube."
+        "file will be relative to the MATCH cube, rather than the FROM "
+        "cube.",
     )
     parser.add_argument(
         "files",
         nargs="*",
-        help="Three flat.txt files that are the output of ISIS hijitreg."
+        help="Three flat.txt files that are the output of ISIS hijitreg.",
     )
 
     args = parser.parse_args()
@@ -158,7 +166,7 @@ def main():
     elif len(args.files) == 9:
         # This is the old-style positional calling
         oldparser = argparse.ArgumentParser()
-        oldparser.add_argument('outdir', type=Path)
+        oldparser.add_argument("outdir", type=Path)
         oldparser.add_argument("outprefix", type=str)
         oldparser.add_argument("lineinterval", type=float)
         oldparser.add_argument("file_path1", type=Path)
@@ -185,9 +193,9 @@ def main():
                 f"up value for --lineinterval."
             )
         else:
-            args.lineinterval = pvl.load(
-                args.conf
-            )["AutoRegistration"]["ControlNet"]["Control_Lines"]
+            args.lineinterval = pvl.load(args.conf)["AutoRegistration"][
+                "ControlNet"
+            ]["Control_Lines"]
     elif args.lineinterval <= 0:
         raise ValueError("--lineinterval must be positive.")
 
@@ -199,25 +207,47 @@ def main():
         fp2 = set_file_path(outdir, fp2)
         fp3 = set_file_path(outdir, fp3)
 
-    start(
-        fp1, which1,
-        fp2, which2,
-        fp3, which3,
-        line_interval=args.lineinterval,
-        outdir=outdir, outprefix=args.outprefix,
-        plotshow=args.plot, plotsave=args.saveplot
-    )
+    try:
+        start(
+            fp1,
+            which1,
+            fp2,
+            which2,
+            fp3,
+            which3,
+            line_interval=args.lineinterval,
+            outdir=outdir,
+            outprefix=args.outprefix,
+            plotshow=args.plot,
+            plotsave=args.saveplot,
+            writecsv=args.csv,
+        )
+    except subprocess.CalledProcessError as err:
+        print("Had an ISIS error:", file=sys.stderr)
+        print(" ".join(err.cmd), file=sys.stderr)
+        print(err.stdout, file=sys.stderr)
+        print(err.stderr, file=sys.stderr)
+        sys.exit(1)
+    except Exception as err:
+        traceback.print_exc(file=sys.stderr)
+        print(err, file=sys.stderr)
+        sys.exit(1)
     return
 
 
 def start(
-    file_path1: Path, whichfrom1: bool,
-    file_path2: Path, whichfrom2: bool,
-    file_path3: Path, whichfrom3: bool,
+    file_path1: Path,
+    whichfrom1: bool,
+    file_path2: Path,
+    whichfrom2: bool,
+    file_path3: Path,
+    whichfrom3: bool,
     line_interval: float,
-    outdir: Path, outprefix=None,
-    window_size=11, window_width=2,
-    plotshow=False, plotsave=False
+    outdir: Path,
+    outprefix=None,
+    plotshow=False,
+    plotsave=False,
+    writecsv=False,
 ):
     oid1 = hirise.get_ObsID_fromfile(file_path1)
     oid2 = hirise.get_ObsID_fromfile(file_path2)
@@ -231,8 +261,163 @@ def start(
             f"paths ({file_path1}, {file_path2}, {file_path3}) do not match."
         )
 
+    (
+        nfftime,
+        sample,
+        line,
+        linerate,
+        tdi,
+        t0,
+        t1,
+        t2,
+        t3,
+        offx_filtered,
+        offy_filtered,
+        xinterp,
+        yinterp,
+        min_avg_error,
+        min_k,
+        jittercheckx,
+        jitterchecky,
+        rh0,
+    ) = resolve_jitter(
+        file_path1,
+        whichfrom1,
+        file_path2,
+        whichfrom2,
+        file_path3,
+        whichfrom3,
+        line_interval,
+    )
+
+    # The outputs
+    print(f"Average error is {min_avg_error} at min index {min_k}")
+    print(f"linerate is {linerate}")
+    print(f"TDI = {tdi}")
+
+    # To do: Remove the py suffix from output filenames.
+
     if outprefix is None:
         outprefix = str(oid)
+
+    # Characterize the smear:
+    (
+        max_smear_sample,
+        max_smear_line,
+        max_smear_mag,
+        dysdx,
+        dyldx,
+        xi,
+    ) = pixel_smear(nfftime, sample, line, linerate, tdi)
+
+    write_smear_data(
+        (outdir / (outprefix + "_smear_py.txt")),
+        max_smear_sample,
+        max_smear_line,
+        max_smear_mag,
+        dysdx,
+        dyldx,
+        xi,
+        oid,
+    )
+
+    # Make a text file of the jitter data
+    jitter_p = outdir / (outprefix + "_jitter_py.txt")
+    jitter_text = [
+        f"""# Using image {oid} the jitter was found with an
+Average Error of {min_avg_error}
+Maximum Cross-track pixel smear {max_smear_sample}
+Maximum Down-track pixel smear {max_smear_line}
+Maximum Pixel Smear Magnitude {max_smear_mag}
+
+Sample                 Line                   ET"""
+    ]
+    for s, l, e in zip(sample, line, nfftime):
+        jitter_text.append(f"""{s}     {l}     {e}""")
+
+    logger.info(f"Writing: {jitter_p}")
+    jitter_p.write_text("\n".join(jitter_text))
+
+    # Writing the data we will plot later in gnuplot
+    data_p = outdir / (outprefix + "_jitter_plot_py.txt")
+    t_shift = [t1 - t0, t2 - t0, t3 - t0]
+    jittercheckx_shift = [
+        jittercheckx[0] + rh0["x1"],
+        jittercheckx[1] + rh0["x1"],
+        jittercheckx[2] + rh0["x1"],
+    ]
+    jitterchecky_shift = [
+        jitterchecky[0] + rh0["y1"],
+        jitterchecky[1] + rh0["y2"],
+        jitterchecky[2] + rh0["y3"],
+    ]
+
+    # Note the comment before the first label
+    # This ordering is historic to the original file output.
+    string_labels = [
+        "# ET_shift",
+        "Sample",
+        "Line",
+        "t1_shift",
+        "offx1",
+        "xinterp1",
+        "jittercheckx1_shift",
+        "offy1",
+        "yinterp1",
+        "jitterchecky1_shift",
+        "t2_shift",
+        "offx2",
+        "xinterp2",
+        "jittercheckx2_shift",
+        "offy2",
+        "yinterp2",
+        "jitterchecky2_shift",
+        "t3_shift",
+        "offx3",
+        "xinterp3",
+        "jittercheckx3_shift",
+        "offy3",
+        "yinterp3",
+        "jitterchecky3_shift",
+    ]
+    data_to_plot = (
+        string_labels,
+        nfftime - t0,
+        sample,
+        line,
+        t_shift[0],
+        offx_filtered[0],
+        xinterp[0],
+        jittercheckx_shift[0],
+        offy_filtered[0],
+        yinterp[0],
+        jitterchecky_shift[0],
+        t_shift[1],
+        offx_filtered[1],
+        xinterp[1],
+        jittercheckx_shift[1],
+        offy_filtered[1],
+        yinterp[1],
+        jitterchecky_shift[1],
+        t_shift[2],
+        offx_filtered[2],
+        xinterp[2],
+        jittercheckx_shift[2],
+        offy_filtered[2],
+        yinterp[2],
+        jitterchecky_shift[2],
+    )
+
+    write_data_for_plotting(data_p, *data_to_plot)
+
+    if writecsv:
+        write_csv(outdir / (outprefix + "_jitter_plot_py.csv"), *data_to_plot)
+
+    gnuplot_p = outdir / (outprefix + "_jitter_plot_py.plt")
+    img_file_name = outdir / (outprefix + "_jitter_plot_py.png")
+    write_gnuplot_file(
+        gnuplot_p, data_p, img_file_name, file_path1, file_path2, file_path3
+    )
 
     if plotsave:
         try:
@@ -240,6 +425,37 @@ def start(
         except TypeError:
             plotsave = outdir / (outprefix + "_jitter_plot_py.pdf")
 
+    if plotshow or plotsave:
+        plot(
+            t_shift,
+            offx_filtered,
+            offy_filtered,
+            xinterp,
+            yinterp,
+            jittercheckx_shift,
+            jitterchecky_shift,
+            [file_path1.stem, file_path2.stem, file_path3.stem],
+            nfftime - t0,
+            sample,
+            line,
+            show=plotshow,
+            save=plotsave,
+        )
+
+    return
+
+
+def resolve_jitter(
+    file_path1: Path,
+    whichfrom1: bool,
+    file_path2: Path,
+    whichfrom2: bool,
+    file_path3: Path,
+    whichfrom3: bool,
+    line_interval: float,
+    window_size=11,
+    window_width=2,
+):
     t1, offx1, offy1, lines1, dt1, tdi1, linerate1 = parse_file(
         file_path1, window_size, window_width, whichfrom1
     )
@@ -271,12 +487,22 @@ def start(
     else:
         raise ValueError("The values of linerate are not identical.")
 
-    offx1_filtered = filter_data(nfft, 2 / nfft, offx1)
-    offy1_filtered = filter_data(nfft, 2 / nfft, offy1)
-    offx2_filtered = filter_data(nfft, 2 / nfft, offx2)
-    offy2_filtered = filter_data(nfft, 2 / nfft, offy2)
-    offx3_filtered = filter_data(nfft, 2 / nfft, offx3)
-    offy3_filtered = filter_data(nfft, 2 / nfft, offy3)
+    offx_filtered = list(
+        map(
+            filter_data,
+            itertools.repeat(nfft),
+            itertools.repeat(2 / nfft),
+            (offx1, offx2, offx3),
+        )
+    )
+    offy_filtered = list(
+        map(
+            filter_data,
+            itertools.repeat(nfft),
+            itertools.repeat(2 / nfft),
+            (offy1, offy2, offy3),
+        )
+    )
 
     # The values in tt are the fractional points in [0:1]
     # that correspond to the nfft number.
@@ -288,20 +514,40 @@ def start(
     t0 = t1[0]
     duration = t1[-1] - t0
 
-    xinterp1, yinterp1, x1, y1, ddt1, overxx1, overyy1 = create_matrices(
-        t1, offx1_filtered, offy1_filtered,
-        dt1, duration, t0,
-        nfft, nfftime, tt
+    xinterp = [None] * 3
+    yinterp = [None] * 3
+    xinterp[0], yinterp[0], x1, y1, ddt1, overxx1, overyy1 = create_matrices(
+        t1,
+        offx_filtered[0],
+        offy_filtered[0],
+        dt1,
+        duration,
+        t0,
+        nfft,
+        nfftime,
+        tt,
     )
-    xinterp2, yinterp2, x2, y2, ddt2, overxx2, overyy2 = create_matrices(
-        t2, offx2_filtered, offy2_filtered,
-        dt2, duration, t0,
-        nfft, nfftime, tt
+    xinterp[1], yinterp[1], x2, y2, ddt2, overxx2, overyy2 = create_matrices(
+        t2,
+        offx_filtered[1],
+        offy_filtered[1],
+        dt2,
+        duration,
+        t0,
+        nfft,
+        nfftime,
+        tt,
     )
-    xinterp3, yinterp3, x3, y3, ddt3, overxx3, overyy3 = create_matrices(
-        t3, offx3_filtered, offy3_filtered,
-        dt3, duration, t0,
-        nfft, nfftime, tt
+    xinterp[2], yinterp[2], x3, y3, ddt3, overxx3, overyy3 = create_matrices(
+        t3,
+        offx_filtered[2],
+        offy_filtered[2],
+        dt3,
+        duration,
+        t0,
+        nfft,
+        nfftime,
+        tt,
     )
 
     logger.info("Searching for correct phasetol")
@@ -348,15 +594,9 @@ def start(
         phasetol = k * tolcoef
 
         # null the frequencies that cause a problem (really zero them out)
-        overxxx1, overyyy1 = mask_frequencies(
-            phasetol, ddt1, overxx1, overyy1
-        )
-        overxxx2, overyyy2 = mask_frequencies(
-            phasetol, ddt2, overxx2, overyy2
-        )
-        overxxx3, overyyy3 = mask_frequencies(
-            phasetol, ddt3, overxx3, overyy3
-        )
+        overxxx1, overyyy1 = mask_frequencies(phasetol, ddt1, overxx1, overyy1)
+        overxxx2, overyyy2 = mask_frequencies(phasetol, ddt2, overxx2, overyy2)
+        overxxx3, overyyy3 = mask_frequencies(phasetol, ddt3, overxx3, overyy3)
 
         # Adding all frequencies together
         stackedx = np.ma.stack((overxxx1, overxxx2, overxxx3))
@@ -373,34 +613,40 @@ def start(
         jittery = overy - overy[0]
 
         # checking
-        jittercheckx1 = np.interp(
-            tt + dt1/duration, tt, jitterx, left=0, right=0
-        ) - jitterx
-        jitterchecky1 = np.interp(
-            tt + dt1/duration, tt, jittery, left=0, right=0
-        ) - jittery
+        jittercheckx1 = (
+            np.interp(tt + dt1 / duration, tt, jitterx, left=0, right=0)
+            - jitterx
+        )
+        jitterchecky1 = (
+            np.interp(tt + dt1 / duration, tt, jittery, left=0, right=0)
+            - jittery
+        )
 
-        jittercheckx2 = np.interp(
-            tt + dt2/duration, tt, jitterx, left=0, right=0
-        ) - jitterx
-        jitterchecky2 = np.interp(
-            tt + dt2/duration, tt, jittery, left=0, right=0
-        ) - jittery
+        jittercheckx2 = (
+            np.interp(tt + dt2 / duration, tt, jitterx, left=0, right=0)
+            - jitterx
+        )
+        jitterchecky2 = (
+            np.interp(tt + dt2 / duration, tt, jittery, left=0, right=0)
+            - jittery
+        )
 
-        jittercheckx3 = np.interp(
-            tt + dt3/duration, tt, jitterx, left=0, right=0
-        ) - jitterx
-        jitterchecky3 = np.interp(
-            tt + dt3/duration, tt, jittery, left=0, right=0
-        ) - jittery
+        jittercheckx3 = (
+            np.interp(tt + dt3 / duration, tt, jitterx, left=0, right=0)
+            - jitterx
+        )
+        jitterchecky3 = (
+            np.interp(tt + dt3 / duration, tt, jittery, left=0, right=0)
+            - jittery
+        )
 
         error_vec = (
-            np.abs(xinterp1 - (jittercheckx1 + rh0["x1"])) +
-            np.abs(xinterp2 - (jittercheckx2 + rh0["x2"])) +
-            np.abs(xinterp3 - (jittercheckx3 + rh0["x3"])) +
-            np.abs(yinterp1 - (jitterchecky1 + rh0["y1"])) +
-            np.abs(yinterp2 - (jitterchecky2 + rh0["y2"])) +
-            np.abs(yinterp3 - (jitterchecky3 + rh0["y3"]))
+            np.abs(xinterp[0] - (jittercheckx1 + rh0["x1"]))
+            + np.abs(xinterp[1] - (jittercheckx2 + rh0["x2"]))
+            + np.abs(xinterp[2] - (jittercheckx3 + rh0["x3"]))
+            + np.abs(yinterp[0] - (jitterchecky1 + rh0["y1"]))
+            + np.abs(yinterp[1] - (jitterchecky2 + rh0["y2"]))
+            + np.abs(yinterp[2] - (jitterchecky3 + rh0["y3"]))
         ) / 6.0
 
         error = error_vec.mean()
@@ -434,7 +680,7 @@ def start(
         k += 1
 
         omega = k - 1
-        c = omega/(2.0 * nfft)
+        c = omega / (2.0 * nfft)
 
         jitterxx = filter_data(nfft, c, min_jitterx)
         jitteryy = filter_data(nfft, c, min_jittery)
@@ -443,34 +689,44 @@ def start(
         jitteryy = jitteryy - jitteryy[0]
 
         # checking
-        jittercheckx1 = np.interp(
-            tt + dt1/duration, tt, jitterxx, left=0, right=0
-        ) - jitterxx
-        jitterchecky1 = np.interp(
-            tt + dt1/duration, tt, jitteryy, left=0, right=0
-        ) - jitteryy
+        jittercheckx1 = (
+            np.interp(tt + dt1 / duration, tt, jitterxx, left=0, right=0)
+            - jitterxx
+        )
+        jitterchecky1 = (
+            np.interp(tt + dt1 / duration, tt, jitteryy, left=0, right=0)
+            - jitteryy
+        )
 
-        jittercheckx2 = np.interp(
-            tt + dt2/duration, tt, jitterxx, left=0, right=0
-        ) - jitterxx
-        jitterchecky2 = np.interp(
-            tt + dt2/duration, tt, jitteryy, left=0, right=0
-        ) - jitteryy
+        jittercheckx2 = (
+            np.interp(tt + dt2 / duration, tt, jitterxx, left=0, right=0)
+            - jitterxx
+        )
+        jitterchecky2 = (
+            np.interp(tt + dt2 / duration, tt, jitteryy, left=0, right=0)
+            - jitteryy
+        )
 
-        jittercheckx3 = np.interp(
-            tt + dt3/duration, tt, jitterxx, left=0, right=0
-        ) - jitterxx
-        jitterchecky3 = np.interp(
-            tt + dt3/duration, tt, jitteryy, left=0, right=0
-        ) - jitteryy
+        jittercheckx3 = (
+            np.interp(tt + dt3 / duration, tt, jitterxx, left=0, right=0)
+            - jitterxx
+        )
+        jitterchecky3 = (
+            np.interp(tt + dt3 / duration, tt, jitteryy, left=0, right=0)
+            - jitteryy
+        )
 
-        error_vec = 1.0/6.0*(
-            np.abs(xinterp1 - (jittercheckx1 + rh0["x1"])) +
-            np.abs(xinterp2 - (jittercheckx2 + rh0["x2"])) +
-            np.abs(xinterp3 - (jittercheckx3 + rh0["x3"])) +
-            np.abs(yinterp1 - (jitterchecky1 + rh0["y1"])) +
-            np.abs(yinterp2 - (jitterchecky2 + rh0["y2"])) +
-            np.abs(yinterp3 - (jitterchecky3 + rh0["y3"]))
+        error_vec = (
+            1.0
+            / 6.0
+            * (
+                np.abs(xinterp[0] - (jittercheckx1 + rh0["x1"]))
+                + np.abs(xinterp[1] - (jittercheckx2 + rh0["x2"]))
+                + np.abs(xinterp[2] - (jittercheckx3 + rh0["x3"]))
+                + np.abs(yinterp[0] - (jitterchecky1 + rh0["y1"]))
+                + np.abs(yinterp[1] - (jitterchecky2 + rh0["y2"]))
+                + np.abs(yinterp[2] - (jitterchecky3 + rh0["y3"]))
+            )
         )
 
         error = error_vec.mean()
@@ -489,118 +745,38 @@ def start(
             min_jitter_check_y3 = jitterchecky3
     # end while
 
-    # The outputs
-    print(f" Average error is {min_avg_error} at min index {min_k}")
-    print(f"linerate is {linerate}")
-    print(f"TDI = {tdi}")
-
-    max_smear_sample, max_smear_line, max_smear_mag = pixel_smear(
-        nfftime, sample, line, linerate, tdi,
-        path=(outdir / (outprefix + "_smear_py.txt")),
-        image_id=oid
+    return (
+        nfftime,
+        sample,
+        line,
+        linerate,
+        tdi,
+        t0,
+        t1,
+        t2,
+        t3,
+        offx_filtered,
+        offy_filtered,
+        xinterp,
+        yinterp,
+        min_avg_error,
+        min_k,
+        [min_jitter_check_x1, min_jitter_check_x2, min_jitter_check_x3],
+        [min_jitter_check_y1, min_jitter_check_y2, min_jitter_check_y3],
+        rh0,
     )
-
-    # To do: Remove the py suffix from jitter and smear!
-
-    # Make a text file of the jitter data
-    jitter_p = outdir / (outprefix+ "_jitter_py.txt")
-    jitter_text = [f"""# Using image {oid} the jitter was found with an
-# Average Error of {min_avg_error}
-# Maximum Cross-track pixel smear {max_smear_sample}
-# Maximum Down-track pixel smear {max_smear_line}
-# Maximum Pixel Smear Magnitude {max_smear_mag}
-#
-# Sample                 Line                   ET"""]
-    for s, l, e in zip(sample, line, nfftime):
-        jitter_text.append(f"""{s}     {l}     {e}""")
-
-    logger.info(f"Writing: {jitter_p}")
-    jitter_p.write_text("\n".join(jitter_text))
-
-    # I think we could re-do this for matplotlib.  Let's defer it for now.
-    # Writing the data we will plot later in gnuplot
-    data_p = outdir / (outprefix + "_jitter_plot_py.txt")
-    t1_shift = t1 - t0
-    t2_shift = t2 - t0
-    t3_shift = t3 - t0
-    jittercheckx1_shift = min_jitter_check_x1 + rh0["x1"]
-    jitterchecky1_shift = min_jitter_check_y1 + rh0["y1"]
-    jittercheckx2_shift = min_jitter_check_x2 + rh0["x2"]
-    jitterchecky2_shift = min_jitter_check_y2 + rh0["y2"]
-    jittercheckx3_shift = min_jitter_check_x3 + rh0["x3"]
-    jitterchecky3_shift = min_jitter_check_y3 + rh0["y3"]
-    # ArrayXd* Data[] =
-    #   {&ET_shift, &Sample, &Line,
-    #    &t1_shift,
-    #    &offx1, &xinterp1, &jittercheckx1_shift,
-    #    &offy1, &yinterp1, &jitterchecky1_shift,
-    #    &t2_shift,
-    #    &offx2, &xinterp2, &jittercheckx2_shift,
-    #    &offy2, &yinterp2, &jitterchecky2_shift,
-    #    &t3_shift,
-    #    &offx3, &xinterp3, &jittercheckx3_shift,
-    #    &offy3, &yinterp3, &jitterchecky3_shift
-    #   };
-
-    # Note the comment before the first label
-    string_labels = [
-        "# ET_shift", "Sample", "Line",
-        "t1_shift", "offx1", "xinterp1", "jittercheckx1_shift",
-        "offy1", "yinterp1", "jitterchecky1_shift",
-        "t2_shift", "offx2", "xinterp2", "jittercheckx2_shift",
-        "offy2", "yinterp2", "jitterchecky2_shift",
-        "t3_shift", "offx3", "xinterp3", "jittercheckx3_shift",
-        "offy3", "yinterp3", "jitterchecky3_shift"
-    ]
-
-    # int numData = sizeof(Data)/sizeof(ArrayXd*);
-    write_data_for_plotting(
-        data_p, string_labels, nfftime - t0, sample, line, t1_shift,
-        offx1_filtered, xinterp1, jittercheckx1_shift, offy1_filtered, yinterp1,
-        jitterchecky1_shift, t2_shift, offx2_filtered, xinterp2,
-        jittercheckx2_shift, offy2_filtered, yinterp2, jitterchecky2_shift,
-        t3_shift, offx3_filtered, xinterp3,
-        jittercheckx3_shift, offy3_filtered, yinterp3, jitterchecky3_shift
-    )
-
-    write_csv(
-        outdir / (outprefix + "_jitter_plot_py.csv"),
-        string_labels,
-        nfftime - t0, sample, line, t1_shift,
-        offx1_filtered, xinterp1, jittercheckx1_shift, offy1_filtered, yinterp1,
-        jitterchecky1_shift, t2_shift, offx2_filtered, xinterp2,
-        jittercheckx2_shift, offy2_filtered, yinterp2, jitterchecky2_shift,
-        t3_shift, offx3_filtered, xinterp3, jittercheckx3_shift,
-        offy3_filtered, yinterp3, jitterchecky3_shift
-    )
-
-    gnuplot_p = outdir / (outprefix + "_jitter_plot_py.plt")
-    img_file_name = outdir / (outprefix + "_jitter_plot_py.png")
-    write_gnuplot_file(
-        gnuplot_p, data_p, img_file_name, file_path1, file_path2, file_path3
-    )
-
-    if plotshow or plotsave:
-        plot(
-            t1_shift, offx1_filtered, offy1_filtered,
-            xinterp1, yinterp1, jittercheckx1_shift, jitterchecky1_shift,
-            file_path1.stem,
-            t2_shift, offx2_filtered, offy2_filtered,
-            xinterp2, yinterp2, jittercheckx2_shift, jitterchecky2_shift,
-            file_path2.stem,
-            t3_shift, offx3_filtered, offy3_filtered,
-            xinterp3, yinterp3, jittercheckx3_shift, jitterchecky3_shift,
-            file_path3.stem,
-            nfftime - t0, sample, line, show=plotshow, save=plotsave
-        )
-
-    return
 
 
 def create_matrices(
-    time: np.array, offx: np.array, offy: np.array,
-    dt: float, duration: float, t0: float,
-    nfft: int, nfftime: np.array, tt: abc.Sequence
+    time: np.array,
+    offx: np.array,
+    offy: np.array,
+    dt: float,
+    duration: float,
+    t0: float,
+    nfft: int,
+    nfftime: np.array,
+    tt: abc.Sequence,
 ):
     """Returns a tuple of numpy arrays.
 
@@ -641,10 +817,10 @@ def create_matrices(
     y = 2 * np.fft.fft(yinterp) / nfft
 
     # separating sines and cosines
-    xa = x[:int(nfft / 2)].real
-    xb = -1 * x[:int(nfft / 2)].imag
-    ya = y[:int(nfft / 2)].real
-    yb = -1 * y[:int(nfft / 2)].imag
+    xa = x[: int(nfft / 2)].real
+    xb = -1 * x[: int(nfft / 2)].imag
+    ya = y[: int(nfft / 2)].real
+    yb = -1 * y[: int(nfft / 2)].imag
 
     # calculates the phase difference
     twopi = math.pi * 2
@@ -653,8 +829,16 @@ def create_matrices(
 
     # the coeficients for the frequencies
     with np.errstate(divide="ignore"):
-        aaax = -0.5 * (-1 * xa * np.cos(ddt) + np.sin(ddt) * xb - xa) / np.sin(ddt)
-        aaay = -0.5 * (-1 * ya * np.cos(ddt) + np.sin(ddt) * yb - ya) / np.sin(ddt)
+        aaax = (
+            -0.5
+            * (-1 * xa * np.cos(ddt) + np.sin(ddt) * xb - xa)
+            / np.sin(ddt)
+        )
+        aaay = (
+            -0.5
+            * (-1 * ya * np.cos(ddt) + np.sin(ddt) * yb - ya)
+            / np.sin(ddt)
+        )
 
     with np.errstate(invalid="ignore"):
         bbbx = -0.5 * (xb * np.cos(ddt) + np.sin(ddt) * xa + xb) / np.sin(ddt)
@@ -702,15 +886,17 @@ def filter_data(nfft: int, c: float, data: np.array) -> np.array:
         raise IndexError("The data array can only be 1D.")
 
     # Use padding so the data is not distorted.
-    front_padding = math.floor(nfft - len(data)/ 2)
-    back_padding = math.ceil(nfft - len(data)/ 2)
+    front_padding = math.floor(nfft - len(data) / 2)
+    back_padding = math.ceil(nfft - len(data) / 2)
 
     # Apply the padding
-    padded = np.concatenate((
-        np.array([data[0]] * front_padding),
-        data,
-        np.array([data[-1]] * back_padding)
-    ))
+    padded = np.concatenate(
+        (
+            np.array([data[0]] * front_padding),
+            data,
+            np.array([data[-1]] * back_padding),
+        )
+    )
 
     freq = np.fft.fft(padded)
 
@@ -719,18 +905,16 @@ def filter_data(nfft: int, c: float, data: np.array) -> np.array:
         (np.linspace(0, nfft - 1, nfft), np.linspace(-1 * nfft, -1, nfft))
     )
 
-    exponential = np.exp(-1 * c**2 * exp_vec**2)
+    exponential = np.exp(-1 * c ** 2 * exp_vec ** 2)
 
     # The ifft of the product
     filtered = np.fft.ifft(freq * exponential)
 
     # Remove the padding and take the real part
-    return filtered[front_padding:front_padding + len(data)].real
+    return filtered[front_padding : front_padding + len(data)].real
 
 
-def mask_frequencies(
-    phasetol: float, ddt: np.array, x: np.array, y: np.array
-):
+def mask_frequencies(phasetol: float, ddt: np.array, x: np.array, y: np.array):
     """Returns *x* and *y* as numpy masked arrays with 'problematic frequencies'
     masked.
 
@@ -839,7 +1023,7 @@ def parse_file(
     offx_arr = np.array(offset_x)
     offy_arr = np.array(offset_y)
 
-    magnitude = np.sqrt(offx_arr**2 + offy_arr**2)
+    magnitude = np.sqrt(offx_arr ** 2 + offy_arr ** 2)
     avemag = medfilt(magnitude, window_size)
 
     # Throw out the out-of-range values:
@@ -877,13 +1061,7 @@ def parse_file(
 
 
 def pixel_smear(
-    t: np.array,
-    sample: np.array,
-    line: np.array,
-    linerate: float,
-    tdi: int,
-    path=None,
-    image_id=None
+    t: np.array, sample: np.array, line: np.array, linerate: float, tdi: int,
 ):
     """Returns the smear values from the derived jitter function.
 
@@ -909,8 +1087,8 @@ def pixel_smear(
     shifted_t = t - t[0]
 
     # xi = T(1):linerate:T(end);
-    n = math.floor((shifted_t[-1] - shifted_t[0])/linerate) + 1
-    xi = np.linspace(0, n-1, n) * linerate + shifted_t[0]
+    n = math.floor((shifted_t[-1] - shifted_t[0]) / linerate) + 1
+    xi = np.linspace(0, n - 1, n) * linerate + shifted_t[0]
 
     # Interpolate the jitter function at intervals equivalent to the linerate
     f_samp = PchipInterpolator(shifted_t, sample, extrapolate=False)
@@ -931,7 +1109,7 @@ def pixel_smear(
     dyldx = np.diff(yil) * tdi
 
     # Calculate the magnitude of the smear
-    mag_smear = np.sqrt(dysdx**2 + dyldx**2)
+    mag_smear = np.sqrt(dysdx ** 2 + dyldx ** 2)
 
     # Find maxSmearS, the largest element by magnitude in dysdx
     max_smear_s = max(dysdx)
@@ -942,26 +1120,8 @@ def pixel_smear(
     # Find maxSmearMag, the largest element by magnitude in magSmear
     max_smear_mag = max(mag_smear)
 
-    # Make a text file of the smear data
-    if path is not None:
-        id_str = f" for {image_id}"
-        smear_text = [
-            f"""\
-# Smear values are calculated from the derived jitter function{id_str}.
-# Maximum Cross-track pixel smear {max_smear_s}
-# Maximum Down-track pixel smear {max_smear_l}
-# Maximum Pixel Smear Magnitude {max_smear_mag}
-# Sample                 Line                   EphemerisTime"""
-        ]
-
-        for ess, ell, exi in zip(dysdx, dyldx, xi):
-            smear_text.append(f"{ess}     {ell}     {exi}")
-
-        logger.info(f"Writing: {path}")
-        path.write_text("\n".join(smear_text))
-
     # Outputs
-    return max_smear_s, max_smear_l, max_smear_mag
+    return max_smear_s, max_smear_l, max_smear_mag, dysdx, dyldx, xi
 
 
 def set_file_path(location: Path, file_path: Path):
@@ -972,10 +1132,19 @@ def set_file_path(location: Path, file_path: Path):
 
 
 def plot(
-    t1, x1, y1, xinterp1, yinterp1, jittercheckx1, jitterchecky1, title1,
-    t2, x2, y2, xinterp2, yinterp2, jittercheckx2, jitterchecky2, title2,
-    t3, x3, y3, xinterp3, yinterp3, jittercheckx3, jitterchecky3, title3,
-    et, sample, line, show=True, save=False
+    t,
+    x,
+    y,
+    xinterp,
+    yinterp,
+    jittercheckx,
+    jitterchecky,
+    title,
+    et,
+    sample,
+    line,
+    show=True,
+    save=False,
 ):
     plt.ioff()
     fig = plt.figure(constrained_layout=True)
@@ -984,14 +1153,14 @@ def plot(
     fig.suptitle("Resolve Jitter Results")
 
     ax00 = fig.add_subplot(gs[0, 0:2])
-    ax00.set_title(title1)
+    ax00.set_title(title[0])
     ax00.set_ylabel("Sample Offset")
 
     ax01 = fig.add_subplot(gs[0, 2:4])
-    ax01.set_title(title2)
+    ax01.set_title(title[1])
 
     ax02 = fig.add_subplot(gs[0, 4:])
-    ax02.set_title(title3)
+    ax02.set_title(title[2])
 
     ax10 = fig.add_subplot(gs[1, 0:2])
     ax10.set_ylabel("Line Offset")
@@ -1011,29 +1180,29 @@ def plot(
     ax21.set_ylabel("Line Offset")
     ax21.set_xlabel("Seconds")
 
-    ax00.plot(t1, x1, "o", c="red")
-    ax00.plot(et, xinterp1, c="green")
-    ax00.plot(et, jittercheckx1, c="yellow")
+    ax00.plot(t[0], x[0], "o", c="red")
+    ax00.plot(et, xinterp[0], c="green")
+    ax00.plot(et, jittercheckx[0], c="yellow")
 
-    ax01.plot(t2, x2, "o", c="red")
-    ax01.plot(et, xinterp2, c="green")
-    ax01.plot(et, jittercheckx2, c="yellow")
+    ax01.plot(t[1], x[1], "o", c="red")
+    ax01.plot(et, xinterp[1], c="green")
+    ax01.plot(et, jittercheckx[1], c="yellow")
 
-    ax02.plot(t3, x3, "o", c="red")
-    ax02.plot(et, xinterp3, c="green")
-    ax02.plot(et, jittercheckx3, c="yellow")
+    ax02.plot(t[2], x[2], "o", c="red")
+    ax02.plot(et, xinterp[2], c="green")
+    ax02.plot(et, jittercheckx[2], c="yellow")
 
-    ax10.plot(t1, y1, "o", c="red")
-    ax10.plot(et, yinterp1, c="green")
-    ax10.plot(et, jitterchecky1, c="yellow")
+    ax10.plot(t[0], y[0], "o", c="red")
+    ax10.plot(et, yinterp[0], c="green")
+    ax10.plot(et, jitterchecky[0], c="yellow")
 
-    ax11.plot(t2, y2, "o", c="red")
-    ax11.plot(et, yinterp2, c="green")
-    ax11.plot(et, jitterchecky2, c="yellow")
+    ax11.plot(t[1], y[1], "o", c="red")
+    ax11.plot(et, yinterp[1], c="green")
+    ax11.plot(et, jitterchecky[1], c="yellow")
 
-    ax12.plot(t3, y3, "o", c="red")
-    ax12.plot(et, yinterp3, c="green")
-    ax12.plot(et, jitterchecky3, c="yellow")
+    ax12.plot(t[2], y[2], "o", c="red")
+    ax12.plot(et, yinterp[2], c="green")
+    ax12.plot(et, jitterchecky[2], c="yellow")
 
     ax20.plot(et, sample, c="blue")
     ax21.plot(et, line, c="blue")
@@ -1051,7 +1220,7 @@ def write_csv(path: os.PathLike, labels: list, *cols, fillvalue="nan"):
     instead of a fixed-width text file.
     """
     logger.info(f"Writing: {path}")
-    with open(path, 'w', newline='') as csvfile:
+    with open(path, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(labels)
         for zipped in itertools.zip_longest(*cols, fillvalue=fillvalue):
@@ -1088,9 +1257,47 @@ def write_data_for_plotting(
         f.write("\n")
 
 
+def write_smear_data(
+    path: Path,
+    max_smear_s,
+    max_smear_l,
+    max_smear_mag,
+    dysdx,
+    dyldx,
+    et,
+    image_id=None,
+):
+    # Make a text file of the smear data
+    if image_id is None:
+        id_str = ""
+    else:
+        id_str = f" for {image_id}"
+
+    smear_text = [
+        f"""\
+    # Smear values are calculated from the derived jitter function{id_str}.
+    # Maximum Cross-track pixel smear {max_smear_s}
+    # Maximum Down-track pixel smear {max_smear_l}
+    # Maximum Pixel Smear Magnitude {max_smear_mag}
+    # Sample                 Line                   EphemerisTime"""
+    ]
+
+    for ess, ell, exi in zip(dysdx, dyldx, et):
+        smear_text.append(f"{ess}     {ell}     {exi}")
+
+    logger.info(f"Writing: {path}")
+    path.write_text("\n".join(smear_text))
+
+    return
+
+
 def write_gnuplot_file(
-    gnuplot_path: Path, data_path: Path, img_path: Path,
-    file_path1: Path, file_path2: Path, file_path3: Path
+    gnuplot_path: Path,
+    data_path: Path,
+    img_path: Path,
+    file_path1: Path,
+    file_path2: Path,
+    file_path3: Path,
 ):
     """Writes a gnuplot file that will plot the contents of a file
     written by write_data_for_plotting().
