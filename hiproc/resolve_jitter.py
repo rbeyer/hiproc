@@ -776,7 +776,7 @@ def create_matrices(
     t0: float,
     nfft: int,
     nfftime: np.array,
-    tt: abc.Sequence,
+    tt: np.array,
 ):
     """Returns a tuple of numpy arrays.
 
@@ -1079,8 +1079,20 @@ def pixel_smear(
     :param tdi: The image TDI value (int).
     :param path: Optional path to write out smear details to (Path).
     :param image_id: Optional Observation ID (string).
-    :return:
+    :return: six-tuple which contains:
+        0. sample maximum smear value (float)
+        1. line maximum smear value (float)
+        2. Maximum smear magnitude (float)
+        3. Sample smear values (numpy array)
+        4. Line smear values (numpy array)
+        5. Ephemeris times at linerate intervals (numpy array)
     """
+    # The output here differs from the C++ output in a very, very minor
+    # way.  The absolute difference between the line and sample smear
+    # is 0.002 pixels.  I could not track this down.  It may be due to
+    # precision differences in the double values that C++ uses, but I'm
+    # just not sure.
+
     # The array T has large values. Use a shifted version of it when
     # interpolating to reduce the effect of those values on numerical
     # accuracy.
@@ -1088,7 +1100,9 @@ def pixel_smear(
 
     # xi = T(1):linerate:T(end);
     n = math.floor((shifted_t[-1] - shifted_t[0]) / linerate) + 1
-    xi = np.linspace(0, n - 1, n) * linerate + shifted_t[0]
+    # This is from the original code, but by definition shifted_t[0] is zero.
+    # xi = np.linspace(0, n - 1, n) * linerate + shifted_t[0]
+    xi = np.linspace(0, n - 1, n) * linerate
 
     # Interpolate the jitter function at intervals equivalent to the linerate
     f_samp = PchipInterpolator(shifted_t, sample, extrapolate=False)
@@ -1112,13 +1126,15 @@ def pixel_smear(
     mag_smear = np.sqrt(dysdx ** 2 + dyldx ** 2)
 
     # Find maxSmearS, the largest element by magnitude in dysdx
-    max_smear_s = max(dysdx)
+    msi = np.argmax(np.abs(dysdx))
+    max_smear_s = dysdx[msi]
 
     # Find maxSmearL, the largest element by magnitude in dyldx
-    max_smear_l = max(dyldx)
+    msi = np.argmax(np.abs(dyldx))
+    max_smear_l = dyldx[msi]
 
     # Find maxSmearMag, the largest element by magnitude in magSmear
-    max_smear_mag = max(mag_smear)
+    max_smear_mag = np.max(mag_smear)
 
     # Outputs
     return max_smear_s, max_smear_l, max_smear_mag, dysdx, dyldx, xi
@@ -1275,11 +1291,11 @@ def write_smear_data(
 
     smear_text = [
         f"""\
-    # Smear values are calculated from the derived jitter function{id_str}.
-    # Maximum Cross-track pixel smear {max_smear_s}
-    # Maximum Down-track pixel smear {max_smear_l}
-    # Maximum Pixel Smear Magnitude {max_smear_mag}
-    # Sample                 Line                   EphemerisTime"""
+# Smear values are calculated from the derived jitter function{id_str}.
+# Maximum Cross-track pixel smear {max_smear_s}
+# Maximum Down-track pixel smear {max_smear_l}
+# Maximum Pixel Smear Magnitude {max_smear_mag}
+# Sample                 Line                   EphemerisTime"""
     ]
 
     for ess, ell, exi in zip(dysdx, dyldx, et):
