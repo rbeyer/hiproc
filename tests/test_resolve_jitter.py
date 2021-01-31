@@ -205,17 +205,15 @@ class TestResolveJitter(unittest.TestCase):
 
         t_arr = np.array(time_list)
         t0 = t_arr[0]
-
-        et, et_shift = rj.get_time_arrays(nfft, t0, t_arr[-1])
+        nfftime = np.linspace(t0, t_arr[-1], nfft)
         duration = t_arr[-1] - t0
 
-        ddt, overxx, overyy, xinterp, yinterp, x, y = rj.create_matrices(
-            nfft, dt, t_arr, tt,
-            np.array(offx_list), np.array(offy_list),
-            et_shift, t0, duration
+        xinterp, yinterp, x, y, ddt, overxx, overyy = rj.create_matrices(
+            t_arr, np.array(offx_list), np.array(offy_list),
+            dt, duration, t0, nfft, nfftime, tt
         )
-        # This runs, but I'm not sure what the right values are.  Maybe this
-        # will become clear later?
+        # This runs, but I'm not sure what the right values are to test for
+        # here.  Maybe this will become clear later?
 
     def test_filter_data(self):
         data = np.array([0.6611, 0.7258, 0.6485, 0.6213, 0.5806, 0.6429, 0.6055,
@@ -233,56 +231,74 @@ class TestResolveJitter(unittest.TestCase):
 
     def test_parse_file(self):
         (
-            tdi, nfft, line_rate, tt, et, et_shift, t0, duration,
-            dt, ddt, t, offx, offy,
-            xinterp, yinterp, x, y, overxx, overyy
-        ) = rj.parse_file(self.flat_text, -1, 20, 11, 2)
+            t_arr, offx, offy, lines, dt, tdi, line_rate
+        ) = rj.parse_file(self.flat_text, 11, 2, True)
         self.assertEqual(128, tdi)
-        self.assertEqual(4096, nfft)
+        self.assertEqual(70000, lines)
         self.assertEqual(0.000097, line_rate)
         # Need to test arrays, too
-        # This function is s l o w .
 
-    def test_make_null_problematic_frequencies(self):
+    def test_mask_frequencies(self):
         (
-            tdi, nfft, line_rate, tt, et, et_shift, t0, duration,
-            dt, ddt, t, offx, offy,
-            xinterp, yinterp, x, y, overxx, overyy
-        ) = rj.parse_file(self.flat_text, -1, 20, 11, 2)
-        rj.make_null_problematic_frequencies(0.01, ddt, overxx, overyy)
+            t_arr, offx, offy, lines, dt, tdi, line_rate
+        ) = rj.parse_file(self.flat_text, 11, 2)
+        nfft = rj.upper_power_of_two(lines / 20)
+        tt = np.linspace(0, 1, nfft, endpoint=False)
+        nfftime = np.linspace(t_arr[0], t_arr[-1], nfft)
+        xinterp, yinterp, x, y, ddt, overxx, overyy = rj.create_matrices(
+            t_arr, offx, offy,
+            dt, t_arr[-1] - t_arr[0], t_arr[0], nfft, nfftime, tt
+        )
+        rj.mask_frequencies(0.01, ddt, overxx, overyy)
         # Not sure how to test these large arrays :(
-
-    def test_overwrite_null_freq(self):
-        a = np.ma.array([1, 1, 1, 1], mask=[True, True, True, False])
-        s1 = np.ma.array([2, 2, 2, 2], mask=[True, True, False, False])
-        s2 = np.ma.array([3, 3, 3, 3], mask=[True, False, False, False])
-        arr = rj.overwrite_null_freq(a, s1, s2)
-        npt.assert_almost_equal(
-            np.ma.array([0, 3, 2.5, 1], mask=[True, False, False, False]),
-            arr
-        )
-
-        wrong_shape = np.array([1, 2])
-        self.assertRaises(
-            IndexError, rj.overwrite_null_freq, a, s1, wrong_shape
-        )
 
     @patch('hiproc.resolve_jitter.Path')
     def test_pixel_smear(self, m_path):
+        # This test is now slow because it basically engages the whole
+        # process.  Need to figure out how to mock this data better.
         (
-            tdi, nfft, line_rate, tt, et, et_shift, t0, duration,
-            dt, ddt, t, offx, offy,
-            xinterp, yinterp, x, y, overxx, overyy
-        ) = rj.parse_file(self.flat_text, -1, 20, 11, 2)
-
-        max_smear_s, max_smear_l, max_smear_mag = rj.pixel_smear(
-            np.array(offx), np.array(offy), t, line_rate, tdi,
-            "dummy_path", "dummy_id"
+            nfftime,
+            sample,
+            line,
+            linerate,
+            tdi,
+            t0,
+            t1,
+            t2,
+            t3,
+            offx_filtered,
+            offy_filtered,
+            xinterp,
+            yinterp,
+            min_avg_error,
+            min_k,
+            jittercheckx,
+            jitterchecky,
+            rh0,
+        ) = rj.resolve_jitter(
+            self.flat_text,
+            True,
+            self.flat_text,
+            True,
+            self.flat_text,
+            True,
+            20,
         )
 
-        self.assertAlmostEqual(0.34293872479407383, max_smear_s)
-        self.assertAlmostEqual(0.585173051485981, max_smear_l)
-        self.assertAlmostEqual(0.5953484180785305, max_smear_mag)
+        (
+            max_smear_s,
+            max_smear_l,
+            max_smear_mag,
+            dysdx,
+            dyldx,
+            xi
+        ) = rj.pixel_smear(
+            nfftime, sample, line, linerate, tdi
+        )
+
+        self.assertAlmostEqual(-0.8419796875685424, max_smear_s)
+        self.assertAlmostEqual(-9.052314552452234, max_smear_l)
+        self.assertAlmostEqual(9.09026020017119, max_smear_mag)
 
     # def test_write_data_for_plotting(self):
     #     m = mock_open()
@@ -295,6 +311,7 @@ class TestResolveJitter(unittest.TestCase):
     #             ['one', 'two', 'three'], col1, col2
     #         )
 
-    #         rj.write_data_for_plotting("dummy-file", ['one', 'two'], col1, col2)
+    #         rj.write_data_for_plotting(
+    #         "dummy-file", ['one', 'two'], col1, col2)
     #         print(m.mock_calls)
 
