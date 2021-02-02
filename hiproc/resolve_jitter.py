@@ -57,7 +57,6 @@ import os
 import subprocess
 import sys
 import traceback
-from collections import abc
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -183,7 +182,6 @@ def main():
         which2 = True if args.which2 != 1 else False
         which3 = True if args.which2 != 1 else False
     else:
-        # This is the wrong number of positional arguments
         parser.error("Only takes 3 or 9 positional arguments.")
 
     if args.lineinterval is None:
@@ -338,7 +336,7 @@ Sample                 Line                   ET"""
     logger.info(f"Writing: {jitter_p}")
     jitter_p.write_text("\n".join(jitter_text))
 
-    # Writing the data we will plot later in gnuplot
+    # Create data for plotting
     data_p = outdir / (outprefix + "_jitter_plot_py.txt")
     t_shift = [t1 - t0, t2 - t0, t3 - t0]
     jittercheckx_shift = [
@@ -353,7 +351,7 @@ Sample                 Line                   ET"""
     ]
 
     # Note the comment before the first label
-    # This ordering is historic to the original file output.
+    # This ordering and naming is historic to the original file output.
     string_labels = [
         "# ET_shift",
         "Sample",
@@ -456,6 +454,52 @@ def resolve_jitter(
     window_size=11,
     window_width=2,
 ):
+    """
+    Returns a large tuple of information that is the result of solving for
+    the jitter based on the three input files.
+
+    The first file path sets some variables for all of the runs.  The
+    whichfrom booleans determine determines the sense of the offsets.
+    A value of True makes the offsets relative to the From cube specified
+    in the flat.tab, and False makes the offsets relative to the Match cube.
+
+    :param file_path1: File Path for first flat.tab file.
+    :param whichfrom1: Offsets relative to FROM for first flat.tab file.
+    :param file_path2: File Path for second flat.tab file.
+    :param whichfrom2: Offsets relative to FROM for second flat.tab file.
+    :param file_path3: File Path for third flat.tab file.
+    :param whichfrom3: Offsets relative to FROM for third flat.tab file.
+    :param line_interval: The number of lines to use to set the number of
+        Fourier transform intervals.
+    :param window_size: The kernel size for median filtering the offsets,
+        should be an odd integer.
+    :param window_width: Sets the boundaries above and below the filtered
+        average beyond which to exclude outliers.
+    :return: An 18-tuple, whose values are:
+        0: Time values starting at *t0* (numpy array).
+        1: Sample direction jitter for each time (numpy array).
+        2: Line direction jitter for each time (numpy array).
+        3: The LineRate from the FROM and MATCH files (float).
+        4: The TDI for the FROM and MATCH files (int).
+        5: Zero time at which the Fourier Transform steps start (float).
+        6: Unique time values from file one (numpy array).
+        7: Unique time values from file two (numpy array).
+        8: Unique time values from file three (numpy array).
+        9: List of three numpy arrays representing the Gaussian filtered
+            offsets in the sample direction from the three input files.
+        10: List of three numpy arrays representing the Gaussian filtered
+            offsets in the line direction from the three input files.
+        11: List of three numpy arrays representing the interpolation of
+            sample offsets for each input file at each time.
+        12: List of three numpy arrays representing the interpolation of
+            line offsets for each input file at each time.
+        13: The average error of the jitter solution with respect to the
+            measured offsets.
+        14: min_k,
+        15: [min_jitter_check_x1, min_jitter_check_x2, min_jitter_check_x3],
+        16: [min_jitter_check_y1, min_jitter_check_y2, min_jitter_check_y3],
+        17: The first value of the sample and line from each file (dict).
+    """
     t1, offx1, offy1, lines1, dt1, tdi1, linerate1 = parse_file(
         file_path1, window_size, window_width, whichfrom1
     )
