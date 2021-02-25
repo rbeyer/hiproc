@@ -96,6 +96,16 @@ import hiproc.util as util
 
 logger = logging.getLogger(__name__)
 
+# 1st pixel = index 1 for these
+ch_pause = (
+    (252, 515, 778),  # Channel 0 pause point sample locations
+    (247, 510, 773),  # Channel 1 pause point sample locations
+)
+ch_width = (
+    (17, 17, 17),  # Number of pixels to cut from pause point
+    (-17, -17, -17),
+)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -1239,16 +1249,6 @@ def Cubenorm_Filter_filter(
 
     # zap the pause point pixels
     if pause and 1024 == len(x):
-        # 1st pixel = index 1
-        ch_pause = [
-            (252, 515, 778),  # Channel 0 pause point sample locations
-            (247, 510, 773),  # Channel 1 pause point sample locations
-        ]
-        ch_width = [
-            (17, 17, 17),  # Number of pixels to cut from pause point
-            (-17, -17, -17),
-        ]
-
         for samp, width in zip(ch_pause[chan], ch_width[chan]):
             zap_slice = pause_slicer(samp, width)
             x[zap_slice] = [0] * abs(width)
