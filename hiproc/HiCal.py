@@ -117,6 +117,7 @@ def main():
         "--conf",
         required=False,
         default=Path(__file__).resolve().parent.parent / "data" / "HiCal.conf",
+        help="Configuration file to use, default: %(default)s"
     )
     parser.add_argument(
         "--db",
@@ -125,7 +126,8 @@ def main():
         help="The .json file to use.  Optionally, if it "
         "starts with a '.' it is considered an extension "
         "and will be swapped with the input file's "
-        "extension to find the .json file to use.",
+        "extension to find the .json file to use. "
+        "Default: %(default)s",
     )
     parser.add_argument(
         "-b",
@@ -133,12 +135,29 @@ def main():
         required=False,
         type=int,
         default=0,
-        help="The number of medstd widths for bit-flip " "cleaning.",
+        help="The number of medstd widths for bit-flip cleaning. Leaving it "
+             "as zero implies no bit-flip cleaning. Default: %(default)s",
     )
     # parser.add_argument('--hgfconf', required=False, default='HiGainFx.conf')
-    parser.add_argument("--nfconf", required=False, default="NoiseFilter.conf")
     parser.add_argument(
-        "--bin2", required=False, action="store_true", default=None
+        "--nfconf",
+        required=False,
+        default="NoiseFilter.conf",
+        help="Default: %(default)s"
+    )
+    parser.add_argument(
+        "--bin2",
+        required=False,
+        action="store_true",
+        default=None,
+        help="By default HiCal will look at all of the HiRISE .cub files in "
+             "the directory with the input file(s) in it, and determine "
+             "whether any of the EDRs from this observation was bin2 and will "
+             "internally take care of setting this switch, but if you're just "
+             "processing some observations and not all of them, then although "
+             "IR10 may be binned, and you didn't convert it to a .cub file or "
+             "even download it, then it isn't there for this program to find, "
+             "and explicitly setting this switch is needed."
     )
     parser.add_argument(
         "--nobin2",
@@ -146,9 +165,16 @@ def main():
         action="store_false",
         default=None,
         dest="bin2",
+        help="Forcibly sets the --bin2 switch to off, even if it would "
+             "otherwise be automatically determined to be on."
     )
     parser.add_argument(
-        "--bin4", required=False, action="store_true", default=None
+        "--bin4",
+        required=False,
+        action="store_true",
+        default=None,
+        help="Same as the --bin2 switch, but for setting whether any EDRs "
+             "from this observation are bin4."
     )
     parser.add_argument(
         "--nobin4",
@@ -156,6 +182,8 @@ def main():
         action="store_false",
         default=None,
         dest="bin4",
+        help="Forcibly sets the --bin4 switch to off, even if it would "
+             "otherwise be automatically determined to be on."
     )
     parser.add_argument(
         "cube",
