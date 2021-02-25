@@ -9,7 +9,7 @@ values in the reverse-clock and buffer areas, which are crucial for
 calibration.
 """
 
-# Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
+# Copyright 2020-2021, Ross A. Beyer (rbeyer@seti.org)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ calibration.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Parts of this were inspired by fix_74.pro, find_zero2REV.pro
-# by Alan Delamere, Dec 2020, but the implementation
+# Parts of this were inspired by fix_74.pro, find_zero2REV.pro (Dec 2020),
+# and fix_74_all_new.pro (Feb 2021) by Alan Delamere, but the implementation
 # here was written from scratch.
 
 
@@ -35,15 +35,19 @@ import shutil
 import subprocess
 import sys
 import traceback
+from collections import abc
 from pathlib import Path
 
 import numpy as np
+import scipy.signal as signal
 
 import pvl
 import kalasiris as isis
 
 import hiproc.util as util
+import hiproc.HiCal as HiCal
 from hiproc.bitflips import apply_special_pixels
+from hiproc.hirise import get_ChannelID_fromfile
 
 logger = logging.getLogger(__name__)
 
@@ -162,9 +166,45 @@ def fix(
         f"Fraction of LIS pixels in Reverse-Clock area: {revclk_lisfrac}"
     )
 
+    rev_model = ramp_rev_clock(
+        cal_image,
+        mask_lines,
+        label["IsisCube"]["Instrument"]["ChannelNumber"],
+        zero_correction
+    ).astype(int)
+    # # Mask out all of the rev-clock for testing, so we get wholesale
+    # # replacement
+    # orig_cal_image = np.ma.copy(cal_image)
+    # o_mean = np.ma.mean(orig_cal_image[:20, :], axis=0)
+    # y_err_upper = np.ma.max(orig_cal_image[:20, :], axis=0) - o_mean
+    # y_err_lower = o_mean - np.ma.min(orig_cal_image[:20, :], axis=0)
+
+    # cal_image[:20, :] = np.ma.masked
+
+    # # Some plotting for debugging:
+    # import matplotlib.pyplot as plt
+    # plt.plot(o_mean, 'k', label='Mean of Rev-Clock columns')
+    # # plt.errorbar(
+    # #     np.linspace(0, o_mean.size, num=o_mean.size, endpoint=False),
+    # #     o_mean,
+    # #     yerr=[y_err_lower, y_err_upper],
+    # #     fmt='k',
+    # #     label='Mean of Rev-Clock columns'
+    # # )
+    # for i in range(19):
+    #     plt.plot(orig_cal_image[i, :], 'k.')
+    # plt.plot(orig_cal_image[19, :], 'k.', label='Original Rev-Clock')
+    # plt.plot(rev_model, 'r', label="Fixed")
+    # plt.legend(loc='best')
+    # plt.show()
+    # sys.exit()
+
     logger.info("Fixing Reverse-Clock pixels.")
     fixed_cal = np.ma.apply_along_axis(
-        fix_rev_clock, 0, cal_image, mask_lines, zero_correction
+        fix_rev_clock, 0, np.ma.concatenate((
+            cal_image,
+            rev_model.reshape((1, rev_model.size))
+        ))
     )
 
     logger.info("Writing out Reverse-Clock pixels.")
@@ -194,92 +234,148 @@ def fix(
     # print(buffer.dtype)
     # print(buffer.shape)
 
-    # first_im_line = 19+(20+label["IsisCube"]["Instrument"]["Tdi"])/binning
-    if np.ma.count_masked(calbuf) / calbuf.size <= tolerance:
-        refr = int(np.ma.median(calbuf))
-        logger.info(f"Median of Calibration Buffer Pixels: {refr}")
-    else:
-        refr = int(np.ma.median(calbuf))
-        # raise ValueError(
-        logger.error(
-            "Less than 40% of the Calibration Buffer Pixels have a"
-            f"real value: {np.ma.count_masked(calbuf) / calbuf.size}"
+    if np.ma.count_masked(buffer) / buffer.size > tolerance:
+        # first_im_line = 19+(20+label["IsisCube"]["Instrument"]["Tdi"])/binning
+        sp_frac = np.ma.count_masked(calbuf[:20, :]) / calbuf[:20, :].size
+        if sp_frac <= tolerance:
+            refr = int(np.ma.median(calbuf[:20, :]))
+            logger.info(
+                f"Median of first 20 lines of Calibration Buffer Pixels: {refr}"
+            )
+        else:
+            logger.error(
+                f"More than {tolerance * 100}% of the Calibration Buffer "
+                f"Pixels have special pixel values: {100 * sp_frac}%."
+            )
+            isp = pvl.loads(
+                isis.catoriglab(in_path).stdout
+            )["INSTRUMENT_SETTING_PARAMETERS"]
+            adc = label["IsisCube"]["Instrument"]["ADCTimingSetting"]
+            if adc == -9999:
+                adc = isp["MRO:ADC_TIMING_SETTINGS"]
+
+            cid = get_ChannelID_fromfile(in_path)
+            refr = int(
+                revclock_model(
+                    cid.ccdname + cid.ccdnumber + "_" + cid.channel,
+                    binning,
+                    label[
+                        "IsisCube"
+                    ]["Instrument"]["FpaPositiveYTemperature"].value,
+                    adc
+                )
+            )
+            logger.error(f"Using a model-based substitute ({refr}).")
+            # import hiproc.img as img
+            # lut = img.LUT_Table(isp["MRO:LOOKUP_CONVERSION_TABLE"])
+            # if refr <= lut.table[1]:
+            #     logger.error(f"Using a model-based substitute ({refr}).")
+            # else:
+            #     logger.error(
+            #         f"Model ({refr}) was greater than LUT floor "
+            #         f"({lut.table[1]}). Setting to LUT floor."
+            #     )
+            #     refr = lut.table[1]
+
+        if np.ma.count_masked(dark[:20]) / dark[:20].size <= tolerance:
+            refd = int(np.ma.median(dark[:20]))
+            logger.info(f"Median of first 20 lines of Dark Pixels: {refd}")
+        else:
+            refd = int(np.ma.median(fixed_cal[:20, :]))
+            logger.error(
+                f"More than {tolerance * 100}% of the first 20 lines of "
+                f"Dark Pixels have a real "
+                f"value: {np.ma.count_masked(dark[:20]) / dark[:20].size} "
+                f"Using the rev-clock median ({refd})."
+            )
+
+        model_buffer = dark[:, 2:14] - refd + refr
+        # print(model_buffer)
+        # print(model_buffer.dtype)
+        # print(model_buffer.shape)
+
+        # # Mask out all of the buffer for testing, so we get wholesale
+        # # replacement
+        # buffer.mask = True
+
+        logger.info("Fixing Buffer pixels.")
+        fixed_buf = np.ma.apply_along_axis(
+            fix_buffer,
+            1,
+            np.ma.concatenate((buffer, model_buffer), 1),
+            buffer.shape[1]
         )
+        # print(fixed_buf)
+        # print(fixed_buf.dtype)
+        # print(fixed_buf.shape)
 
-    if np.ma.count_masked(dark[:20]) / dark[:20].size <= tolerance:
-        refd = int(np.ma.median(dark[:20]))
-        logger.info(f"Median of first 20 lines of Dark Pixels: {refd}")
-    else:
-        refd = int(np.ma.median(dark[:20]))
-        # raise ValueError(
-        logger.error(
-            "Less than 40% of the first 20 lines of Dark Pixels have a "
-            f"real value: {np.ma.count_masked(dark[:20]) / dark[:20].size}"
-        )
-
-    model_buffer = dark[:, 2:14] - refd + refr
-    # print(model_buffer)
-    # print(model_buffer.dtype)
-    # print(model_buffer.shape)
-
-    logger.info("Fixing Buffer pixels.")
-    fixed_buf = np.ma.apply_along_axis(
-        fix_buffer,
-        1,
-        np.ma.concatenate((buffer, model_buffer), 1),
-        buffer.shape[1]
-    )
-    # print(fixed_buf)
-    # print(fixed_buf.dtype)
-    # print(fixed_buf.shape)
-
-    ha_dict["BufferPixels"] = apply_special_pixels(
-        fixed_buf, specialpix
-    ).data.tolist()
-    logger.info("Writing out Buffer pixels.")
-    isis.cube.overwrite_table(out_p, "HiRISE Ancillary", ha_dict)
+        ha_dict["BufferPixels"] = apply_special_pixels(
+            fixed_buf, specialpix
+        ).data.tolist()
+        logger.info("Writing out Buffer pixels.")
+        isis.cube.overwrite_table(out_p, "HiRISE Ancillary", ha_dict)
 
     return
+
+
+def fit_ramp(
+    col: np.ma.array,
+    mask_lines: int,
+):
+    """Returns the slope from the ramp pixels."""
+    return np.ma.polyfit(
+            np.arange(col[20 + mask_lines:].size),
+            col[20 + mask_lines:],
+            1
+        )
 
 
 def get_ramp_slope(
     col: np.ma.array,
     mask_lines: int,
 ):
-    """Returns the slope from the ramp pixels."""
-    fit = np.ma.polyfit(
-            np.arange(col[20 + mask_lines:].size),
-            col[20 + mask_lines:],
-            1
-        )
-    return fit[0]
+    return fit_ramp(col, mask_lines)[0]
+
+
+def get_ramp_intercept(
+    col: np.ma.array,
+    mask_lines: int,
+):
+    return fit_ramp(col, mask_lines)[1]
 
 
 def fix_rev_clock(
     cal_image_col: np.ma.array,
-    mask_lines: int,
-    zero_correction=0,
     lis_fraction=0.2,
 ):
     """Returns a np.masked array where the LIS pixels in the
-    reverse-clock area are replaced with a fit from the ramp area, if
-    the percent of LIS pixels is greater than or equal to *lis_fraction*.
+    reverse-clock area are replaced with a fill value from the end
+    of the column, if the percent of LIS pixels is greater than or
+    equal to *lis_fraction*.
 
-    The size of the mask is variable, based on binning, so the number of
-    *mask_lines* must be provided.
+    It is assumed that cal_image_col array has one more final entry
+    (at position [-1]) than it should, and that value is used to
+    fill the masked areas, if needed, and then is not included
+    in the array on return.
     """
     if np.ma.count_masked(cal_image_col[:20]) / 20 >= lis_fraction:
-        # Attempt to derive value from the ramp via a linear fit
-        fit = np.ma.polyfit(
-            np.arange(cal_image_col[20 + mask_lines:].size),
-            cal_image_col[20 + mask_lines:],
-            1
-        )
-
         cal_image_col[:20] = cal_image_col[:20].filled(
-            fill_value=fit[1] - zero_correction
+            fill_value=cal_image_col[-1]
         )
-    return cal_image_col
+    return cal_image_col[:-1]
+
+
+def ramp_rev_clock(
+    cal_image: np.ma.array,
+    mask_lines: int,
+    chan: int,
+    zero_correction=0,
+):
+    ramp_model = np.ma.apply_along_axis(
+        get_ramp_intercept, 0, cal_image, mask_lines
+    )
+
+    return flatten(ramp_model - zero_correction, chan)
 
 
 def fix_buffer(
@@ -307,6 +403,137 @@ def fix_buffer(
         # print(buf_row[:stop])
 
     return buf_row[:stop]
+
+
+def revclock_model(
+    channelid: str,
+    binning: int,
+    temperature: float,
+    adc: abc.Sequence
+) -> float:
+    # The slope and intercept data is from a presentation by Ken
+    # Herkenhoff, in July 2020, entitled "Analysis of flight reverse-clocked
+    # data" in the file Full\ reverse\ analysis.pptx
+    # However, I think the ADC 7, 4 values were added after that date, but
+    # sometime before Feb 2021.
+    adc = tuple(adc)
+    if adc == (5, 4):
+        if binning != 1:
+            raise KeyError(
+                "There is no model for ADC 5,4 data with a binning other "
+                "than 1."
+            )
+        pairs = {
+            "RED0_0": (1278, 4.08),
+            "RED1_0": (1072, 3.32),
+            "RED2_0": (1214, 3.45),
+            "RED3_0": (1083, 3.70),
+            "RED4_0": (1124, 3.52),
+            "RED5_0": (1148, 4.90),
+            "RED6_0": (992, 4.14),
+            "RED7_0": (1117, 1.90),
+            "RED8_0": (1269, 4.56),
+            "RED9_0": (1144, 3.33),
+            "IR10_0": (1121, 4.92),
+            "IR11_0": (1171, 3.35),
+            "BG12_0": (986, 3.78),
+            "BG13_0": (1027, 4.10),
+            "RED0_1": (1341, 5.70),
+            "RED1_1": (1114, 4.65),
+            "RED2_1": (1093, 4.73),
+            "RED3_1": (1187, 5.15),
+            "RED4_1": (1078, 4.54),
+            "RED5_1": (1335, 5.50),
+            "RED6_1": (1154, 5.36),
+            "RED7_1": (1355, 5.55),
+            "RED8_1": (1398, 4.27),
+            "RED9_1": (1255, 5.47),
+            "IR10_1": (991, 5.81),
+            "IR11_1": (1145, 4.20),
+            "BG12_1": (1112, 5.67),
+            "BG13_1": (974, 5.32),
+        }
+        intercept, slope = pairs[channelid]
+
+    elif adc == (7, 4):
+        pairs = {
+            "RED1_0": {
+                1: (1010.4, 0.7),
+                2: (930.4, 1.9),
+                4: (914.4, 2.8),
+            },
+            "RED1_1": {
+                1: (869.2, 3.5),
+                2: (845.3, 3.1),
+                4: (699.2, 7.1),
+            },
+            "RED2_0": {
+                1: (1051.2, 1.6),
+                2: (962.7, 2.6),
+                4: (923.6, 4.1),
+            },
+            "RED2_1": {
+                1: (842.5, 3.9),
+                2: (734.9, 5.1),
+                4: (644.9, 7.7),
+            },
+            "RED3_0": {
+                1: (958.8, 1.8),
+                2: (841.5, 3.7),
+                4: (788.1, 5.5),
+            },
+            "RED3_1": {
+                1: (916.8, 3.5),
+                2: (759.8, 6.1),
+                4: (648.4, 9.1),
+            },
+        }
+        intercept, slope = pairs[channelid][binning]
+
+    else:
+        raise KeyError(
+            f"Do not have a model for {adc}."
+        )
+
+    return temperature * slope + intercept
+
+
+def flatten(arr: np.array, chan: int):
+    # The idea here is to flatten the zero_correction array between the pause
+    # points
+    sos = signal.butter(1, 0.5, output="sos")
+    pl = list()
+    for samp, width in zip(HiCal.ch_pause[chan], HiCal.ch_width[chan]):
+        sl = HiCal.pause_slicer(samp, width)
+        pl.append(sl.start)
+        pl.append(sl.stop)
+
+    # # Supports debug plotting below, 2 lines
+    # fixed = np.copy(arr)
+    # filtered_whole = np.full_like(arr, np.mean(arr))
+    for pslice in (
+        slice(None, pl[0]),
+        slice(pl[1], pl[2]),
+        slice(pl[3], pl[4]),
+        slice(pl[5], None)
+    ):
+        m = np.mean(arr[pslice])
+        filtered = signal.sosfilt(sos, arr[pslice] - m)
+        arr[pslice] = (arr[pslice] - m - filtered) + m
+        # # Supports debug plotting below, 2 lines
+        # fixed[pslice] = (arr[pslice] - m - filtered) + m
+        # filtered_whole[pslice] = filtered + m
+
+    # # Some plotting for debugging:
+    # import matplotlib.pyplot as plt
+    # plt.plot(arr, 'k', label='Original')
+    # # plt.plot(filtered_whole, 'b', label='Filtered')
+    # plt.plot(fixed, 'r', label="Fixed")
+    # plt.legend(loc='best')
+    # plt.show()
+    # sys.exit()
+
+    return arr
 
 
 if __name__ == "__main__":
