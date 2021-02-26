@@ -87,6 +87,8 @@ import warnings
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
+
 import kalasiris as isis
 import pvl
 
@@ -186,8 +188,15 @@ def main():
              "otherwise be automatically determined to be on."
     )
     parser.add_argument(
+        "-n", "--info",
+        action="store_true",
+        help="If given, the program will not run, but will instead report "
+             "information about the input files and various things that "
+             "the program would have done, if it was run regularly."
+    )
+    parser.add_argument(
         "cube",
-        metavar="cube_file",
+        metavar="cube_file(s)",
         nargs="+",
         help="More than one can be listed here.",
     )
@@ -219,19 +228,26 @@ def main():
         with open(db_path, "r") as f:
             db = json.load(f)
 
-        out_cube = util.path_w_suffix(args.output, c)
         try:
-            db = start(
-                c,
-                out_cube,
-                db,
-                conf,
-                args.conf,
-                args.bitflipwidth,
-                args.bin2,
-                args.bin4,
-                keep=args.keep,
-            )
+            if args.info:
+                print(f"HiCal Information for {c}:")
+                print("\n".join(norun_info(c, db, conf, args.bin2, args.bin4)))
+            else:
+                out_cube = util.path_w_suffix(args.output, c)
+                db = start(
+                    c,
+                    out_cube,
+                    db,
+                    conf,
+                    args.conf,
+                    args.bitflipwidth,
+                    args.bin2,
+                    args.bin4,
+                    keep=args.keep,
+                )
+                with open(db_path, "w") as f:
+                    json.dump(db, f, indent=0, sort_keys=True)
+
         except UserWarning as err:
             logger.warning(err)
             continue
@@ -244,9 +260,6 @@ def main():
             print(err.stdout)
             print(err.stderr)
             raise err
-
-        with open(db_path, "w") as f:
-            json.dump(db, f, indent=0, sort_keys=True)
 
     return
 
@@ -274,6 +287,98 @@ def conf_setup(conf_path: os.PathLike, nfconf_path: os.PathLike) -> dict:
     return conf
 
 
+def norun_info(cube: os.PathLike, db: dict, conf: dict, bin2: bool, bin4: bool):
+
+    lines = list()
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("ignore")
+        in_cube, cid, ccdchan, lis_per = setup(cube, db, conf)
+        if len(w) > 0:
+            for wa in w:
+                lines.append(f"Would have warned: {wa.message}")
+
+    lines.append(
+        f'Image LIS: {db["LOW_SATURATED_PIXELS"]} pixels, '
+        f'{lis_per:.2f}%'
+    )
+
+    # Non-imaging areas:
+    label = pvl.load(cube)
+    specialpix = getattr(
+        isis.specialpixels, label["IsisCube"]["Core"]["Pixels"]["Type"]
+    )
+    t_name = "HiRISE Calibration Image"
+    hci_dict = isis.cube.get_table(in_cube, t_name)
+    cal_vals = np.array(hci_dict["Calibration"])
+    cal_image = np.ma.masked_outside(
+        cal_vals, specialpix.Min, specialpix.Max
+    )
+    revclk_liscount = np.ma.count_masked(cal_image[:20, :])
+    revclk_lisfrac = revclk_liscount / cal_image[:20, :].size
+    lines.append(
+        f"Reverse-Clock LIS: {revclk_liscount} pixels, "
+        f"{revclk_lisfrac:.2%}"
+    )
+
+    hca_dict = isis.cube.get_table(cube, "HiRISE Calibration Ancillary")
+    calbuf_vals = np.array(hca_dict["BufferPixels"])
+    calbuf = np.ma.masked_outside(
+        calbuf_vals, specialpix.Min, specialpix.Max
+    )
+    calbuf_liscount = np.ma.count_masked(calbuf[:20, :])
+    calbuf_lisfrac = calbuf_liscount / calbuf[:20, :].size
+    lines.append(
+        f"Reverse-Clock Buffer LIS: {calbuf_liscount} pixels, "
+        f"{calbuf_lisfrac:.2%}"
+    )
+
+    ha_dict = isis.cube.get_table(cube, "HiRISE Ancillary")
+    buffer_vals = np.array(ha_dict["BufferPixels"])
+    buffer = np.ma.masked_outside(
+        buffer_vals, specialpix.Min, specialpix.Max
+    )
+    buffer_liscount = np.ma.count_masked(buffer)
+    buffer_lisfrac = buffer_liscount / buffer.size
+    lines.append(
+        f"Buffer LIS: {buffer_liscount} pixels, "
+        f"{buffer_lisfrac:.2%}"
+    )
+
+    b = 1, 2, 4, 8, 16
+    flags = set_flags(
+        conf["HiCal"], db, ccdchan, b.index(int(db["BINNING"]))
+    )
+    lines.append(str(flags))
+
+    destripe_filter = check_destripe(in_cube, int(db["BINNING"]), bin2, bin4)
+    lines.append(f"Would the destripe filter be run: {destripe_filter}")
+
+    return lines
+
+
+def setup(cube: os.PathLike, db: dict, conf: dict):
+    in_cube = Path(cube)
+    cid = hirise.get_ChannelID_fromfile(in_cube)
+    if str(cid) != db["PRODUCT_ID"]:
+        raise ValueError(
+            "The Product ID in the file ({}) does not match "
+            "the one in the database ({}).".format(str(cid), db["PRODUCT_ID"])
+        )
+    ccdchan = (cid.get_ccd(), cid.channel)
+    lis_per = (
+        float(db["LOW_SATURATED_PIXELS"])
+        / (int(db["IMAGE_LINES"]) * int(db["LINE_SAMPLES"]))
+        * 100.0
+    )
+    if (
+        ccdchan == ("IR10", "1")
+        and lis_per > conf["HiCal"]["HiCal_Bypass_IR10_1"]
+    ):
+        raise UserWarning("Bypassing IR10_1.")
+
+    return in_cube, cid, ccdchan, lis_per
+
+
 def start(
     cube: os.PathLike,
     out_cube: Path,
@@ -286,20 +391,10 @@ def start(
     keep=False,
 ) -> dict:
 
-    in_cube = Path(cube)
-
     # The original Perl Setup00() builds data structures that we don't
     # need.
     # The original Perl Setup01() set up data routing and did filename
     # checking that we don't need here.
-
-    cid = hirise.get_ChannelID_fromfile(in_cube)
-    if str(cid) != db["PRODUCT_ID"]:
-        msg = (
-            "The Product ID in the file ({}) does not match "
-            "the one in the database ({}).".format(str(cid), db["PRODUCT_ID"])
-        )
-        raise ValueError(msg)
 
     # The original Perl Setup03 queried the HiCat.Planned_Observations
     # table to get all of the possible binning values for CCDs in this
@@ -310,17 +405,7 @@ def start(
     # functionality is now broken up and spread out to the check_destripe()
     # function, the set_flags() function, and the if statement below that
     # checks HiCal_Bypass_IR10_1
-    ccdchan = (cid.get_ccd(), cid.channel)
-    lis_per = (
-        float(db["LOW_SATURATED_PIXELS"])
-        / (int(db["IMAGE_LINES"]) * int(db["LINE_SAMPLES"]))
-        * 100.0
-    )
-    if (
-        ccdchan == ("IR10", "1")
-        and lis_per > conf["HiCal"]["HiCal_Bypass_IR10_1"]
-    ):
-        raise UserWarning("Bypassing IR10_1.")
+    in_cube, cid, ccdchan, lis_per = setup(cube, db, conf)
 
     destripe_filter = check_destripe(in_cube, int(db["BINNING"]), bin2, bin4)
 
@@ -361,7 +446,7 @@ def HiCal(
     bitflipwidth=0,
     keep=False,
 ) -> tuple:
-    logger.info("HiCal start.")
+    logger.info(f"HiCal start: {in_cube}")
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
 
@@ -527,7 +612,7 @@ def HiCal(
     if not keep:
         to_delete.unlink()
 
-    logger.info("HiCal done.")
+    logger.info(f"HiCal done: {out_cube}")
     return std_final, diff_std_dev, zapped, hical_status
 
 
