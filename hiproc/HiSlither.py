@@ -37,6 +37,8 @@ import hiproc.util as util
 import hiproc.HiColorInit as hicolor
 import hiproc.HiJitReg as hjr
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -50,7 +52,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     start(args.cubes, keep=args.keep)
     return
@@ -81,7 +83,7 @@ def cube_check(
             have_str = str(have_ccds[0])
         else:
             have_str = "{} and {}".format(*have_ccds)
-        logging.info(
+        logger.info(
             "For a slither set, we need at least a RED and BG CCD."
             + f"We only have: {have_str}"
         )
@@ -101,7 +103,7 @@ def HiSlither(
     if bg is None:
         raise TypeError("Expected a BG HiColorCube, but got None.")
 
-    logging.info("Beginning HiSlither for {}".format(str(red)))
+    logger.info("Beginning HiSlither for {}".format(str(red)))
 
     temp_token = datetime.now().strftime("HiSlither-%y%m%d%H%M%S")
 
@@ -111,7 +113,7 @@ def HiSlither(
         # masking the red band with itself. The dummy band allows for
         # RGB (synthetic B) to be created by HiBeautify even if the
         # IR band is missing.
-        logging.info("Missing IR, creating a null band.")
+        logger.info("Missing IR, creating a null band.")
         ir_slither_p = make_dummy_IR(red, bg)
         ir = hicolor.HiColorCube(ir_slither_p)
     else:
@@ -119,8 +121,8 @@ def HiSlither(
 
     bg_slither_p = run_slither(bg)
 
-    logging.info("Slither finished, merging stacks.")
-    logging.info(
+    logger.info("Slither finished, merging stacks.")
+    logger.info(
         "Creating {}-{}-{} mosaic".format(
             ir.get_ccd(), red.get_ccd(), bg.get_ccd()
         )

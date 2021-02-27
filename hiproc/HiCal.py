@@ -156,7 +156,7 @@ def main():
              "the directory with the input file(s) in it, and determine "
              "whether any of the EDRs from this observation was bin2 and will "
              "internally take care of setting this switch, but if you're just "
-             "processing some observations and not all of them, then although "
+             "processing some RED channels and not all of them, then although "
              "IR10 may be binned, and you didn't convert it to a .cub file or "
              "even download it, then it isn't there for this program to find, "
              "and explicitly setting this switch is needed."
@@ -203,7 +203,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logger(logger, args.log, args.logfile)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     if len(args.cube) > 1 and (
         not args.output.startswith(".") or not args.db.startswith(".")

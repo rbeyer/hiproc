@@ -38,6 +38,8 @@ import kalasiris as isis
 import hiproc.util as util
 import hiproc.HiColorNorm as hcn
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -75,7 +77,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     start(
         args.cubes, args.conf, args.output_irb, args.output_rgb, keep=args.keep
@@ -140,9 +142,9 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
         print(err.stderr)
 
     if len(cubes) == 1:
-        logging.info("Warning, missing one half!")
+        logger.info("Warning, missing one half!")
     else:
-        logging.info("Using both halves")
+        logger.info("Using both halves")
         isis.handmos(
             cubes[1].path,
             mosaic=irb_out_p,
@@ -170,7 +172,7 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
 
     # Subtract the unaltered RED band from the high pass filtered BG for
     # synthetic blue.
-    logging.info("Creating synthetic B, subtracting RED from BG")
+    logger.info("Creating synthetic B, subtracting RED from BG")
     rgbsynthb_p = to_del.add(irb_out_p.with_suffix(f".{temp_token}_B.cub"))
     isis.algebra(
         f"{irb_out_p}+3",

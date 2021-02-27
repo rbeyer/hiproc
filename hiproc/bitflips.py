@@ -171,8 +171,7 @@ def main():
 
         args = parser.parse_args()
 
-        # util.set_logging(args.log, args.logfile)
-        util.set_logger(logger, args.log, args.logfile)
+        util.set_logger(logger, args.verbose, args.logfile, args.log)
 
         out_p = util.path_w_suffix(args.output, args.file)
 
@@ -1353,7 +1352,6 @@ def find_smart_window(
     # I didn't want to eliminate all of it, as it might be needed
     # again.
 
-    logger = logging.getLogger(f"{__name__}.find_smart_window")
     # print(dn)
     # print(f'mindn {mindn}')
     # print(f'maxdn {maxdn}')
@@ -1710,7 +1708,7 @@ def pick_index(
         than the fraction will choose the index farther from the centraldn.
     :return: two-tuple of ints which represent the minimum and maximum indices.
     """
-    logger = logging.getLogger(f"{__name__}.pick_index")
+    # logger = logger.getLogger(f"{__name__}.pick_index")
     # print(f"min_indices: {min_indices}")
     # print(f"max_indices: {max_indices}")
     # print(f"minima_i: {minima_i}")
@@ -1971,7 +1969,7 @@ def best_index(
         include it.
     :return: index into *counts*
     """
-    logger = logging.getLogger(f"{__name__}.best_index")
+    # logger = logger.getLogger(f"{__name__}.best_index")
 
     # If they're the same, short circuit this whole function.
     if i1 == i2:

@@ -49,6 +49,8 @@ import kalasiris as isis
 import hiproc.util as util
 import hiproc.HiColorInit as hicolor
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -70,12 +72,12 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     try:
         successful_ccds = start(args.cubes, args.conf, keep=args.keep)
     except RuntimeError as err:
-        logging.critical("Unable to continue. " + str(err))
+        logger.critical("Unable to continue. " + str(err))
         sys.exit()
     except subprocess.CalledProcessError as err:
         print("Had an ISIS error:")
@@ -314,7 +316,7 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
                 ):
                     self["EdgyCount"] += 1
 
-                    logging.info(
+                    logger.info(
                         "Marginal register {} lines, {} samples to "
                         "edge.".format(
                             deltaLine - self["SearchLines"] / 2,
@@ -369,7 +371,7 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
             ):
                 self["MatchedCount"] -= 1
                 self.IgnoredPoints.add(cm["PointId"])
-                logging.info(
+                logger.info(
                     "Ignorable point {} with ".format(cm["PointId"])
                     + "badness {} and ".format(cm["GoodnessOfFit"])
                     + f"smoothing delta {delta}"
@@ -452,10 +454,10 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
                 ):
                     v.append("Ignore", True)
                     badness += 1
-                    logging.info("Ignoring point {}".format(v["PointId"]))
+                    logger.info("Ignoring point {}".format(v["PointId"]))
             cn.append(k, v)
 
-        logging.info(f"{badness} point(s) ignored.")
+        logger.info(f"{badness} point(s) ignored.")
 
         new_pvl = pvl.PVLModule(ControlNetwork=cn)
 
@@ -526,7 +528,7 @@ def jitter_iter(
     # so we can't really make a loop.
     step = 1
 
-    logging.info(f"Attempting hijitreg iteration #{step} for {color}")
+    logger.info(f"Attempting hijitreg iteration #{step} for {color}")
 
     color_jitter = JitterCube(color, conf)
 
@@ -554,7 +556,7 @@ def jitter_iter(
         return True
 
     step += 1
-    logging.info(f"Attempting hijitreg iteration #{step} for {color}")
+    logger.info(f"Attempting hijitreg iteration #{step} for {color}")
 
     # second pass
     run_HiJitReg(red.path, color_jitter, jit_param, temp_token, keep=keep)
@@ -563,10 +565,10 @@ def jitter_iter(
     ret = Analyze_Flat(color_jitter, step, coverage)
 
     if ret == 0:
-        logging.info(f"Jitter registration failed for {color}")
+        logger.info(f"Jitter registration failed for {color}")
         return False
     elif ret < 0:
-        logging.info("!!! Validation Required !!!")
+        logger.info("!!! Validation Required !!!")
         return True
     else:
         return True
@@ -589,10 +591,10 @@ def run_HiJitReg(
         ]["File_Status"]
 
     if file_status == "KEEP":
-        logging.info("Using existing regdef file due to KEEP file status.")
+        logger.info("Using existing regdef file due to KEEP file status.")
     else:
-        logging.info(f"Writing new regdef file {color.regdef_path}")
-        logging.info(params)
+        logger.info(f"Writing new regdef file {color.regdef_path}")
+        logger.info(params)
         write_regdef(color.regdef_path, params)
 
     tmp_control = color.cnet_path.with_suffix(".net")
@@ -654,22 +656,22 @@ def Analyze_Flat(
     cube.reset()
     cube.filterCNetPVL()
 
-    logging.info(
+    logger.info(
         "Matched Registers     = {} of {}".format(
             cube["MatchedCount"], cube["RegisterCount"]
         )
     )
-    logging.info("Average Sample Offset = {}".format(cube["AvgSampleOffset"]))
-    logging.info("Average Line Offset   = {}".format(cube["AvgLineOffset"]))
-    logging.info("Edgy Count            = {}".format(cube["EdgyCount"]))
-    logging.info("Suspect Points        = {}".format(cube["SuspectCount"]))
+    logger.info("Average Sample Offset = {}".format(cube["AvgSampleOffset"]))
+    logger.info("Average Line Offset   = {}".format(cube["AvgLineOffset"]))
+    logger.info("Edgy Count            = {}".format(cube["EdgyCount"]))
+    logger.info("Suspect Points        = {}".format(cube["SuspectCount"]))
 
     if cube["AvgSampleOffset"] is None or cube["AvgLineOffset"] is None:
-        logging.warning("No points met the correlation tolerance.")
+        logger.warning("No points met the correlation tolerance.")
         return 0
 
     if hijitreg and cube["CanSlither"] is False:
-        logging.warning(
+        logg.warning(
             "Too few correlated lines found for cubic slither fit."
         )
         return 0
@@ -679,25 +681,25 @@ def Analyze_Flat(
     ]
 
     if good_fraction < 0.5 * fraction and step <= 1:
-        logging.info(
+        logger.info(
             f"Too few correlated points ({good_fraction}) "
             "found at this tolerance."
         )
         return 0
 
     elif hijitreg and good_fraction < 0.25 * fraction and step <= 2:
-        logging.info(
+        logger.info(
             f"Too few correlated points ({good_fraction}) "
             "found at this tolerance."
         )
         return -1
 
     if hijitreg and cube["EdgyCount"] > 2 and good_fraction > 0.8 * fraction:
-        logging.info("More than two edgy points with search box size.")
+        logger.info("More than two edgy points with search box size.")
         return -1
 
     if cube["SuspectCount"] > 3:
-        logging.info("More than three suspect points with search box size.")
+        logger.info("More than three suspect points with search box size.")
         return -1
 
     return 1

@@ -38,6 +38,7 @@
 
 import argparse
 import itertools
+import logging
 from pathlib import Path
 
 import hiproc.hirise as hirise
@@ -54,6 +55,8 @@ import hiproc.HiBeautify as HiBeautify
 import hiproc.HiPrecisionInit as HiPrecisionInit
 import hiproc.HiNoProj as HiNoProj
 import hiproc.HiJACK as HiJACK
+
+logger = logging.getLogger(__name__)
 
 
 class ChannelCube(hirise.ChannelID):
@@ -109,7 +112,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log, args.logfile)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     oid = hirise.get_ObsID_fromfile(args.img[0])
     parent = Path(args.img[0]).parent

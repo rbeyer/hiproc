@@ -41,6 +41,8 @@ import kalasiris as isis
 
 import hiproc.util as util
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     try:
@@ -56,7 +58,7 @@ def main():
 
         args = parser.parse_args()
 
-        util.set_logging(args.log, args.logfile)
+        util.set_logger(logger, args.verbose, args.logfile, args.log)
 
         out_p = util.path_w_suffix(args.output, args.cube)
 
@@ -286,7 +288,7 @@ def unflip(in_p: Path, out_p: Path, keep=False):
 
             hist = isis.Histogram(this_p)
 
-            logging.info(
+            logger.info(
                 f"bitflip position {pm}{delt}, near: {near} "
                 f"far: {far}, extrema: {hist[extrema]}"
             )
@@ -299,13 +301,13 @@ def unflip(in_p: Path, out_p: Path, keep=False):
                 try:
                     thresh = get_unflip_thresh(hist, far, near, d)
                 except ValueError as err:
-                    logging.info(err)
+                    logger.info(err)
                     count -= 1
                     break
                 subtract_over_thresh(this_p, next_p, thresh, d, keep=keep)
                 this_p = next_p
             else:
-                logging.info(
+                logger.info(
                     "The far value was beyond the extrema. " "Didn't bother."
                 )
 

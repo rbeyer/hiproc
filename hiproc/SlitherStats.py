@@ -30,6 +30,7 @@
 
 import argparse
 import csv
+import logging
 import os
 
 import matplotlib.pyplot as plt
@@ -37,6 +38,8 @@ import numpy as np
 import numpy.polynomial.polynomial as P
 
 import hiproc.util as util
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -50,7 +53,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     for s in args.slithertxts:
         slitherstats = Polyfit(s, args.plot)

@@ -21,6 +21,7 @@ import logging
 import os
 from pathlib import Path
 
+import hiproc
 import hiproc.hirise as hirise
 
 
@@ -28,12 +29,19 @@ def parent_parser() -> argparse.ArgumentParser:
     """Returns a parent parser with common arguments for PyRISE programs."""
     parent = argparse.ArgumentParser(add_help=False)
     parent.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Displays additional information as processing progresses."
+    )
+    parent.add_argument(
         "-l",
         "--log",
         required=False,
-        default="WARNING",
-        help="The log level to show for this program, can "
-        "be a named log level or a numerical level.",
+        help=argparse.SUPPRESS,
+        # help="The log level to show for this program, can "
+        # "be a named log level or a numerical level.",
     )
     parent.add_argument(
         "--logfile",
@@ -51,22 +59,35 @@ def parent_parser() -> argparse.ArgumentParser:
         "intermediary files, but if this option is given, it "
         "won't.",
     )
+    parent.add_argument(
+        '--version',
+        action='version',
+        version=f"hiproc version {hiproc.__version__}",
+        help="Show library version number."
+    )
     return parent
 
 
-def set_logger(logger, i, filename=None) -> None:
+def set_logger(logger, verblvl=None, filename=None, loglvl=0) -> None:
     """Sets the log level and configuration for applications."""
-    if isinstance(i, int):
-        log_level = i
+    if loglvl is not None:
+        if isinstance(loglvl, int):
+            lvl = loglvl
+        else:
+            lvl = getattr(logging, loglvl.upper(), logging.WARNING)
     else:
-        log_level = getattr(logging, i.upper(), logging.WARNING)
+        lvl_dict = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
+        if verblvl in lvl_dict:
+            lvl = lvl_dict[verblvl]
+        else:
+            lvl = lvl_dict[max(lvl_dict.keys())]
 
-    logger.setLevel(log_level)
+    logger.setLevel(lvl)
 
     ch = logging.StreamHandler()
-    ch.setLevel(log_level)
+    ch.setLevel(lvl)
 
-    if log_level < 20:  # less than INFO
+    if lvl < 20:  # less than INFO
         formatter = logging.Formatter("%(name)s - %(levelname)s: %(message)s")
     else:
         formatter = logging.Formatter("%(levelname)s: %(message)s")
@@ -76,7 +97,7 @@ def set_logger(logger, i, filename=None) -> None:
 
     if filename is not None:
         fh = logging.FileHandler(filename)
-        fh.setLevel(log_level)
+        fh.setLevel(lvl)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
 

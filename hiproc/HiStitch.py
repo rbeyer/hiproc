@@ -44,6 +44,8 @@ import kalasiris as isis
 import hiproc.hirise as hirise
 import hiproc.util as util
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -92,7 +94,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     (db, outcub_path) = start(
         args.cube0,
@@ -255,7 +257,7 @@ def HiStitch(
     ccd_number: int,
     keep=False,
 ) -> tuple:
-    logging.info("HiStitch start.")
+    logger.info("HiStitch start.")
 
     out_path = Path(out_cube)
     # Allows for indexing in lists ordered by bin value.
@@ -274,7 +276,7 @@ def HiStitch(
 
     # HiStitchStep() - runs HiStitch, and originally inserted to db, now we
     # just return at the bottom of this function.
-    logging.info(
+    logger.info(
         HiStitchStep(
             cubes,
             out_path,
@@ -299,7 +301,7 @@ def HiStitch(
         HiFurrow_Fix(out_path, furrow_file, max_mean, keep=keep)
         furrow_file.rename(out_path)
 
-    logging.info("HiStitch done.")
+    logger.info("HiStitch done.")
     return (truthchannel, balanceratio)
 
 
@@ -346,7 +348,7 @@ def set_flags(
             and max_dstd
             < float(conf["HiStitch_Balance_Bin_DarkPixel_STD"][binning])
         ):
-            logging.warning(
+            logger.warning(
                 "Original Perl issue: conf file arrays are being "
                 "indexed incorrectly, may affect setting of "
                 "equalize and balance flags."
@@ -498,7 +500,7 @@ def HiFurrow_Fix(
 
     # copy the input file to the output file then mosaic the
     # furrow area as needed.
-    logging.info(f"Copy {in_cub} to {out_cube}.")
+    logger.info(f"Copy {in_cub} to {out_cube}.")
     shutil.copyfile(in_cub, out_cube)
     isis.handmos(
         alg_cub,

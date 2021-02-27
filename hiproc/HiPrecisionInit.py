@@ -42,6 +42,8 @@ import pvl
 import hiproc.SlitherStats as sstats
 import hiproc.util as util
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -60,7 +62,7 @@ def main():
     args = parser.parse_args()
 
     # Ignore args.log to always print info when run from the command line.
-    util.set_logging("info")
+    util.set_logger(logger, "info", args.logfile, args.log)
 
     start(args.slither_text, args.conf)
 
@@ -72,8 +74,8 @@ def start(slither_paths: list, conf_path: os.PathLike):
 
     yes_HiJACK = list()
     thresh = float(conf["HiPrecisionInit"]["Mean_Jitter_Magnitude_Threshold"])
-    logging.info(f"Mean_Jitter_Magnitude_Threshold: {thresh}")
-    logging.info(f"Average\tProcess \tFile Name")
+    logger.info(f"Mean_Jitter_Magnitude_Threshold: {thresh}")
+    logger.info(f"Average\tProcess \tFile Name")
     for s in slither_paths:
         (need, avediff) = needs_HiJACK(s, thresh)
         if need:
@@ -81,7 +83,7 @@ def start(slither_paths: list, conf_path: os.PathLike):
         else:
             terminus = "HiNoProj"
 
-        logging.info("{:.2}\t{}\t{}".format(avediff, terminus, s))
+        logger.info("{:.2}\t{}\t{}".format(avediff, terminus, s))
         yes_HiJACK.append(need)
 
     return yes_HiJACK

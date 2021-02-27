@@ -44,6 +44,8 @@ import kalasiris as isis
 import hiproc.hirise as hirise
 import hiproc.util as util
 
+logger = logging.getLogger(__name__)
+
 
 class HiccdStitchCube(hirise.CCDID):
     """A class for HiRISE CCD IDs with additional capabilities for
@@ -213,13 +215,13 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     # outcub_path = set_outcube(args.output, pid0)
 
     if args.cubenorm is not None:
         if len(args.cubenorm) != len(args.cubes):
-            logging.critical(
+            logger.critical(
                 f"The number of cubes ({len(args.cubes)}) and "
                 "the number of cubenorm flags given "
                 f"({len(args.cubenorm)}) did not match. Exiting."
@@ -327,7 +329,7 @@ def start(
 def HiccdStitch(
     cubes: list, out_path: os.PathLike, conf: dict, keep=False
 ) -> list:
-    logging.info("HiccdStitch start.")
+    logger.info("HiccdStitch start.")
 
     # This string will get placed in the filename for all of our
     # temporary files. It will (hopefully) prevent collisions with
@@ -353,7 +355,7 @@ def HiccdStitch(
 
     cubes.sort()
 
-    logging.info(
+    logger.info(
         "The Original Perl looked for a custom file for "
         "hiccdstitch's shiftdef parameter, but the default ISIS "
         "file seems better, so this isn't implemented."
@@ -368,7 +370,7 @@ def HiccdStitch(
 
     SNR_Check(cubes, conf["HiccdStitch"]["HiccdStitch_SNR_Threshold"])
 
-    logging.info("HiccdStitch done.")
+    logger.info("HiccdStitch done.")
     if not keep:
         to_delete.unlink()
 
@@ -711,7 +713,7 @@ def BalanceStep(cubes, conf, keep=False) -> list:
     # Here's the pythonic version:
     cubes.sort()
     for (offset, group) in get_group_i(cubes):
-        logging.info("Correction before redistribution.")
+        logger.info("Correction before redistribution.")
         for ccd in group:
             i = ccd + offset
             cubes[i].correction = get_correction(
@@ -720,7 +722,7 @@ def BalanceStep(cubes, conf, keep=False) -> list:
                 conf["HiccdStitch_Balance_Correction"],
                 i,
             )
-            logging.info(
+            logger.info(
                 f"CCDID: {cubes[i]}, correction: {cubes[i].correction}"
             )
 
@@ -728,11 +730,11 @@ def BalanceStep(cubes, conf, keep=False) -> list:
             cubes, group, offset, conf["HiccdStitch_Control_CCD"]
         )
 
-        logging.info("Correction after redistribution.")
+        logger.info("Correction after redistribution.")
         for ccd in group:
             i = ccd + offset
             cubes[i].correction /= normalization
-            logging.info(
+            logger.info(
                 f"CCDID: {cubes[i]}, correction: {cubes[i].correction}, "
                 f"left: {cubes[i].lstats}, right: {cubes[i].rstats}"
             )
@@ -841,7 +843,7 @@ def get_correction(this_c, prev_c, Balance_corr, is_not_first=True) -> float:
             return 1
     else:
         if is_not_first:
-            logging.warning(
+            logger.warning(
                 "Original Perl issue: non-MULTIPLY value "
                 "for HiccdStitch_Balance_Correction leads "
                 "to a correction value that is calculated "
@@ -922,17 +924,17 @@ def SpecialProcessingFlags(cube: HiccdStitchCube):
 def SNR_Check(cubes: list, snr_threshold: float):
     snr_list = list()
     for c in cubes:
-        logging.info(f"{c}, binning: {c.bin}, SNRs: {c.snr_list}")
+        logger.info(f"{c}, binning: {c.bin}, SNRs: {c.snr_list}")
         if c.bin == 1:
             if len(c.snr_list) > 0:
                 snr_list.extend(c.snr_list)
             else:
-                logging.info(
+                logger.info(
                     "Without SNR values, this won't be included in "
                     "the check."
                 )
         else:
-            logging.info(
+            logger.info(
                 "Since binning is more than 1, this CCD won't be "
                 " included in the check."
             )
@@ -942,7 +944,7 @@ def SNR_Check(cubes: list, snr_threshold: float):
 
     snr_average = statistics.mean(snr_list)
     if snr_average < snr_threshold:
-        logging.warning(
+        logger.warning(
             f"The average SNR is {snr_average}, which is greater "
             f"than the threshold: {snr_threshold}"
         )

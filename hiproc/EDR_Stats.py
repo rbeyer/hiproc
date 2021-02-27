@@ -95,7 +95,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logger(logger, args.log, args.logfile)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     if len(args.img) > 1 and not args.output.startswith("."):
         logger.critical(

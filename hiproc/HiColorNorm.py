@@ -45,6 +45,8 @@ import kalasiris as isis
 import hiproc.hirise as hirise
 import hiproc.util as util
 
+logger = logging.getLogger(__name__)
+
 
 class ColorCube(hirise.ObservationID):
     """A class for HiRISE multiband COLOR cubes."""
@@ -223,7 +225,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     (ir_ratio, bg_ratio) = start(
         args.cubes,
@@ -655,7 +657,7 @@ def per_band(
         # As the comment below states, I *think* that the OP had a copy
         # and paste error here, because even though it kept track of both
         # the IR and BG boxcar dimensions, they were always identical.
-        logging.warning(
+        logger.warning(
             "The original Perl calculates the boxcar size for "
             "both the IR and BG based only on the ratio of the "
             "IR to the RED."

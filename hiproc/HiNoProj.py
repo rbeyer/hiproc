@@ -44,6 +44,8 @@ import hiproc.util as util
 import hiproc.HiColorInit as hci
 import hiproc.HiColorNorm as hcn
 
+logger = logging.getLogger(__name__)
+
 
 class Cube(hci.HiColorCube):
     def __init__(self, pathlike):
@@ -73,7 +75,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     try:
         start(
@@ -293,7 +295,7 @@ def fix_labels(
     # This doesn't seem to be needed, maybe it was HiROC-specific.
 
     #  Add SourceProductIds to Archive group in label
-    logging.info(
+    logger.info(
         "Original Perl just assumes that both channels are included "
         "in the balance cube."
     )
@@ -349,7 +351,7 @@ def HiNoProj(
 
     # Mosaic noproj'ed ccds using average line/sample offset
     shutil.copyfile(base_cube.next_path, out_p)
-    logging.info(
+    logger.info(
         "Original Perl hard codes this file copy from RED5, even if "
         "another cube is selected as the base_ccd."
     )

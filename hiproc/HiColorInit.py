@@ -37,6 +37,8 @@ import kalasiris as isis
 import hiproc.hirise as hirise
 import hiproc.util as util
 
+logger = logging.getLogger(__name__)
+
 
 CCD_Corresponence = {
     "IR10": "RED4",
@@ -73,10 +75,10 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     if not args.output_suffix.startswith("."):
-        logging.critical(
+        logger.critical(
             "--output_suffix must start with a period, and it "
             f"does not: {args.output_suffix}"
         )
@@ -85,7 +87,7 @@ def main():
     try:
         start(args.cubes, args.output_suffix, keep=args.keep)
     except ValueError as err:
-        logging.critical(err)
+        logger.critical(err)
         sys.exit()
     except subprocess.CalledProcessError as err:
         print("Had an ISIS error:")

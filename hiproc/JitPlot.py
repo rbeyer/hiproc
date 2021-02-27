@@ -43,6 +43,8 @@ import hiproc.util as util
 import hiproc.HiColorInit as hicolor
 import hiproc.HiJitReg as hjr
 
+logger = logging.getLogger(__name__)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -62,7 +64,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     conf = pvl.load(str(args.conf))
 
@@ -147,7 +149,7 @@ def filter_and_smooth(j: hjr.JitterCube) -> tuple:
             or cm["PointId"] in j.IgnoredPoints
         ):
             rejected.append(point)
-            logging.info("Rejecting {}, {}".format(cm["Row"], cm["Column"]))
+            logger.info("Rejecting {}, {}".format(cm["Row"], cm["Column"]))
         else:
             accepted.append(point)
 

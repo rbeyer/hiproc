@@ -50,6 +50,8 @@ import hiproc.util as util
 import hiproc.HiJitReg as hjr
 import hiproc.HiNoProj as hnp
 
+logger = logging.getLogger(__name__)
+
 resolve_jitter_path = (
     "/Users/rbeyer/software/HiPrecision/fromOleg/HiPrecision/resolveJitter"
 )
@@ -79,7 +81,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log)
+    util.set_logger(logger, args.verbose, args.logfile, args.log)
 
     try:
         start(
@@ -322,19 +324,19 @@ def make_flats(cubes, common_cube, conf, temp_token, keep=False):
                     c.path, "Instrument", "StitchedProductIds"
                 )
                 if len(channels) < 2:
-                    logging.info(
+                    logger.info(
                         f"Increasing columns because {c.path} is "
                         "missing a channel."
                     )
                     params["COLS"] += 1
                     min_fraction_good *= 0.5
-            logging.info(
+            logger.info(
                 "The minimum allowable Fraction Good "
                 f"Matches = {min_fraction_good}"
             )
             step = 0
             while step <= confauto["Algorithm"]["Steps"]:
-                logging.info(f"Step {step} begin")
+                logger.info(f"Step {step} begin")
 
                 hjr.run_HiJitReg(
                     common_cube.next_path, c, params, temp_token, keep=keep
@@ -399,7 +401,7 @@ def ResolveJitter(
         rj_args.append(f.relative_to(jitter_path.parent))
         rj_args.append("-1")
 
-    logging.info(rj_args)
+    logger.info(rj_args)
     subprocess.run(rj_args, check=True)
 
     # Just double-check that the file we expect was created:
@@ -583,7 +585,7 @@ def HiJACK(
     )[0]
     # shutil.copyfile(base_cube.next_path, red_p)
     shutil.copyfile(red_5.next_path, red_p)
-    logging.info(
+    logger.info(
         "Original Perl hard codes this file copy from RED5, even if "
         "another cube is selected as the base_ccd."
     )
