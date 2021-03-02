@@ -199,10 +199,14 @@ def fix(
     # plt.show()
     # sys.exit()
 
-    logger.info("Fixing Reverse-Clock pixels.")
+    # When we "fix" pixels, we must ensure that we are only fixing the LIS
+    # pixels.  The cal_image has all special pixels masked out, so
+    # we need to create a new structure that only masks the LIS pixels.
+    cal_lismasked = np.ma.masked_equal(cal_vals, specialpix.Lis)
+    logger.info("Fixing Reverse-Clock LIS pixels.")
     fixed_cal = np.ma.apply_along_axis(
         fix_rev_clock, 0, np.ma.concatenate((
-            cal_image,
+            cal_lismasked,
             rev_model.reshape((1, rev_model.size))
         ))
     )
@@ -299,11 +303,12 @@ def fix(
         # buffer.mask = True
 
         logger.info("Fixing Buffer pixels.")
+        buffer_lismasked = np.ma.masked_equal(buffer_vals, specialpix.Lis)
         fixed_buf = np.ma.apply_along_axis(
             fix_buffer,
             1,
-            np.ma.concatenate((buffer, model_buffer), 1),
-            buffer.shape[1]
+            np.ma.concatenate((buffer_lismasked, model_buffer), 1),
+            buffer_lismasked.shape[1]
         )
         # print(fixed_buf)
         # print(fixed_buf.dtype)
@@ -348,9 +353,9 @@ def fix_rev_clock(
     cal_image_col: np.ma.array,
     lis_fraction=0.2,
 ):
-    """Returns a np.masked array where the LIS pixels in the
-    reverse-clock area are replaced with a fill value from the end
-    of the column, if the percent of LIS pixels is greater than or
+    """Returns a np.masked array where the masked pixels in the
+    *cal_image_col* are replaced with a fill value from the end
+    of the column, if the percent of masked pixels is greater than or
     equal to *lis_fraction*.
 
     It is assumed that cal_image_col array has one more final entry
