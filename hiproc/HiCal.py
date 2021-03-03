@@ -1235,10 +1235,15 @@ def Cubenorm_Filter(
     divide=False,
     chan=None,
 ) -> tuple:
-    """Perform a highpass filter on the cubenorm table output of the
-    columnar average and median values.
+    """Returns a two-tuple with the standard deviation of the
+    filtered average and a boolean indicating whether the maximum
+    value of the ValidPoints in *cubenorm_tab* are at one end or
+    the other (depending on *chan*).
     """
-    logger.info(Cubenorm_Filter.__doc__)
+    logger.info(
+        "Perform a highpass filter on the cubenorm table output of the "
+        "columnar average and median values."
+    )
     if boxfilter < 3:
         raise ValueError(f"boxfilter={boxfilter} is less than 3")
 
@@ -1536,13 +1541,17 @@ def NoiseFilter_cubenorm_edit(
     conf: dict,
     zapc=False,
 ) -> None:
-    """This function zaps the relevent pixels in the cubenorm output and
-    creates an edited cubenorm file."""
+    """This function returns nothing, but creates a pair of edited cubenorm
+    files.
+    """
     # Slightly different values from other function, not entirely sure why.
     # Pause point locations are 1-based pixel numbers, so -1 to get list index.
     # Width values are the number of pixels to affect, including the pause
     # point pixel.
-    logger.info(NoiseFilter_cubenorm_edit.__doc__)
+    logger.info(
+        "Zaps the relevant pixels in the cubenorm output and creates an "
+        "edited cubenorm file."
+    )
 
     # pause point sample locations:
     ch_pause = {
