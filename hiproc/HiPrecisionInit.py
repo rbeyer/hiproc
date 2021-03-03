@@ -62,7 +62,7 @@ def main():
     args = parser.parse_args()
 
     # Ignore args.log to always print info when run from the command line.
-    util.set_logger(logger, "info", args.logfile, args.log)
+    util.set_logger("info", args.logfile, args.log)
 
     start(args.slither_text, args.conf)
 

@@ -72,7 +72,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logger(logger, args.log, args.logfile)
+    util.set_logger(args.verbose, args.logfile, args.log)
 
     edr_path = Path(args.edr)
     mdr_path = Path(args.mdr)

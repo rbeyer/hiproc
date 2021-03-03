@@ -81,8 +81,9 @@ def parent_parser() -> argparse.ArgumentParser:
     return parent
 
 
-def set_logger(logger, verblvl=None, filename=None, loglvl=0) -> None:
+def set_logger(verblvl=None, filename=None, loglvl=0) -> None:
     """Sets the log level and configuration for applications."""
+    logger = logging.getLogger(__name__.split(".")[0])
     if loglvl is not None:
         if isinstance(loglvl, int):
             lvl = loglvl

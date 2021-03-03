@@ -53,7 +53,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logger(logger, args.verbose, args.logfile, args.log)
+    util.set_logger(args.verbose, args.logfile, args.log)
 
     for s in args.slithertxts:
         slitherstats = Polyfit(s, args.plot)
