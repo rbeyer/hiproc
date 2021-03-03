@@ -145,6 +145,7 @@ def fix(
     )
 
     mask_lines = int(20 / binning)
+    ramp_start = 20 + mask_lines
 
     # Get the average slope of the dark ramp
     hca_dict = isis.cube.get_table(in_path, "HiRISE Calibration Ancillary")
@@ -154,7 +155,7 @@ def fix(
     )
     # print(caldark.shape)
     dark_slopes = np.ma.apply_along_axis(
-        get_ramp_slope, 0, caldark[:,1:], mask_lines
+        get_ramp_slope, 0, caldark[ramp_start:, 1:]
     )
     # print(dark_slopes.shape)
     # print(dark_slopes)
@@ -212,6 +213,18 @@ def fix(
             f"Less than tolerance ({tolerance}), will not fix Buffer."
         )
 
+    ramp_lisfrac = np.ma.count_masked(
+        cal_image[ramp_start:]
+    ) / cal_image[ramp_start:].size
+
+    if ramp_lisfrac > tolerance:
+        fixed = False
+        logger.warning(
+            f"The fraction of LIS pixels in the ramp area ({ramp_lisfrac}) "
+            f"is greater than the tolerance ({tolerance}), which prevents "
+            f"lisfix processing."
+        )
+
     if fixed:
         shutil.copy(in_path, out_path)
     else:
@@ -220,8 +233,7 @@ def fix(
     # Fix rev-clock
     if revclk_lisfrac > tolerance:
         rev_model = ramp_rev_clock(
-            cal_image,
-            mask_lines,
+            cal_image[ramp_start:],
             label["IsisCube"]["Instrument"]["ChannelNumber"],
             zero_correction
         ).astype(int)
@@ -356,30 +368,17 @@ def fix(
     return fixed
 
 
-def fit_ramp(
-    col: np.ma.array,
-    mask_lines: int,
-):
+def fit_ramp(col: np.ma.array):
     """Returns the slope from the ramp pixels."""
-    return np.ma.polyfit(
-            np.arange(col[20 + mask_lines:].size),
-            col[20 + mask_lines:],
-            1
-        )
+    return np.ma.polyfit(np.arange(col.size), col, 1)
 
 
-def get_ramp_slope(
-    col: np.ma.array,
-    mask_lines: int,
-):
-    return fit_ramp(col, mask_lines)[0]
+def get_ramp_slope(col: np.ma.array):
+    return fit_ramp(col)[0]
 
 
-def get_ramp_intercept(
-    col: np.ma.array,
-    mask_lines: int,
-):
-    return fit_ramp(col, mask_lines)[1]
+def get_ramp_intercept(col: np.ma.array):
+    return fit_ramp(col)[1]
 
 
 def fix_rev_clock(
@@ -404,13 +403,12 @@ def fix_rev_clock(
 
 
 def ramp_rev_clock(
-    cal_image: np.ma.array,
-    mask_lines: int,
+    ramp_image: np.ma.array,
     chan: int,
     zero_correction=0,
 ):
     ramp_model = np.ma.apply_along_axis(
-        get_ramp_intercept, 0, cal_image, mask_lines
+        get_ramp_intercept, 0, ramp_image
     )
 
     return flatten(ramp_model - zero_correction, chan)
