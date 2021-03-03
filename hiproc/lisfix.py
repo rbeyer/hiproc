@@ -45,7 +45,6 @@ import pvl
 import kalasiris as isis
 
 import hiproc.util as util
-import hiproc.HiCal as HiCal
 from hiproc.bitflips import apply_special_pixels
 from hiproc.hirise import get_ChannelID_fromfile
 
@@ -91,17 +90,29 @@ def fix(
     in_path: os.PathLike,
     out_path: os.PathLike,
     tolerance=0.4
-):
+) -> bool:
     """The ISIS cube file at *out_path* will be the result of running lis-fix
-    processing of the file at *in-path*.
+    processing of the file at *in-path*, if allowed by *tolerance*.  If the
+    *tolerance* setting would result in the application of lis-fix, then
+    no file will be created at *out_path* and this function will return
+    False.  Otherwise there will be a file there, and this function
+    will return True.
 
-    If the fraction of LIS pixels in the Calibration Buffer Pixel area or
-    the first 20 lines of Dark Pixels is greater than *tolerance* a ValueError
-    is raised.
+    If the fraction of LIS pixels in the Reverse-Clock areas is
+    greater than *tolerance*, then all LIS pixels in the rev-clock
+    will be converted to a real DN value based on modeling the slope
+    of the ramp area.
+
+    If the fraction of LIS pixels in the Buffer Pixel area is greater
+    than *tolerance*, this algorithm will attempt to fix those LIS pixels,
+    as well.
+
+    If the file at *in_path* isn't an ISIS cube, a ValueError will be raised.
 
     This function anticipates a HiRISE cube that has the following
     table objects in its label: HiRISE Calibration Ancillary,
-    HiRISE Calibration Image, HiRISE Ancillary.
+    HiRISE Calibration Image, HiRISE Ancillary.  If they are not present
+    a KeyError will be raised.
 
     The HiRISE Calibration Ancillary table contains the BufferPixels
     and DarkPixels from either side of the HiRISE Calibration Image.
@@ -113,6 +124,7 @@ def fix(
 
     in_p = Path(in_path)
     out_p = Path(out_path)
+    fixed = False
 
     label = pvl.load(in_p)
     if "IsisCube" not in label:
@@ -123,10 +135,7 @@ def fix(
         isis.specialpixels, label["IsisCube"]["Core"]["Pixels"]["Type"]
     )
 
-    shutil.copy(in_path, out_path)
-
-    #############################
-    # Fix the reverse-clock area:
+    # Get Rev-Clock data
     t_name = "HiRISE Calibration Image"
     hci_dict = isis.cube.get_table(in_path, t_name)
     cal_vals = np.array(hci_dict["Calibration"])
@@ -163,62 +172,16 @@ def fix(
         cal_image[:20, :]
     ) / cal_image[:20, :].size
     logger.info(
-        f"Fraction of LIS pixels in Reverse-Clock area: {revclk_lisfrac}"
+        f"Fraction of LIS pixels in Reverse-Clock area: {revclk_lisfrac:.2}"
     )
+    if revclk_lisfrac > tolerance:
+        fixed = True
+    else:
+        logger.info(
+            f"Less than tolerance ({tolerance}), will not fix Reverse-Clock."
+        )
 
-    rev_model = ramp_rev_clock(
-        cal_image,
-        mask_lines,
-        label["IsisCube"]["Instrument"]["ChannelNumber"],
-        zero_correction
-    ).astype(int)
-    # # Mask out all of the rev-clock for testing, so we get wholesale
-    # # replacement
-    # orig_cal_image = np.ma.copy(cal_image)
-    # o_mean = np.ma.mean(orig_cal_image[:20, :], axis=0)
-    # y_err_upper = np.ma.max(orig_cal_image[:20, :], axis=0) - o_mean
-    # y_err_lower = o_mean - np.ma.min(orig_cal_image[:20, :], axis=0)
-
-    # cal_image[:20, :] = np.ma.masked
-
-    # # Some plotting for debugging:
-    # import matplotlib.pyplot as plt
-    # plt.plot(o_mean, 'k', label='Mean of Rev-Clock columns')
-    # # plt.errorbar(
-    # #     np.linspace(0, o_mean.size, num=o_mean.size, endpoint=False),
-    # #     o_mean,
-    # #     yerr=[y_err_lower, y_err_upper],
-    # #     fmt='k',
-    # #     label='Mean of Rev-Clock columns'
-    # # )
-    # for i in range(19):
-    #     plt.plot(orig_cal_image[i, :], 'k.')
-    # plt.plot(orig_cal_image[19, :], 'k.', label='Original Rev-Clock')
-    # plt.plot(rev_model, 'r', label="Fixed")
-    # plt.legend(loc='best')
-    # plt.show()
-    # sys.exit()
-
-    # When we "fix" pixels, we must ensure that we are only fixing the LIS
-    # pixels.  The cal_image has all special pixels masked out, so
-    # we need to create a new structure that only masks the LIS pixels.
-    cal_lismasked = np.ma.masked_equal(cal_vals, specialpix.Lis)
-    logger.info("Fixing Reverse-Clock LIS pixels.")
-    fixed_cal = np.ma.apply_along_axis(
-        fix_rev_clock, 0, np.ma.concatenate((
-            cal_lismasked,
-            rev_model.reshape((1, rev_model.size))
-        ))
-    )
-
-    logger.info("Writing out Reverse-Clock pixels.")
-    hci_dict["Calibration"] = apply_special_pixels(
-        fixed_cal, specialpix
-    ).data.tolist()
-    isis.cube.overwrite_table(out_p, t_name, hci_dict)
-
-    ######################
-    # Fix the buffer area:
+    # Get Buffer Data
     calbuf_vals = np.array(hca_dict["BufferPixels"])
     calbuf = np.ma.masked_outside(
         calbuf_vals, specialpix.Min, specialpix.Max
@@ -238,7 +201,77 @@ def fix(
     # print(buffer.dtype)
     # print(buffer.shape)
 
-    if np.ma.count_masked(buffer) / buffer.size > tolerance:
+    buffer_lisfrac = np.ma.count_masked(buffer) / buffer.size
+    logger.info(
+        f"Fraction of LIS pixels in Buffer area: {buffer_lisfrac:.2}"
+    )
+    if buffer_lisfrac > tolerance:
+        fixed = True
+    else:
+        logger.info(
+            f"Less than tolerance ({tolerance}), will not fix Buffer."
+        )
+
+    if fixed:
+        shutil.copy(in_path, out_path)
+    else:
+        return False
+
+    # Fix rev-clock
+    if revclk_lisfrac > tolerance:
+        rev_model = ramp_rev_clock(
+            cal_image,
+            mask_lines,
+            label["IsisCube"]["Instrument"]["ChannelNumber"],
+            zero_correction
+        ).astype(int)
+        # # Mask out all of the rev-clock for testing, so we get wholesale
+        # # replacement
+        # orig_cal_image = np.ma.copy(cal_image)
+        # o_mean = np.ma.mean(orig_cal_image[:20, :], axis=0)
+        # y_err_upper = np.ma.max(orig_cal_image[:20, :], axis=0) - o_mean
+        # y_err_lower = o_mean - np.ma.min(orig_cal_image[:20, :], axis=0)
+
+        # cal_image[:20, :] = np.ma.masked
+
+        # # Some plotting for debugging:
+        # import matplotlib.pyplot as plt
+        # plt.plot(o_mean, 'k', label='Mean of Rev-Clock columns')
+        # # plt.errorbar(
+        # #     np.linspace(0, o_mean.size, num=o_mean.size, endpoint=False),
+        # #     o_mean,
+        # #     yerr=[y_err_lower, y_err_upper],
+        # #     fmt='k',
+        # #     label='Mean of Rev-Clock columns'
+        # # )
+        # for i in range(19):
+        #     plt.plot(orig_cal_image[i, :], 'k.')
+        # plt.plot(orig_cal_image[19, :], 'k.', label='Original Rev-Clock')
+        # plt.plot(rev_model, 'r', label="Fixed")
+        # plt.legend(loc='best')
+        # plt.show()
+        # sys.exit()
+
+        # When we "fix" pixels, we must ensure that we are only fixing the LIS
+        # pixels.  The cal_image has all special pixels masked out, so
+        # we need to create a new structure that only masks the LIS pixels.
+        cal_lismasked = np.ma.masked_equal(cal_vals, specialpix.Lis)
+        logger.info("Fixing Reverse-Clock LIS pixels.")
+        fixed_cal = np.ma.apply_along_axis(
+            fix_rev_clock, 0, np.ma.concatenate((
+                cal_lismasked,
+                rev_model.reshape((1, rev_model.size))
+            ))
+        )
+
+        logger.info("Writing out Reverse-Clock pixels.")
+        hci_dict["Calibration"] = apply_special_pixels(
+            fixed_cal, specialpix
+        ).data.tolist()
+        isis.cube.overwrite_table(out_p, t_name, hci_dict)
+
+    # Fix the buffer area:
+    if buffer_lisfrac > tolerance:
         # first_im_line = 19+(20+label["IsisCube"]["Instrument"]["Tdi"])/binning
         sp_frac = np.ma.count_masked(calbuf[:20, :]) / calbuf[:20, :].size
         if sp_frac <= tolerance:
@@ -247,9 +280,9 @@ def fix(
                 f"Median of first 20 lines of Calibration Buffer Pixels: {refr}"
             )
         else:
-            logger.error(
-                f"More than {tolerance * 100}% of the Calibration Buffer "
-                f"Pixels have special pixel values: {100 * sp_frac}%."
+            logger.info(
+                f"More than {tolerance:.1%} of the Calibration Buffer "
+                f"Pixels have special pixel values: {sp_frac:.2%}."
             )
             isp = pvl.loads(
                 isis.catoriglab(in_path).stdout
@@ -269,7 +302,7 @@ def fix(
                     adc
                 )
             )
-            logger.error(f"Using a model-based substitute ({refr}).")
+            logger.info(f"Using a model-based substitute ({refr}).")
             # import hiproc.img as img
             # lut = img.LUT_Table(isp["MRO:LOOKUP_CONVERSION_TABLE"])
             # if refr <= lut.table[1]:
@@ -286,8 +319,8 @@ def fix(
             logger.info(f"Median of first 20 lines of Dark Pixels: {refd}")
         else:
             refd = int(np.ma.median(fixed_cal[:20, :]))
-            logger.error(
-                f"More than {tolerance * 100}% of the first 20 lines of "
+            logger.info(
+                f"More than {tolerance:.1%} of the first 20 lines of "
                 f"Dark Pixels have a real "
                 f"value: {np.ma.count_masked(dark[:20]) / dark[:20].size} "
                 f"Using the rev-clock median ({refd})."
@@ -320,7 +353,7 @@ def fix(
         logger.info("Writing out Buffer pixels.")
         isis.cube.overwrite_table(out_p, "HiRISE Ancillary", ha_dict)
 
-    return
+    return fixed
 
 
 def fit_ramp(
@@ -508,8 +541,8 @@ def flatten(arr: np.array, chan: int):
     # points
     sos = signal.butter(1, 0.5, output="sos")
     pl = list()
-    for samp, width in zip(HiCal.ch_pause[chan], HiCal.ch_width[chan]):
-        sl = HiCal.pause_slicer(samp, width)
+    for samp, width in zip(util.ch_pause[chan], util.ch_width[chan]):
+        sl = util.pause_slicer(samp, width)
         pl.append(sl.start)
         pl.append(sl.stop)
 

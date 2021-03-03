@@ -25,6 +25,19 @@ import hiproc
 import hiproc.hirise as hirise
 
 
+# These are primarily for use by HiCal and lisfix, primarily meant to be
+# used by pause_slicer()
+# 1st pixel = index 1 for these
+ch_pause = (
+    (252, 515, 778),  # Channel 0 pause point sample locations
+    (247, 510, 773),  # Channel 1 pause point sample locations
+)
+ch_width = (
+    (17, 17, 17),  # Number of pixels to cut from pause point
+    (-17, -17, -17),
+)
+
+
 def parent_parser() -> argparse.ArgumentParser:
     """Returns a parent parser with common arguments for PyRISE programs."""
     parent = argparse.ArgumentParser(add_help=False)
@@ -216,3 +229,26 @@ def conf_check_bounds(conf_name: str, bounds: tuple, conf_value: str) -> None:
         "The {} parameter must be between {} and {} inclusive, "
         "but was {}".format(conf_name, *bounds, conf_value)
     )
+
+
+def pause_slicer(samp: int, width: int) -> slice:
+    """Returns a slice object which satisfies the range of indexes for a pause
+    point.
+
+    The incoming numbers for samp are 1-based pixel numbers, so must
+    subtract 1 to get a list index.
+    The width values are the number of pixels to affect, including the
+    pause point pixel.  If positive they start with the pause point pixel
+    and count 'up.'  If negative, they start with the pause point pixel
+    and count 'down.'
+    """
+    # We don't need to protect for indices less than zero or greater than the
+    # length of the list, because slice objects can take values that would not
+    # be valid for item access.
+    if width > 0:
+        s_start = samp - 1
+        s_stop = s_start + width
+    else:
+        s_start = samp + width
+        s_stop = samp
+    return slice(s_start, s_stop)

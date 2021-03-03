@@ -93,20 +93,11 @@ import kalasiris as isis
 import pvl
 
 import hiproc.bitflips as bf
+import hiproc.lisfix as lisfix
 import hiproc.hirise as hirise
 import hiproc.util as util
 
 logger = logging.getLogger(__name__)
-
-# 1st pixel = index 1 for these
-ch_pause = (
-    (252, 515, 778),  # Channel 0 pause point sample locations
-    (247, 510, 773),  # Channel 1 pause point sample locations
-)
-ch_width = (
-    (17, 17, 17),  # Number of pixels to cut from pause point
-    (-17, -17, -17),
-)
 
 
 def main():
@@ -139,6 +130,16 @@ def main():
         default=0,
         help="The number of medstd widths for bit-flip cleaning. Leaving it "
              "as zero implies no bit-flip cleaning. Default: %(default)s",
+    )
+    parser.add_argument(
+        "-t",
+        "--lis_tolerance",
+        type=float,
+        default=1,
+        help="If the fraction of LIS pixels in each of the Reverse-Clock and "
+             "Buffer areas are higher than this value, lis-fix processing "
+             "will occur for that area. Leaving it as 1.0 indicates that "
+             "no lis-fix correction will be made. Default: %(default)s",
     )
     # parser.add_argument('--hgfconf', required=False, default='HiGainFx.conf')
     parser.add_argument(
@@ -243,6 +244,7 @@ def main():
                     args.bitflipwidth,
                     args.bin2,
                     args.bin4,
+                    args.lis_tolerance,
                     keep=args.keep,
                 )
                 with open(db_path, "w") as f:
@@ -385,9 +387,10 @@ def start(
     db: dict,
     conf: dict,
     conf_path: os.PathLike,
-    bitflipwidth,
+    bitflipwidth: int,
     bin2: bool,
     bin4: bool,
+    lis_tolerance: float,
     keep=False,
 ) -> dict:
 
@@ -422,6 +425,7 @@ def start(
         db,
         destripe=destripe_filter,
         bitflipwidth=bitflipwidth,
+        lis_tolerance=lis_tolerance,
         keep=keep,
     )
 
@@ -444,6 +448,7 @@ def HiCal(
     db: dict,
     destripe=False,
     bitflipwidth=0,
+    lis_tolerance=1,
     keep=False,
 ) -> tuple:
     logger.info(f"HiCal start: {in_cube}")
@@ -499,6 +504,7 @@ def HiCal(
         int(db["BINNING"]),
         flags.noise_filter,
         bitflipwidth=bitflipwidth,
+        lis_tolerance=lis_tolerance,
         keep=keep,
     )
     next_cube = hical_file
@@ -864,11 +870,12 @@ def run_hical(
     binning: int,
     noise_filter: bool,
     bitflipwidth=0,
+    lis_tolerance=1,
     keep=False,
 ) -> str:
 
     to_d = isis.PathSet()
-    in_cub_path = Path(in_cube)
+    next_cube = Path(in_cube)
     status = "Standard"
 
     to_s = "{}+SignedWord+{}:{}".format(
@@ -893,9 +900,9 @@ def run_hical(
             status = "BadCal"
 
     if noise_filter:
-        mask_cube = to_d.add(in_cub_path.with_suffix(".mask.cub"))
+        mask_cube = to_d.add(next_cube.with_suffix(".mask.cub"))
         mask(
-            in_cub_path,
+            next_cube,
             mask_cube,
             conf["NoiseFilter"]["NoiseFilter_Raw_Min"],
             conf["NoiseFilter"]["NoiseFilter_Raw_Max"],
@@ -903,9 +910,16 @@ def run_hical(
             width=bitflipwidth,
             keep=keep,
         )
-        isis.hical(mask_cube, **hical_args)
-    else:
-        isis.hical(in_cub_path, **hical_args)
+        next_cube = mask_cube
+
+    lisfix_cube = next_cube.with_suffix(".lisfix.cub")
+    if (
+        lisfix.fix(next_cube, lisfix_cube, lis_tolerance)
+    ):
+        to_d.add(lisfix_cube)
+        next_cube = lisfix_cube
+
+    isis.hical(next_cube, **hical_args)
 
     if not keep:
         to_d.unlink()
@@ -1362,8 +1376,8 @@ def Cubenorm_Filter_filter(
 
     # zap the pause point pixels
     if pause and 1024 == len(x):
-        for samp, width in zip(ch_pause[chan], ch_width[chan]):
-            zap_slice = pause_slicer(samp, width)
+        for samp, width in zip(util.ch_pause[chan], util.ch_width[chan]):
+            zap_slice = util.pause_slicer(samp, width)
             x[zap_slice] = [0] * abs(width)
 
     # boxfilter
@@ -1397,29 +1411,6 @@ def Cubenorm_Filter_filter(
             x[i] = x[i + patch[chan]]
 
     return x
-
-
-def pause_slicer(samp: int, width: int) -> slice:
-    """Returns a slice object which satisfies the range of indexes for a pause
-    point.
-
-    The incoming numbers for samp are 1-based pixel numbers, so must
-    subtract 1 to get a list index.
-    The width values are the number of pixels to affect, including the
-    pause point pixel.  If positive they start with the pause point pixel
-    and count 'up.'  If negative, they start with the pause point pixel
-    and count 'down.'
-    """
-    # We don't need to protect for indices less than zero or greater than the
-    # length of the list, because slice objects can take values that would not
-    # be valid for item access.
-    if width > 0:
-        s_start = samp - 1
-        s_stop = s_start + width
-    else:
-        s_start = samp + width
-        s_stop = samp
-    return slice(s_start, s_stop)
 
 
 def highlow_destripe(
@@ -1596,7 +1587,7 @@ def NoiseFilter_cubenorm_edit(
         )
 
         for samp, width in zip(ch_pause[chan], ch_width[chan]):
-            zap_slice = pause_slicer(samp, width)
+            zap_slice = util.pause_slicer(samp, width)
             for i in range(zap_slice.start, zap_slice.stop):
                 if trigger:
                     norm[i] = 0
@@ -1613,7 +1604,7 @@ def NoiseFilter_zaptrigger(
 ) -> bool:
     trigger = False
     for samp, width in zip(ch_pause, ch_width):
-        zap_slice = pause_slicer(samp, width)
+        zap_slice = util.pause_slicer(samp, width)
         for i in range(zap_slice.start, zap_slice.stop):
             if vpnts[i] / max_vpnts < nonvalid_frac:
                 trigger = True
