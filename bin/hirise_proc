@@ -1,5 +1,0 @@
-#!/usr/bin/env python
-
-import hiproc.hiproc as proc
-
-proc.main()

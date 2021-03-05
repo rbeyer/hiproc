@@ -1,5 +1,0 @@
-#!/usr/bin/env python
-
-import hiproc.EDR_Stats as edr
-
-edr.main()

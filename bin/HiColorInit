@@ -1,5 +1,0 @@
-#!/usr/bin/env python
-
-import hiproc.HiColorInit as hci
-
-hci.main()

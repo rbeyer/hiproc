@@ -1,5 +1,0 @@
-#!/usr/bin/env python
-
-import hiproc.mdr2cub as m2c
-
-m2c.main()

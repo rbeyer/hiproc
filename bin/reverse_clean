@@ -1,5 +1,0 @@
-#!/usr/bin/env python
-
-import hiproc.reverse_clean as rc
-
-rc.main()

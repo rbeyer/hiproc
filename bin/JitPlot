@@ -1,5 +1,0 @@
-#!/usr/bin/env python
-
-import hiproc.JitPlot as jp
-
-jp.main()
