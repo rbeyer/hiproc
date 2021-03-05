@@ -47,7 +47,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'hiproc'
-copyright = "2020, Ross A. Beyer"
+copyright = "2020-2021, Ross A. Beyer"
 author = "Ross A. Beyer"
 
 # The version info for the project you're documenting, acts as replacement

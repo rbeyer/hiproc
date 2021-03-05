@@ -11,7 +11,7 @@ Welcome to hiproc's documentation!
    modules
    contributing
    authors
-   history
+   changelog
 
 Indices and tables
 ==================

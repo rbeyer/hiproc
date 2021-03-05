@@ -1682,7 +1682,7 @@ def pick_index(
 
     :param min_indices: Array of indices that are good candidates for the
         minimum DN.
-    :param max_indices:Array of indices that are good candidates for the
+    :param max_indices: Array of indices that are good candidates for the
         maximum DN.
     :param max_prom_i: Index of the peak of the maximum prominence.
     :param prominences:  Prominences array output from find_peaks() for minima.
@@ -1706,7 +1706,9 @@ def pick_index(
         certain circumstances, less than this fraction will consider the
         difference noise and will choose the index closer to centraldn, more
         than the fraction will choose the index farther from the centraldn.
+
     :return: two-tuple of ints which represent the minimum and maximum indices.
+
     """
     # logger = logger.getLogger(f"{__name__}.pick_index")
     # print(f"min_indices: {min_indices}")

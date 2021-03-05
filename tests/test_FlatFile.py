@@ -13,6 +13,7 @@ import unittest
 
 import hiproc.FlatFile as ff
 
+
 class TestFlatFile(unittest.TestCase):
     def setUp(self):
         self.flat = ff.FlatFile(

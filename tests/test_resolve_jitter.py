@@ -11,7 +11,7 @@
 
 import unittest
 from pathlib import Path
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 import numpy as np
 import numpy.testing as npt
@@ -314,4 +314,3 @@ class TestResolveJitter(unittest.TestCase):
     #         rj.write_data_for_plotting(
     #         "dummy-file", ['one', 'two'], col1, col2)
     #         print(m.mock_calls)
-

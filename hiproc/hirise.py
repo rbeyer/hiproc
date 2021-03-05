@@ -82,18 +82,20 @@ class ObservationID:
     """A class for HiRISE Observation IDs.
 
     :ivar phase: The three-letter string indicating the mission phase
-    of this Observation ID.
+        of this Observation ID.
     :ivar orbit_number: The six-digit orbit number (with leading zeros)
-    as a string.
+        as a string.
     :ivar target: The four digit code (with leading zeroes) is defined as
-    follows: Values between 0000 and 3595, inclusive, reflect the central
-    latitude of the observation to within a half-degree, multiplied by 10.
-    (0905, for example, is thus a latitude of 90.5 degrees.) 0.0 degrees is the
-    night-side equator, which is where the orbit number increments. 90.0 south
-    pole on the ascending pass. 180.0 is the day-side equator on the ascending
-    pass. 270.0 is the north pole on the descending pass. Text values between
-    9000 and 9303, inclusive, represent off-planet targets
-    such as Phobos, Deimos, or stars.
+        follows: Values between 0000 and 3595, inclusive, reflect
+        the central latitude of the observation to within a
+        half-degree, multiplied by 10.  (0905, for example, is thus
+        a latitude of 90.5 degrees.) 0.0 degrees is the night-side
+        equator, which is where the orbit number increments. 90.0
+        south pole on the ascending pass. 180.0 is the day-side
+        equator on the ascending pass. 270.0 is the north pole on
+        the descending pass. Text values between 9000 and 9303,
+        inclusive, represent off-planet targets such as Phobos,
+        Deimos, or stars.
     """
 
     def __init__(self, *args):

@@ -7,8 +7,8 @@ from setuptools import setup, find_packages
 with open('README.rst') as readme_file:
     readme = readme_file.read()
 
-with open('HISTORY.rst') as history_file:
-    history = history_file.read()
+with open('CHANGELOG.rst') as change_file:
+    changelog = change_file.read()
 
 requirements = []
 
@@ -48,7 +48,7 @@ setup(
         ],
     },
     install_requires=requirements,
-    long_description=readme + '\n\n' + history,
+    long_description=readme + '\n\n' + changelog,
     include_package_data=True,
     keywords='hiproc',
     name='hiproc',

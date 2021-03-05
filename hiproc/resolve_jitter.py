@@ -475,30 +475,53 @@ def resolve_jitter(
         should be an odd integer.
     :param window_width: Sets the boundaries above and below the filtered
         average beyond which to exclude outliers.
-    :return: An 18-tuple, whose values are:
-        0: Time values starting at *t0* (numpy array).
-        1: Sample direction jitter for each time (numpy array).
-        2: Line direction jitter for each time (numpy array).
-        3: The LineRate from the FROM and MATCH files (float).
-        4: The TDI for the FROM and MATCH files (int).
-        5: Zero time at which the Fourier Transform steps start (float).
-        6: Unique time values from file one (numpy array).
-        7: Unique time values from file two (numpy array).
-        8: Unique time values from file three (numpy array).
-        9: List of three numpy arrays representing the Gaussian filtered
-            offsets in the sample direction from the three input files.
-        10: List of three numpy arrays representing the Gaussian filtered
-            offsets in the line direction from the three input files.
-        11: List of three numpy arrays representing the interpolation of
-            sample offsets for each input file at each time.
-        12: List of three numpy arrays representing the interpolation of
-            line offsets for each input file at each time.
-        13: The average error of the jitter solution with respect to the
-            measured offsets.
-        14: min_k,
-        15: [min_jitter_check_x1, min_jitter_check_x2, min_jitter_check_x3],
-        16: [min_jitter_check_y1, min_jitter_check_y2, min_jitter_check_y3],
-        17: The first value of the sample and line from each file (dict).
+
+    :return: A gnarly 18-tuple
+
+    The values of the 18-tuple are:
+
+    0
+        Time values starting at *t0* (numpy array).
+    1
+        Sample direction jitter for each time (numpy array).
+    2
+        Line direction jitter for each time (numpy array).
+    3
+        The LineRate from the FROM and MATCH files (float).
+    4
+        The TDI for the FROM and MATCH files (int).
+    5
+        Zero time at which the Fourier Transform steps start (float).
+    6
+        Unique time values from file one (numpy array).
+    7
+        Unique time values from file two (numpy array).
+    8
+        Unique time values from file three (numpy array).
+    9
+        List of three numpy arrays representing the Gaussian filtered
+        offsets in the sample direction from the three input files.
+    10
+        List of three numpy arrays representing the Gaussian filtered
+        offsets in the line direction from the three input files.
+    11
+        List of three numpy arrays representing the interpolation of
+        sample offsets for each input file at each time.
+    12
+        List of three numpy arrays representing the interpolation of
+        line offsets for each input file at each time.
+    13
+        The average error of the jitter solution with respect to the
+        measured offsets.
+    14
+        min_k
+    15
+        [min_jitter_check_x1, min_jitter_check_x2, min_jitter_check_x3],
+    16
+        [min_jitter_check_y1, min_jitter_check_y2, min_jitter_check_y3],
+    17
+        The first value of the sample and line from each file (dict).
+
     """
     t1, offx1, offy1, lines1, dt1, tdi1, linerate1 = parse_file(
         file_path1, window_size, window_width, whichfrom1
