@@ -55,6 +55,6 @@ setup(
     packages=find_packages(include=['hiproc', 'hiproc.*']),
     test_suite='tests',
     url='https://github.com/rbeyer/hiproc',
-    version='0.4.0',
+    version='0.5.0',
     zip_safe=False,
 )
