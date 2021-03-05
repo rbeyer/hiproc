@@ -671,7 +671,7 @@ def Analyze_Flat(
         return 0
 
     if hijitreg and cube["CanSlither"] is False:
-        logg.warning(
+        logger.warning(
             "Too few correlated lines found for cubic slither fit."
         )
         return 0
