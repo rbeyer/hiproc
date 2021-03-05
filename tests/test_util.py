@@ -104,3 +104,7 @@ class TestUtil(unittest.TestCase):
         self.assertRaises(
             AssertionError, util.conf_check_bounds, "foo", (0.1, 1), "1.5"
         )
+
+    def test_pause_slicer(self):
+        self.assertEqual(slice(4, 7), util.pause_slicer(5, 3))
+        self.assertEqual(slice(2, 5), util.pause_slicer(5, -3))

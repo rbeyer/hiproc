@@ -78,10 +78,6 @@ class TestBasic(unittest.TestCase):
         self.assertEqual(chansamp.ssamp, 1)
         self.assertEqual(chansamp.nsamp, 502)
 
-    def test_pause_slicer(self):
-        self.assertEqual(slice(4, 7), hc.pause_slicer(5, 3))
-        self.assertEqual(slice(2, 5), hc.pause_slicer(5, -3))
-
     def test_cut_size(self):
         self.assertEqual((6, 6), hc.cut_size(0, 10))
         self.assertEqual((50, 6), hc.cut_size(0, 255))
