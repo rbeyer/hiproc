@@ -31,6 +31,7 @@ import argparse
 import itertools
 import logging
 import os
+import pkg_resources
 import re
 import shutil
 import subprocess
@@ -66,9 +67,11 @@ def main():
         "-c",
         "--conf",
         required=False,
-        default=Path(__file__).resolve().parent.parent
-        / "data"
-        / "HiNoProj.conf",
+        type=argparse.FileType('r'),
+        default=pkg_resources.resource_stream(
+            __name__,
+            'data/HiNoProj.conf'
+        ),
     )
     parser.add_argument("-b", "--base_ccd_number", required=False, default=5)
     parser.add_argument("cubes", metavar="balance.cub-files", nargs="+")
@@ -80,7 +83,7 @@ def main():
     try:
         start(
             args.cubes,
-            args.conf,
+            pvl.load(args.conf),
             args.output,
             args.base_ccd_number,
             keep=args.keep,
@@ -98,7 +101,7 @@ def main():
 
 def start(
     cube_paths: os.PathLike,
-    conf_path: os.PathLike,
+    conf: dict,
     output="_RED.NOPROJ.cub",
     base_ccd_number=5,
     keep=False,
@@ -134,7 +137,6 @@ def start(
             "is not one of the given cubes."
         )
 
-    conf = pvl.load(str(conf_path))
     conf_check(conf["HiNoProj"])
 
     outcub_path = hcn.set_outpath(output, cubes)

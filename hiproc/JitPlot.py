@@ -32,6 +32,7 @@ a simple text data file that can be plotted.
 
 import argparse
 import logging
+import pkg_resources
 import statistics
 from pathlib import Path
 
@@ -54,9 +55,11 @@ def main():
         "-c",
         "--conf",
         required=False,
-        default=Path(__file__).resolve().parent.parent
-        / "data"
-        / "HiJitReg.conf",
+        type=argparse.FileType('r'),
+        default=pkg_resources.resource_stream(
+            __name__,
+            'data/HiJitReg.conf'
+        ),
     )
     parser.add_argument(
         "cubes", metavar="balance.precolor.cub files", nargs="+"
@@ -66,7 +69,7 @@ def main():
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    conf = pvl.load(str(args.conf))
+    conf = pvl.load(args.conf)
 
     cubes = list(map(hicolor.HiColorCube, args.cubes))
     (red4, red5, ir10, ir11, bg12, bg13) = hicolor.separate_ccds(cubes)

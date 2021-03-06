@@ -17,6 +17,7 @@
 
 import contextlib
 import csv
+import pkg_resources
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -50,18 +51,25 @@ HiRISE_imgs = (
 test_resources = Path("test-resources")
 imgs = list(map(test_resources.joinpath, HiRISE_imgs))
 
-gains = Path("data") / "EDR_Stats_gains_config.pvl"
-conf = Path("data") / "HiCal.conf"
-hgf_conf = Path("data") / "HiGainFx.conf"
-nf_conf = Path("data") / "NoiseFilter.conf"
+gains = pvl.load(
+    pkg_resources.resource_stream(
+        "hiproc",
+        "data/EDR_Stats_gains_config.pvl"
+    )
+)
+conf_path = pkg_resources.resource_filename( "hiproc", "data/HiCal.conf")
+conf = pvl.load(conf_path)
+# hgf_conf = Path("data") / "HiGainFx.conf"
+nf_conf = pvl.load(
+    pkg_resources.resource_stream("hiproc", "data/NoiseFilter.conf")
+)
 
 
 class TestResources(unittest.TestCase):
     """Establishes that the test image exists."""
 
     def test_resources(self):
-        files = imgs + [gains, conf]
-        for f in files:
+        for f in imgs:
             with self.subTest(filepath=f):
                 (truth, test) = rc(f)
                 self.assertEqual(truth, test)
@@ -277,8 +285,7 @@ class TestMock(unittest.TestCase):
 
 class TestConf(unittest.TestCase):
     def test_conf_check(self):
-        c = pvl.load(str(conf))
-        self.assertIsNone(hc.conf_check(c))
+        self.assertIsNone(hc.conf_check(conf))
 
 
 class TestNeedCubenormStatsFile(unittest.TestCase):
@@ -386,7 +393,7 @@ class TestNeedISISCube(unittest.TestCase):
                 self.cube,
                 outcube,
                 myconf,
-                conf,
+                conf_path,
                 3,
                 3,
                 self.binning,
@@ -530,9 +537,9 @@ class TestHiCal(unittest.TestCase):
         self.pid = hirise.get_ChannelID_fromfile(self.cube)
         self.db = edr.EDR_Stats(imgs[0], self.cube, gains)
         self.binning = int(isis.getkey_k(self.cube, "Instrument", "Summing"))
-        self.conf = pvl.load(str(conf))
+        self.conf = conf
         # self.conf['HiGainFx'] = pvl.load(str(hgf_conf))['HiGainFx']
-        self.conf["NoiseFilter"] = pvl.load(str(nf_conf))["NoiseFilter"]
+        self.conf["NoiseFilter"] = nf_conf["NoiseFilter"]
 
     def tearDown(self):
         with contextlib.suppress(FileNotFoundError):
@@ -547,7 +554,7 @@ class TestHiCal(unittest.TestCase):
             outcube,
             ccdchan,
             self.conf,
-            conf,
+            conf_path,
             self.db,
             destripe=False,
             keep=False,

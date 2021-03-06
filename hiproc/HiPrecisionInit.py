@@ -35,7 +35,7 @@
 import argparse
 import logging
 import os
-from pathlib import Path
+import pkg_resources
 
 import pvl
 
@@ -53,9 +53,11 @@ def main():
         "-c",
         "--conf",
         required=False,
-        default=Path(__file__).resolve().parent.parent
-        / "data"
-        / "HiPrecisionInit.conf",
+        type=argparse.FileType('r'),
+        default=pkg_resources.resource_stream(
+            __name__,
+            'data/HiPrecisionInit.conf'
+        ),
     )
     parser.add_argument("slither_text", metavar="slither.txt-files", nargs="+")
 
@@ -64,13 +66,12 @@ def main():
     # Ignore args.log to always print info when run from the command line.
     util.set_logger("info", args.logfile, args.log)
 
-    start(args.slither_text, args.conf)
+    start(args.slither_text, pvl.load(args.conf))
 
     return
 
 
-def start(slither_paths: list, conf_path: os.PathLike):
-    conf = pvl.load(str(conf_path))
+def start(slither_paths: list, conf: dict):
 
     yes_HiJACK = list()
     thresh = float(conf["HiPrecisionInit"]["Mean_Jitter_Magnitude_Threshold"])

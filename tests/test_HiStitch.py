@@ -16,6 +16,7 @@
 # limitations under the License.
 
 import contextlib
+import pkg_resources
 import unittest
 from pathlib import Path
 from unittest.mock import call
@@ -27,7 +28,12 @@ import pvl
 import hiproc.hirise as hirise
 import hiproc.HiStitch as hs
 
-conf_path = Path("data") / "HiStitch.conf"
+conf = pvl.load(
+    pkg_resources.resource_stream(
+        "hiproc",
+        "data/HiStitch.conf"
+    )
+)
 
 
 class TestBasic(unittest.TestCase):
@@ -60,8 +66,7 @@ class TestBasic(unittest.TestCase):
 
 class TestConf(unittest.TestCase):
     def test_conf_check(self):
-        c = pvl.load(str(conf_path))
-        self.assertIsNone(hs.conf_check(c))
+        self.assertIsNone(hs.conf_check(conf))
 
 
 class TestMock(unittest.TestCase):

@@ -29,6 +29,7 @@
 import argparse
 import logging
 import os
+import pkg_resources
 from datetime import datetime
 from pathlib import Path
 
@@ -57,9 +58,11 @@ def main():
         "-c",
         "--conf",
         required=False,
-        default=Path(__file__).resolve().parent.parent
-        / "data"
-        / "HiBeautify.conf",
+        type=argparse.FileType('r'),
+        default=pkg_resources.resource_stream(
+            __name__,
+            'data/HiBeautify.conf'
+        ),
     )
     # parser.add_argument('-f', '--frost', action='store_true',
     #                     help='Use the frost/ice color stretch, and disable '
@@ -80,21 +83,23 @@ def main():
     util.set_logger(args.verbose, args.logfile, args.log)
 
     start(
-        args.cubes, args.conf, args.output_irb, args.output_rgb, keep=args.keep
+        args.cubes,
+        pvl.load(args.conf),
+        args.output_irb,
+        args.output_rgb,
+        keep=args.keep
     )
 
 
 def start(
     cube_paths: list,
-    conf_path: os.PathLike,
+    conf: dict,
     out_irb="_IRB.cub",
     out_rgb="_RGB.cub",
     keep=False,
 ):
 
     # GetConfigurationParameters()
-    conf = pvl.load(str(conf_path))
-
     cubes = list(map(hcn.ColorCube, cube_paths))
 
     cubes.sort()

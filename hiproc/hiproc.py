@@ -39,7 +39,10 @@
 import argparse
 import itertools
 import logging
+import pkg_resources
 from pathlib import Path
+
+import pvl
 
 import hiproc.hirise as hirise
 import hiproc.util as util
@@ -98,7 +101,7 @@ def main():
         "--conf_dir",
         required=False,
         type=Path,
-        default=Path(__file__).resolve().parent.parent / "data",
+        default=Path(pkg_resources.resource_filename(__name__, 'data/')),
     )
     parser.add_argument(
         "--db",
@@ -129,7 +132,7 @@ def main():
         db_list = [x.db for x in chancubes]
 
     if args.color:
-        color(oid, parent, args.conf_dir, parent, db_list, keep=args.keep)
+        color(oid, args.conf_dir, parent, db_list, keep=args.keep)
 
     if args.precision or args.jack:
         jack = False
@@ -141,7 +144,7 @@ def main():
             # HiPrecisionInit to determine if you need to HiNoProj or HiJACK
             #   takes *slither.txt
             HiJACK_flags = HiPrecisionInit.start(
-                slithers, args.conf_dir / "HiPrecisionInit.conf"
+                slithers, pvl.load(args.conf_dir / "HiPrecisionInit.conf")
             )
 
             if any(HiJACK_flags):
@@ -159,14 +162,17 @@ def get_cubes(glob: str, parent: Path) -> list:
     return cubes
 
 
-def edr2stitch(images, conf_dir, keep=False):
+def edr2stitch(images, conf_dir, bitflipwidth=0, lis_tolerance=1, keep=False):
     chids = list()
     for i in images:
         out_edr = util.path_w_suffix(".EDR_Stats.cub", i)
 
         # EDR_Stats
         db = EDR_Stats.EDR_Stats(
-            i, out_edr, conf_dir / "EDR_Stats_gains_config.pvl", keep=keep
+            i,
+            out_edr,
+            pvl.load(conf_dir / "EDR_Stats_gains_config.pvl"),
+            keep=keep
         )
 
         # HiCal
@@ -176,10 +182,15 @@ def edr2stitch(images, conf_dir, keep=False):
             out_edr,
             out_hical,
             db,
-            HiCal.conf_setup(conf_dir / "HiCal.conf", "NoiseFilter.conf"),
+            HiCal.conf_setup(
+                pvl.load(conf_dir / "HiCal.conf"),
+                pvl.load(conf_dir / "NoiseFilter.conf")
+            ),
             conf_dir / "HiCal.conf",
+            bitflipwidth,
             None,
             None,
+            lis_tolerance,
             keep=keep,
         )
 
@@ -195,7 +206,7 @@ def edr2stitch(images, conf_dir, keep=False):
             chid1.db,
             chid2.db,
             ".HiStitch.cub",
-            conf_dir / "HiStitch.conf",
+            pvl.load(conf_dir / "HiStitch.conf"),
             keep=keep,
         )
         cid = HiccdStitch.HiccdStitchCube(o_path)
@@ -208,7 +219,7 @@ def edr2stitch(images, conf_dir, keep=False):
     for color_group in color_groups.values():
         db, out_stitch = HiccdStitch.start(
             color_group,
-            conf_dir / "HiccdStitch.conf",
+            pvl.load(conf_dir / "HiccdStitch.conf"),
             ".HiccdStitch.cub",
             sline=None,
             eline=None,
@@ -232,7 +243,7 @@ def edr2stitch(images, conf_dir, keep=False):
             for c in balcubes:
                 for_jitreg.append(c.nextpath.with_suffix(".precolor.cub"))
 
-    HiJitReg.start(for_jitreg, conf_dir / "HiJitReg.conf", keep=keep)
+    HiJitReg.start(for_jitreg, pvl.load(conf_dir / "HiJitReg.conf"), keep=keep)
 
     # HiSlither
     #   takes same as HiJitReg (and assumes its products are available.
@@ -244,7 +255,7 @@ def edr2stitch(images, conf_dir, keep=False):
 
 
 def color(
-    obsid, path: Path, conf_dir: Path, parent: Path, db_list: list, keep=False
+    obsid, conf_dir: Path, parent: Path, db_list: list, keep=False
 ):
     colors = get_cubes(f"{obsid}_COLOR*.cub", parent)
 
@@ -252,7 +263,11 @@ def color(
     #   takes *COLOR[4|5].cub
     #   creates *UNFILTERED_COLOR[4|5].cub and *COLOR[4|5].HiColorNorm.cub
     HiColorNorm.start(
-        colors, "_COLOR.cub", conf_dir / "HiColorNorm.conf", db_list, keep=keep
+        colors,
+        "_COLOR.cub",
+        pvl.load(conf_dir / "HiColorNorm.conf"),
+        db_list=db_list,
+        keep=keep
     )
 
     # HiBeautify - only for color
@@ -262,7 +277,7 @@ def color(
         x.with_suffix(".HiColorNorm.cub")
     HiBeautify.start(
         [x.with_suffix(".HiColorNorm.cub") for x in colors],
-        conf_dir / "HiBeautify.conf",
+        pvl.load(conf_dir / "HiBeautify.conf"),
     )
     return
 
@@ -280,7 +295,10 @@ def precision(obsid, conf_dir: Path, parent: Path, hijack=False, keep=False):
         # HiNoProj - alternate to HiccdStitch, starts with balance cubes
         #   takes only REDS: *RED*balance.cub
         #   creates PSP_010502_2090_RED.NOPROJ.cub
-        HiNoProj.start(red_bal_cubs, conf_dir / "HiNoProj.conf", keep=keep)
+        HiNoProj.start(
+            red_bal_cubs,
+            pvl.load(conf_dir / "HiNoProj.conf"), keep=keep
+        )
 
     return
 

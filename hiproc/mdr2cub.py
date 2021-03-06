@@ -20,6 +20,7 @@
 
 import argparse
 import logging
+import pkg_resources
 import shutil
 import statistics
 import sys
@@ -46,9 +47,11 @@ def main():
         "-c",
         "--conf",
         required=False,
-        default=Path(__file__).resolve().parent.parent
-        / "data"
-        / "hical.pipelines.conf",
+        type=argparse.FileType('r'),
+        default=pkg_resources.resource_stream(
+            __name__,
+            'data/hical.pipelines.conf'
+        ),
     )
     parser.add_argument("mdr", metavar="MDR_file")
     parser.add_argument(
@@ -215,7 +218,7 @@ def main():
         )
         print(f"fpa_t {fpa_t}")
 
-        conf = pvl.load(str(args.conf))
+        conf = pvl.load(args.conf)
 
         tdg = t_dep_gain(get_one(conf["Hical"], "Profile", cid.ccdname), fpa_t)
         suncorr = solar_correction()

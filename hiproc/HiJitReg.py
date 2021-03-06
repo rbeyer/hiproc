@@ -36,6 +36,7 @@ import itertools
 import logging
 import math
 import os
+import pkg_resources
 import re
 import statistics
 import subprocess
@@ -60,9 +61,11 @@ def main():
         "-c",
         "--conf",
         required=False,
-        default=Path(__file__).resolve().parent.parent
-        / "data"
-        / "HiJitReg.conf",
+        type=argparse.FileType('r'),
+        default=pkg_resources.resource_stream(
+            __name__,
+            'data/HiJitReg.conf'
+        ),
     )
     parser.add_argument(
         "cubes",
@@ -75,7 +78,7 @@ def main():
     util.set_logger(args.verbose, args.logfile, args.log)
 
     try:
-        successful_ccds = start(args.cubes, args.conf, keep=args.keep)
+        successful_ccds = start(args.cubes, pvl.load(args.conf), keep=args.keep)
     except RuntimeError as err:
         logger.critical("Unable to continue. " + str(err))
         sys.exit()
@@ -92,9 +95,7 @@ def main():
     return
 
 
-def start(cube_paths: list, conf_path: os.PathLike, keep=False):
-    conf = pvl.load(str(conf_path))
-
+def start(cube_paths: list, conf: dict, keep=False):
     cubes = list(map(hicolor.HiColorCube, cube_paths))
     (red4, red5, ir10, ir11, bg12, bg13) = hicolor.separate_ccds(cubes)
 
@@ -107,9 +108,12 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
     def __init__(
         self,
         arg,
-        config=Path(__file__).resolve().parent.parent
-        / "data"
-        / "HiJitReg.conf",
+        config=pvl.load(
+            pkg_resources.resource_stream(
+                __name__,
+                'data/HiJitReg.conf'
+            ),
+        ),
         matchccd=None,
     ):
         if isinstance(arg, hicolor.HiColorCube):

@@ -54,6 +54,7 @@ import itertools
 import logging
 import math
 import os
+import pkg_resources
 import subprocess
 import sys
 import traceback
@@ -80,9 +81,11 @@ def main():
     parser.add_argument(
         "-c",
         "--conf",
-        default=Path(__file__).resolve().parent.parent
-        / "data"
-        / "ResolveJitter.conf",
+        type=argparse.FileType('r'),
+        default=pkg_resources.resource_stream(
+            __name__,
+            'data/ResolveJitter.conf'
+        ),
         help="Path to a ResolveJitter.conf file, only needed if "
         "--lineinterval isn't given.",
     )
@@ -185,15 +188,9 @@ def main():
         parser.error("Only takes 3 or 9 positional arguments.")
 
     if args.lineinterval is None:
-        if args.conf is None:
-            raise ValueError(
-                f"--lineinterval was None and so was --conf, so can't look "
-                f"up value for --lineinterval."
-            )
-        else:
-            args.lineinterval = pvl.load(args.conf)["AutoRegistration"][
-                "ControlNet"
-            ]["Control_Lines"]
+        args.lineinterval = pvl.load(args.conf)["AutoRegistration"][
+            "ControlNet"
+        ]["Control_Lines"]
     elif args.lineinterval <= 0:
         raise ValueError("--lineinterval must be positive.")
 

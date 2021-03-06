@@ -16,8 +16,11 @@
 # limitations under the License.
 
 import contextlib
+import pkg_resources
 import unittest
 from pathlib import Path
+
+import pvl
 
 import kalasiris as isis
 import hiproc.EDR_Stats as edr
@@ -27,7 +30,9 @@ from .utils import resource_check as rc
 # Hardcoding these, but I sure would like a better solution.
 HiRISE_img = Path("test-resources") / "PSP_010502_2090_RED5_0.img"
 img = HiRISE_img
-gains = Path("data") / "EDR_Stats_gains_config.pvl"
+gains = pkg_resources.resource_filename(
+    "hiproc", "data/EDR_Stats_gains_config.pvl"
+)
 
 
 class TestResources(unittest.TestCase):
@@ -56,7 +61,7 @@ class TestEDR_Stats(unittest.TestCase):
             Path("print.prt").unlink()
 
     def test_EDR_stats(self):
-        h = edr.EDR_Stats(img, self.outfile, gains)
+        h = edr.EDR_Stats(img, self.outfile, pvl.load(gains))
         self.assertIsInstance(h, dict)
 
 
@@ -83,7 +88,7 @@ class TestNeedHiCube(unittest.TestCase):
         histats["BINNING"] = isis.getkey_k(
             self.hicube, "Instrument", "Summing"
         )
-        s = edr.calc_snr(self.hicube, gains, histats)
+        s = edr.calc_snr(self.hicube, pvl.load(gains), histats)
         self.assertAlmostEqual(s, 291.80442197)
 
     def test_tdi_bin_check(self):

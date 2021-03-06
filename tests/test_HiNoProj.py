@@ -16,6 +16,7 @@
 # limitations under the License.
 
 # import contextlib
+import pkg_resources
 import unittest
 from pathlib import Path
 from unittest.mock import call
@@ -27,7 +28,12 @@ import pvl
 # import hiproc.hirise as hirise
 import hiproc.HiNoProj as hnp
 
-conf_path = Path("data") / "HiNoProj.conf"
+conf = pvl.load(
+    pkg_resources.resource_stream(
+        "hiproc",
+        "data/HiNoProj.conf"
+    )
+)
 
 
 def getkey(cube, group, key):
@@ -57,8 +63,7 @@ class TestHiNoProjCube(unittest.TestCase):
 
 class TestConf(unittest.TestCase):
     def test_conf_check(self):
-        c = pvl.load(str(conf_path))
-        self.assertIsNone(hnp.conf_check(c["HiNoProj"]))
+        self.assertIsNone(hnp.conf_check(conf["HiNoProj"]))
 
 
 class TestHiNoProj(unittest.TestCase):

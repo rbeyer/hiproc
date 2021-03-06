@@ -16,6 +16,7 @@
 # limitations under the License.
 
 # import contextlib
+import pkg_resources
 import subprocess
 import unittest
 from pathlib import Path
@@ -28,7 +29,12 @@ import pvl
 # import hiproc.hirise as hirise
 import hiproc.HiccdStitch as hcs
 
-conf_path = Path("data") / "HiccdStitch.conf"
+conf = pvl.load(
+    pkg_resources.resource_stream(
+        "hiproc",
+        "data/HiccdStitch.conf"
+    )
+)
 
 
 def getkey(cube, group, key):
@@ -108,11 +114,9 @@ class TestHiccdStitchCube(unittest.TestCase):
 
 class TestConf(unittest.TestCase):
     def test_conf_check(self):
-        c = pvl.load(str(conf_path))
-        self.assertIsNone(hcs.conf_check(c))
+        self.assertIsNone(hcs.conf_check(conf))
 
     def test_make_area_dict(self):
-        c = pvl.load(str(conf_path))
         # print(hcs.make_area_dict(c['HiccdStitch']))
         truth = {
             1: [12, 36],
@@ -122,7 +126,7 @@ class TestConf(unittest.TestCase):
             8: [5, 5],
             16: [1, 2],
         }
-        self.assertDictEqual(truth, hcs.make_area_dict(c["HiccdStitch"]))
+        self.assertDictEqual(truth, hcs.make_area_dict(conf["HiccdStitch"]))
 
 
 class TestBasic(unittest.TestCase):

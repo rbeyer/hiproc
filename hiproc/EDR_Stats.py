@@ -47,6 +47,7 @@ import json
 import logging
 import math
 import os
+import pkg_resources
 import sys
 from pathlib import Path
 
@@ -81,9 +82,11 @@ def main():
         "-g",
         "--gains",
         required=False,
-        default=Path(__file__).resolve().parent.parent
-        / "data"
-        / "EDR_Stats_gains_config.pvl",
+        type=argparse.FileType('r'),
+        default=pkg_resources.resource_stream(
+            __name__,
+            'data/EDR_Stats_gains_config.pvl'
+        ),
         help="Path to the gains config PVL file.",
     )
     parser.add_argument(
@@ -104,11 +107,13 @@ def main():
         )
         sys.exit()
 
+    gainsinfo = pvl.load(args.gains)
+
     for i in args.img:
         out_p = util.path_w_suffix(args.output, i)
 
         histats = EDR_Stats(
-            i, out_p, args.gains, args.histmin, args.histmax, keep=args.keep
+            i, out_p, gainsinfo, args.histmin, args.histmax, keep=args.keep
         )
 
         # DB stuff
@@ -123,13 +128,13 @@ def main():
 def EDR_Stats(
     img: os.PathLike,
     out_path: os.PathLike,
-    gains_path: os.PathLike,
+    gainsinfo: dict,
     histmin=0.01,
     histmax=99.99,
     keep=False,
 ) -> dict:
     logger.info(
-        f"EDR_Stats(in: {img}, out: {out_path}, gains: {gains_path}, "
+        f"EDR_Stats(in: {img}, out: {out_path}, "
         f"hist min & max: {histmin} & {histmax}, keep: {keep})"
     )
     try:
@@ -169,7 +174,7 @@ def EDR_Stats(
 
     histats["STD_DN_LEVELS"] = get_dncnt(out_path, histmin, histmax, keep=keep)
     histats["IMAGE_SIGNAL_TO_NOISE_RATIO"] = calc_snr(
-        out_path, gains_path, histats
+        out_path, gainsinfo, histats
     )
     histats["GAP_PIXELS_PERCENT"] = (
         histats["GAP_PIXELS"]
@@ -287,14 +292,15 @@ def get_dncnt(cub: os.PathLike, hmin=0.01, hmax=99.99, keep=False) -> int:
     return count
 
 
-def calc_snr(cub: os.PathLike, gainsfile: os.PathLike, histats: dict) -> float:
+def calc_snr(cub: os.PathLike, gainsinfo: dict, histats: dict) -> float:
     """Calculate the signal to noise ratio."""
     logger.info(calc_snr.__doc__)
 
-    ccdchan = "{0[0]}_{0[1]}".format(hirise.get_ccdchannel(str(cub)))
+    cid = hirise.get_ChannelID_fromfile(cub)
+    ccdchan = f"{cid.get_ccd()}_{cid.channel}"
 
-    gainspvl = pvl.load(str(gainsfile))
-    gain = float(gainspvl["Gains"][ccdchan]["Bin" + str(histats["BINNING"])])
+    # gainspvl = pvl.load(str(gainsfile))
+    gain = float(gainsinfo["Gains"][ccdchan]["Bin" + str(histats["BINNING"])])
 
     img_mean = float(histats["IMAGE_MEAN"])
     lis_pixels = float(histats["LOW_SATURATED_PIXELS"])

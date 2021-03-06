@@ -35,6 +35,7 @@ import csv
 import itertools
 import logging
 import os
+import pkg_resources
 import shutil
 import subprocess
 from datetime import datetime
@@ -53,7 +54,7 @@ import hiproc.HiNoProj as hnp
 logger = logging.getLogger(__name__)
 
 resolve_jitter_path = (
-    "/Users/rbeyer/software/HiPrecision/fromOleg/HiPrecision/resolveJitter"
+    "/Users/rbeyer/software/HiPrecision_Oleg/resolveJitter"
 )
 
 
@@ -66,7 +67,8 @@ def main():
         "-c",
         "--conf_dir",
         required=False,
-        default=Path(__file__).resolve().parent.parent / "data",
+        type=Path,
+        default=Path(pkg_resources.resource_filename( __name__, 'data/')),
         help="Directory where ResolveJitter.conf "
         "and HiJACK.conf can be found.",
     )
@@ -74,6 +76,7 @@ def main():
         "-n",
         "--noplot",
         action="store_false",
+        dest="plot",
         help="Will stop the display of before and after " "jitter plots.",
     )
     parser.add_argument("-b", "--base_ccd_number", required=False, default=5)

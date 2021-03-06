@@ -194,7 +194,7 @@ class TestHiJACK(unittest.TestCase):
                     AutoRegistration={"ControlNet": {"Control_Lines": 10}},
                 )
                 hjk.ResolveJitter(cubes, conf, m_path, "tt", keep=True)
-                rjp = "/Users/rbeyer/software/HiPrecision/fromOleg/HiPrecision/resolveJitter"
+                rjp = "/Users/rbeyer/software/HiPrecision_Oleg/resolveJitter"
                 self.assertEqual(
                     m_run.call_args_list,
                     [

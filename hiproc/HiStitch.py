@@ -34,6 +34,7 @@ import collections
 import json
 import logging
 import os
+import pkg_resources
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -79,9 +80,11 @@ def main():
         "-c",
         "--conf",
         required=False,
-        default=Path(__file__).resolve().parent.parent
-        / "data"
-        / "HiStitch.conf",
+        type=argparse.FileType('r'),
+        default=pkg_resources.resource_stream(
+            __name__,
+            'data/HiStitch.conf'
+        ),
     )
     parser.add_argument("cube0", metavar="cube0.cub-file")
     parser.add_argument("cube1", metavar="cube1.cub-file", nargs="?")
@@ -102,7 +105,7 @@ def main():
         get_db(util.pid_path_w_suffix(args.db, args.cube0)),
         get_db(util.pid_path_w_suffix(args.db2, args.cube1)),
         args.output,
-        args.conf,
+        pvl.load(args.conf),
         keep=args.keep,
     )
 
@@ -120,12 +123,11 @@ def start(
     db0: dict,
     db1: dict,
     output: os.PathLike,
-    conf_path: os.PathLike,
+    conf: dict,
     keep=False,
 ) -> dict:
 
     # GetConfigurationParameters()
-    conf = pvl.load(str(conf_path))
     conf_check(conf)
 
     # GetProductFiles()

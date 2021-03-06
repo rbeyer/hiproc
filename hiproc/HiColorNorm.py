@@ -32,6 +32,7 @@ import csv
 import json
 import logging
 import os
+import pkg_resources
 import re
 import shutil
 import statistics
@@ -208,9 +209,11 @@ def main():
         "-c",
         "--conf",
         required=False,
-        default=Path(__file__).resolve().parent.parent
-        / "data"
-        / "HiColorNorm.conf",
+        type=argparse.FileType('r'),
+        default=pkg_resources.resource_stream(
+            __name__,
+            'data/HiColorNorm.conf'
+        ),
     )
     parser.add_argument(
         "-n",
@@ -230,7 +233,7 @@ def main():
     (ir_ratio, bg_ratio) = start(
         args.cubes,
         args.output,
-        args.conf,
+        pvl.load(args.conf),
         make_unfiltered=args.Make_Unfiltered,
         keep=args.keep,
     )
@@ -246,14 +249,13 @@ def main():
 def start(
     cube_paths,
     out_path,
-    conf_path,
+    conf,
     make_unfiltered=True,
     db_list=None,
     keep=False,
 ):
 
     # GetConfigurationParameters()
-    conf = pvl.load(str(conf_path))
     conf_check(conf)
 
     cubes = list(map(ColorCube, cube_paths, repeat(db_list)))

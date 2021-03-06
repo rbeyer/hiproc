@@ -34,6 +34,7 @@ import json
 import logging
 import operator
 import os
+import pkg_resources
 import pvl
 import statistics
 import subprocess
@@ -190,9 +191,11 @@ def main():
         "-c",
         "--conf",
         required=False,
-        default=Path(__file__).resolve().parent.parent
-        / "data"
-        / "HiccdStitch.conf",
+        type=argparse.FileType('r'),
+        default=pkg_resources.resource_stream(
+            __name__,
+            'data/HiccdStitch.conf'
+        ),
     )
     parser.add_argument(
         "--db",
@@ -231,7 +234,7 @@ def main():
         args.cubenorm = [False] * len(args.cubes)
 
     # Perl: GetConfigurationParameters()
-    conf = pvl.load(str(args.conf))
+    conf = pvl.load(args.conf)
     conf_check(conf)
 
     # We may not need to read anything from the DB, only write to it?
@@ -272,7 +275,7 @@ def main():
     try:
         (db, outpath) = start(
             cubes,
-            args.conf,
+            conf,
             args.output,
             args.sline,
             args.eline,
@@ -293,7 +296,7 @@ def main():
 
 def start(
     cubes: list,
-    conf_path: os.PathLike,
+    conf: dict,
     output: os.PathLike,
     sline=None,
     eline=None,
@@ -301,7 +304,7 @@ def start(
 ):
 
     # Perl: GetConfigurationParameters()
-    conf = pvl.load(str(conf_path))
+    # conf = pvl.load(str(conf_path))
     conf_check(conf)
 
     outcub_path = set_outpath(output, cubes)

@@ -80,6 +80,7 @@ import csv
 import json
 import logging
 import os
+import pkg_resources
 import statistics
 import subprocess
 import sys
@@ -109,7 +110,13 @@ def main():
         "-c",
         "--conf",
         required=False,
-        default=Path(__file__).resolve().parent.parent / "data" / "HiCal.conf",
+        type=Path,
+        default=Path(
+            pkg_resources.resource_filename(
+                __name__,
+                'data/HiCal.conf'
+            )
+        ),
         help="Configuration file to use, default: %(default)s"
     )
     parser.add_argument(
@@ -145,7 +152,13 @@ def main():
     parser.add_argument(
         "--nfconf",
         required=False,
-        default="NoiseFilter.conf",
+        type=Path,
+        default=Path(
+            pkg_resources.resource_filename(
+                __name__,
+                'data/NoiseFilter.conf'
+            )
+        ),
         help="Default: %(default)s"
     )
     parser.add_argument(
@@ -217,7 +230,7 @@ def main():
         sys.exit()
 
     try:
-        conf = conf_setup(args.conf, args.nfconf)
+        conf = conf_setup(pvl.load(args.conf), pvl.load(args.nfconf))
     except (TypeError, NotADirectoryError, FileNotFoundError) as err:
         logger.critical(err)
         sys.exit()
@@ -266,25 +279,25 @@ def main():
     return
 
 
-def conf_setup(conf_path: os.PathLike, nfconf_path: os.PathLike) -> dict:
+def conf_setup(conf: dict, nfconf: dict) -> dict:
     # Get Configuration Parameters
-    conf = pvl.load(str(conf_path))
     conf_check(conf)
 
-    # If the sub-conf arguments aren't 'findable', look for them in
-    # the main conf directory.
-    # hgf_path = util.get_path(Path(args.hgfconf), Path(args.conf).parent)
-    nf_path = util.get_path(
-        Path(nfconf_path),
-        (
-            Path(conf_path).parent,
-            Path(__file__).resolve().parent.parent / "data",
-        ),
-    )
+    # # If the sub-conf arguments aren't 'findable', look for them in
+    # # the main conf directory.
+    # # hgf_path = util.get_path(Path(args.hgfconf), Path(args.conf).parent)
+    # nf_path = util.get_path(
+    #     Path(nfconf_path),
+    #     (
+    #         Path(conf_path).parent,
+    #         Path(__file__).resolve().parent.parent / "data",
+    #     ),
+    # )
 
     # Merge the configuration files together into a single dict
     # conf['HiGainFx'] = pvl.load(str(hgf_path))['HiGainFx']
-    conf["NoiseFilter"] = pvl.load(str(nf_path))["NoiseFilter"]
+    # conf["NoiseFilter"] = pvl.load(str(nf_path))["NoiseFilter"]
+    conf["NoiseFilter"] = nfconf["NoiseFilter"]
 
     return conf
 
@@ -887,7 +900,12 @@ def run_hical(
     if conf["HiCal"]["HiCal_ISIS_Conf"] != "DEFAULT":
         dirs = (
             Path(conf_path).parent,
-            Path(__file__).resolve().parent.parent / "data",
+            Path(
+                pkg_resources.resource_filename(
+                    __name__,
+                    'data/'
+                )
+            )
         )
         if lis_per < 5 and image_buffer_mean > 0:
             hical_args["conf"] = util.get_path(
@@ -1191,7 +1209,12 @@ def HiGainFx(
     coef_dir = Path(coef_path)
 
     if not coef_dir.exists() or not coef_dir.is_dir():
-        coef_dir = Path(__file__).resolve().parent.parent / "data"
+        coef_dir = Path(
+            pkg_resources.resource_filename(
+                __name__,
+                'data/'
+            )
+        )
         logger.warning(
             "The HiGainFx coefficient directory {} could not be "
             "found, using {} instead.".format(coef_path, coef_dir)
