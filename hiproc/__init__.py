@@ -2,4 +2,4 @@
 
 __author__ = """Ross A. Beyer"""
 __email__ = 'rbeyer@seti.org'
-__version__ = '0.5.0'
+__version__ = '0.5.1-dev'

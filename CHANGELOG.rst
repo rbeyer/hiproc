@@ -28,6 +28,10 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+
+0.5.0 (2021-03-05)
+------------------
+
 Added
 +++++
 * lisfix: Added the lisfix module.

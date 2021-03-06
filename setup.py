@@ -4,28 +4,16 @@
 
 from setuptools import setup, find_packages
 
-with open('README.rst') as readme_file:
-    readme = readme_file.read()
-
-with open('CHANGELOG.rst') as change_file:
-    changelog = change_file.read()
-
-requirements = []
+requirements = [
+    "gdal>=3.0.1",
+    "kalasiris>=1.8.0",
+    "matplotlib==3.2.1",
+    "numpy>=1.18.1",
+    "pvl>=1.0.1",
+    "scipy>=1.4.1"
+]
 
 setup(
-    author="Ross A. Beyer",
-    author_email='rbeyer@seti.org',
-    python_requires='>=3.6',
-    classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: Apache Software License',
-        'Natural Language :: English',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-    ],
-    description="A library to help process HiRISE EDRs with ISIS.",
     entry_points={
         'console_scripts': [
             'EDR_Stats=hiproc.EDR_Stats:main',
@@ -48,13 +36,9 @@ setup(
         ],
     },
     install_requires=requirements,
-    long_description=readme + '\n\n' + changelog,
     include_package_data=True,
-    keywords='hiproc',
-    name='hiproc',
+    keywords='HiRISE',
     packages=find_packages(include=['hiproc', 'hiproc.*']),
     test_suite='tests',
-    url='https://github.com/rbeyer/hiproc',
-    version='0.5.0',
     zip_safe=False,
 )
