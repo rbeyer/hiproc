@@ -103,15 +103,6 @@ def main():
         type=Path,
         default=Path(pkg_resources.resource_filename(__name__, 'data/')),
     )
-    parser.add_argument(
-        "--db",
-        required=False,
-        default=".HiCat.json",
-        help="The .json file to use.  Optionally, if it "
-        "starts with a '.' it is considered an extension "
-        "and will be swapped with the input file's "
-        "extension to find the .json file to use.",
-    )
 
     args = parser.parse_args()
 
