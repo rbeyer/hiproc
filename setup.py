@@ -31,12 +31,17 @@ setup(
             'JitPlot=hiproc.JitPlot:main',
             'SlitherStats=hiproc.SlitherStats:main',
             'bitflips=hiproc.bitflips:main',
-            'hiproc=hiproc.hirise_proc:main',
+            'hiproc=hiproc.hiproc:main',
+            'lisfix=hiproc.lisfix:main',
             'mdr2cub=hiproc.mdr2cub:main',
+            'resolve_jitter=hiproc.resolve_jitter:main'
         ],
     },
     install_requires=requirements,
     include_package_data=True,
+    package_data={
+        "hiproc": ["data/*"],
+    },
     keywords='HiRISE',
     packages=find_packages(include=['hiproc', 'hiproc.*']),
     test_suite='tests',
