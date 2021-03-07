@@ -59,8 +59,8 @@ def parent_parser() -> argparse.ArgumentParser:
     parent.add_argument(
         "--logfile",
         required=False,
-        help="The log file to write log messages to instead "
-        "of the terminal.",
+        help="The log file to write log messages to in addition "
+        "to the terminal.",
     )
     parent.add_argument(
         "-k",
@@ -115,26 +115,6 @@ def set_logger(verblvl=None, filename=None, loglvl=0) -> None:
         fh.setFormatter(formatter)
         logger.addHandler(fh)
 
-    return
-
-
-def set_logging(i, filename=None) -> None:
-    """Sets the log level and basic configuration."""
-    if isinstance(i, int):
-        log_level = i
-    else:
-        log_level = getattr(logging, i.upper(), logging.WARNING)
-
-    if filename is None:
-        logging.basicConfig(
-            format="%(levelname)s: %(message)s", level=log_level
-        )
-    else:
-        logging.basicConfig(
-            filename=filename,
-            format="%(levelname)s: %(message)s",
-            level=log_level,
-        )
     return
 
 

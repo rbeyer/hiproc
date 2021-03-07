@@ -90,7 +90,7 @@ def main():
 
     args = parser.parse_args()
 
-    util.set_logging(args.log, args.logfile)
+    util.set_logger(args.verbose, args.logfile, args.log)
 
     out_p = util.path_w_suffix(args.output, args.file)
 

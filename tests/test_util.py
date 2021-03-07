@@ -35,7 +35,7 @@ class TestUtil(unittest.TestCase):
         self.assertIsInstance(util.parent_parser(), argparse.ArgumentParser)
 
     def test_logging(self):
-        util.set_logging("WARNING")
+        util.set_logger(loglvl="WARNING")
         logger = logging.getLogger()
         self.assertEqual(30, logger.getEffectiveLevel())
 
