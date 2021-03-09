@@ -172,7 +172,7 @@ def edr2stitch(images, conf_dir, bitflipwidth=0, lis_tolerance=1, keep=False):
         # HiCal
         out_hical = util.path_w_suffix(".HiCal.cub", out_edr)
 
-        db = HiCal.start(
+        db = HiCal.HiCal(
             out_edr,
             out_hical,
             db,
@@ -181,9 +181,9 @@ def edr2stitch(images, conf_dir, bitflipwidth=0, lis_tolerance=1, keep=False):
                 pvl.load(conf_dir / "NoiseFilter.conf")
             ),
             conf_dir / "HiCal.conf",
+            None,
+            None,
             bitflipwidth,
-            None,
-            None,
             lis_tolerance,
             keep=keep,
         )

@@ -275,15 +275,15 @@ def main():
                 print("\n".join(norun_info(c, db, conf, args.bin2, args.bin4)))
             else:
                 out_cube = util.path_w_suffix(args.output, c)
-                db = start(
+                db = HiCal(
                     c,
                     out_cube,
                     db,
                     conf,
                     args.conf,
-                    args.bitflipwidth,
                     args.bin2,
                     args.bin4,
+                    args.bitflipwidth,
                     args.lis_tolerance,
                     keep=args.keep,
                 )
@@ -427,19 +427,19 @@ def setup(cube: os.PathLike, db: dict, conf: dict):
     return in_cube, cid, ccdchan, lis_per
 
 
-def start(
-    cube: os.PathLike,
-    out_cube: Path,
+def HiCal(
+    in_cube: os.PathLike,
+    out_cube: os.PathLike,
     db: dict,
     conf: dict,
     conf_path: os.PathLike,
-    bitflipwidth: int,
     bin2: bool,
     bin4: bool,
-    lis_tolerance: float,
+    bitflipwidth=0,
+    lis_tolerance=1,
     keep=False,
-) -> dict:
-
+) -> tuple:
+    logger.info(f"HiCal start: {in_cube}")
     # The original Perl Setup00() builds data structures that we don't
     # need.
     # The original Perl Setup01() set up data routing and did filename
@@ -454,50 +454,13 @@ def start(
     # functionality is now broken up and spread out to the check_destripe()
     # function, the set_flags() function, and the if statement below that
     # checks HiCal_Bypass_IR10_1
-    in_cube, cid, ccdchan, lis_per = setup(cube, db, conf)
+    in_cube, cid, ccdchan, lis_per = setup(in_cube, db, conf)
 
-    destripe_filter = check_destripe(in_cube, int(db["BINNING"]), bin2, bin4)
+    destripe = check_destripe(in_cube, int(db["BINNING"]), bin2, bin4)
 
     # The original Perl SetHiCalVersion() placed the HiCal version into the
-    # db, but since we're not interested in persistance, we can ignore it.
+    # db, but since we're not interested in persistence, we can ignore it.
 
-    # All the setup is done, start processing:
-    (std, diff_std, zapped, status) = HiCal(
-        in_cube,
-        out_cube,
-        ccdchan,
-        conf,
-        conf_path,
-        db,
-        destripe=destripe_filter,
-        bitflipwidth=bitflipwidth,
-        lis_tolerance=lis_tolerance,
-        keep=keep,
-    )
-
-    db["HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION"] = std
-    db["DESTRIPED_DIFFERENCE_STANDARD_DEVIATION"] = diff_std
-    db["zapped"] = zapped
-    db["hical_status"] = status
-    # The zapped flag is not in the original code, I'm putting it in
-    # to the DB to use in a later step.
-
-    return db
-
-
-def HiCal(
-    in_cube: os.PathLike,
-    out_cube: os.PathLike,
-    ccdchan: tuple,
-    conf: dict,
-    conf_path: os.PathLike,
-    db: dict,
-    destripe=False,
-    bitflipwidth=0,
-    lis_tolerance=1,
-    keep=False,
-) -> tuple:
-    logger.info(f"HiCal start: {in_cube}")
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
 
@@ -666,8 +629,15 @@ def HiCal(
     if not keep:
         to_delete.unlink()
 
+    db["HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION"] = std_final
+    db["DESTRIPED_DIFFERENCE_STANDARD_DEVIATION"] = diff_std_dev
+    db["zapped"] = zapped
+    db["hical_status"] = hical_status
+    # The zapped flag is not in the original code, I'm putting it in
+    # to the DB to use in a later step.
+
     logger.info(f"HiCal done: {out_cube}")
-    return std_final, diff_std_dev, zapped, hical_status
+    return db
 
 
 def FurrowCheck(vpnts: list, channel: int) -> bool:
