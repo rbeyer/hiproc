@@ -290,6 +290,8 @@ def main():
                 with open(db_path, "w") as f:
                     json.dump(db, f, indent=0, sort_keys=True)
 
+                logger.info(f"Wrote {db_path}")
+
         except UserWarning as err:
             logger.warning(err)
             continue

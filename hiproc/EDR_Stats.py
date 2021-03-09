@@ -164,6 +164,9 @@ def main():
         with open(db_path, "w") as f:
             json.dump(histats, f, indent=0, sort_keys=True)
 
+        logger.info(f"Wrote {db_path}")
+    return
+
 
 def EDR_Stats(
     img: os.PathLike,
@@ -173,10 +176,7 @@ def EDR_Stats(
     histmax=99.99,
     keep=False,
 ) -> dict:
-    logger.info(
-        f"EDR_Stats(in: {img}, out: {out_path}, "
-        f"hist min & max: {histmin} & {histmax}, keep: {keep})"
-    )
+    logger.info(f"EDR_Stats start: {img}")
     try:
         logger.info("The LUT for this file is: " + str(check_lut(img)))
     except KeyError as err:
@@ -224,7 +224,7 @@ def EDR_Stats(
     tdi_bin_check(out_path, histats)
     lut_check(out_path, histats)
 
-    logger.info("EDR_Stats done.")
+    logger.info(f"EDR_Stats done: {out_path}")
     return histats
 
 
