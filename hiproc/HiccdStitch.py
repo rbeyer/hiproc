@@ -357,10 +357,10 @@ def main():
         c.gather_from_db()
 
     try:
-        (db, outpath) = start(
+        (db, outpath) = HiccdStitch(
             cubes,
-            conf,
             args.output,
+            conf,
             args.sline,
             args.eline,
             keep=args.keep,
@@ -414,15 +414,28 @@ def start(
 
 
 def HiccdStitch(
-    cubes: list, out_path: os.PathLike, conf: dict, keep=False
-) -> list:
-    logger.info("HiccdStitch start.")
+    cubes: list,
+    out_path: os.PathLike,
+    conf: dict,
+    sline=None,
+    eline=None,
+    keep=False
+) -> tuple:
+    logger.info(f"HiccdStitch start: {cubes}")
+
+    # Perl: GetConfigurationParameters()
+    # conf = pvl.load(str(conf_path))
+    conf_check(conf)
+
+    out_p = set_outpath(out_path, cubes)
+
+    # Perl: GetImageDims()
+    cubes = GetImageDims(cubes, conf, sline, eline)
 
     # This string will get placed in the filename for all of our
     # temporary files. It will (hopefully) prevent collisions with
     # existing files and also allow for easy clean-up if keep=True
     # temp_token = datetime.now().strftime('HiccdStitch-%y%m%d%H%M%S')
-    out_p = Path(out_path)
 
     to_delete = isis.PathSet()
 
@@ -461,7 +474,20 @@ def HiccdStitch(
     if not keep:
         to_delete.unlink()
 
-    return cubes
+    # Afterwards inserts into CCD_Processing_Statistics table.
+    db = {"OBSERVATION_ID": str(cubes[0].get_obsid())}
+    for c in cubes:
+        ccd_db = {
+            "CCDID": str(c),
+            "RADIOMETRIC_MATCHING_CORRECTION": c.correction,
+            "LEFT_OVERLAP_AVERAGE": c.lstats,
+            "RIGHT_OVERLAP_AVERAGE": c.rstats,
+            "CUBENORM_COLUMN_CORRECTION_STANDARD_DEVIATION": c.cubenorm_stddev,
+        }
+        db[c.get_ccd()] = ccd_db
+
+    logger.info(f"HiccdStitch done: {out_p}")
+    return db, out_p
 
 
 def conf_check(conf: dict) -> dict:
@@ -981,6 +1007,7 @@ def make_balance(cube, conf, balance_path):
     isis.algebra(
         cube.nextpath, to=to_s, operator="unary", a=a_param, c=c_param
     )
+    logger.info(f"Created {balance_path}")
 
 
 def SpecialProcessingFlags(cube: HiccdStitchCube):

@@ -211,10 +211,10 @@ def edr2stitch(images, conf_dir, bitflipwidth=0, lis_tolerance=1, keep=False):
     # need to separate by color:
     color_groups = get_color_groups(cids)
     for color_group in color_groups.values():
-        db, out_stitch = HiccdStitch.start(
+        db, out_stitch = HiccdStitch.HiccdStitch(
             color_group,
-            pvl.load(conf_dir / "HiccdStitch.conf"),
             ".HiccdStitch.cub",
+            pvl.load(conf_dir / "HiccdStitch.conf"),
             sline=None,
             eline=None,
             keep=keep,
