@@ -513,7 +513,9 @@ def HiCal(
 
     logger.info(f"destripe: {destripe}")
 
-    flags = set_flags(hconf, db, ccdchan, b.index(int(db["BINNING"])))
+    flags = set_flags(
+        hconf, db, ccdchan, b.index(int(db["BINNING"])),  bitflipwidth > 0
+    )
     logger.info(flags)
 
     # Start processing cube files
@@ -853,7 +855,7 @@ def get_bins_fromfiles(cube: os.PathLike) -> dict:
 
 
 def set_flags(
-    conf: dict, db: dict, ccdchan: tuple, bindex: int
+    conf: dict, db: dict, ccdchan: tuple, bindex: int, newlogic=True
 ) -> collections.namedtuple:
     """Set various processing flags based on various configuration
     parameters."""
@@ -881,6 +883,8 @@ def set_flags(
     zapcols = False
     if int(db["LOW_SATURATED_PIXELS"]) >= int(conf["HiCal_Noise_LIS_Count"]):
         zapcols = True
+        if newlogic:
+            noise_filter = True
 
     if "DIVIDE" == conf["HiCal_HPF_Cubenorm"]:
         divide = True
@@ -920,7 +924,7 @@ def run_hical(
     lis_per: float,
     image_buffer_mean: float,
     binning: int,
-    noise_filter: bool,
+    noiseclean: bool,
     bitflipwidth=0,
     lis_tolerance=1,
     keep=False,
@@ -956,7 +960,7 @@ def run_hical(
             )
             status = "BadCal"
 
-    if noise_filter:
+    if noiseclean:
         mask_cube = to_d.add(next_cube.with_suffix(".mask.cub"))
         mask(
             next_cube,
