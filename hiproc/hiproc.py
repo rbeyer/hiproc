@@ -194,7 +194,7 @@ def edr2stitch(images, conf_dir, bitflipwidth=0, lis_tolerance=1, keep=False):
     # get Channel pairs
     cids = list()
     for chid1, chid2 in get_CCDpairs(chids):
-        (db, o_path) = HiStitch.start(
+        (db, o_path) = HiStitch.HiStitch(
             chid1.nextpath,
             chid2.nextpath,
             chid1.db,

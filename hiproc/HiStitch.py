@@ -155,7 +155,7 @@ def main():
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    (db, outcub_path) = start(
+    (db, outcub_path) = HiStitch(
         args.cube0,
         args.cube1,
         get_db(util.pid_path_w_suffix(args.db, args.cube0)),
@@ -172,57 +172,8 @@ def main():
     with open(db_path, "w") as f:
         json.dump(db, f, indent=0, sort_keys=True)
 
-
-def start(
-    cube0: os.PathLike,
-    cube1: os.PathLike,
-    db0: dict,
-    db1: dict,
-    output: os.PathLike,
-    conf: dict,
-    keep=False,
-) -> dict:
-
-    # GetConfigurationParameters()
-    conf_check(conf)
-
-    # GetProductFiles()
-    if not cube1:
-        cubes = (Path(cube0),)
-    else:
-        cubes = sort_input_cubes(Path(cube0), Path(cube1))
-
-    chids = get_chids(cubes)
-
-    outcub_path = set_outpath(output, hirise.CCDID(chids[0]), cubes[0].parent)
-
-    # PrepareDBStatements()
-    #   select from HiCat.EDR_Products
-    db_paths = list()
-    db_paths.append(db0)
-    if len(cubes) == 2:
-        db_paths.append(db1)
-
-    dbs = sort_databases([db0, db1], chids)
-
-    (truthchannel, balanceratio) = HiStitch(
-        cubes,
-        outcub_path,
-        conf["HiStitch"],
-        dbs,
-        int(chids[0].ccdnumber),
-        keep=keep,
-    )
-
-    # insert ObsID, pid0.ccdname+pid0.ccdnumber, truthchannel, balanceratio
-    # into HiCat.CCD_Processing_Statistics
-    db = dict()
-    db["OBSERVATION_ID"] = str(chids[0].get_obsid())
-    db["CCD"] = chids[0].get_ccd()
-    db["CONTROL_CHANNEL"] = truthchannel
-    db["CHANNEL_MATCHING_CORRECTION"] = balanceratio
-
-    return (db, outcub_path)
+    logger.info(f"Wrote {db_path}")
+    return
 
 
 def get_db(db_path: os.PathLike) -> dict:
@@ -308,16 +259,39 @@ def sort_databases(dbs: list, chids: tuple) -> tuple:
 
 
 def HiStitch(
-    cubes: list,
+    cube0: os.PathLike,
+    cube1: os.PathLike,
+    db0: dict,
+    db1: dict,
     out_cube: os.PathLike,
     conf: dict,
-    dbs: list,
-    ccd_number: int,
     keep=False,
 ) -> tuple:
-    logger.info("HiStitch start.")
+    logger.info(f"HiStitch start: {cube0} {cube1}")
 
-    out_path = Path(out_cube)
+    # GetConfigurationParameters()
+    conf_check(conf)
+
+    # GetProductFiles()
+    if not cube1:
+        cubes = (Path(cube0),)
+    else:
+        cubes = sort_input_cubes(Path(cube0), Path(cube1))
+
+    chids = get_chids(cubes)
+
+    out_path = set_outpath(out_cube, hirise.CCDID(chids[0]), cubes[0].parent)
+
+    # PrepareDBStatements()
+    #   select from HiCat.EDR_Products
+    db_paths = list()
+    db_paths.append(db0)
+    if len(cubes) == 2:
+        db_paths.append(db1)
+
+    dbs = sort_databases([db0, db1], chids)
+    ccd_number = int(chids[0].ccdnumber)
+
     # Allows for indexing in lists ordered by bin value.
     b = 1, 2, 4, 8, 16
 
@@ -329,7 +303,11 @@ def HiStitch(
     # ProcessingStep() - mostly sets up stuff
     max_mean = max(map(lambda x: float(x["IMAGE_MEAN"]), dbs))
     flags = set_flags(
-        conf, dbs, ccd_number, b.index(int(dbs[0]["BINNING"])), max_mean
+        conf["HiStitch"],
+        dbs,
+        ccd_number,
+        b.index(int(dbs[0]["BINNING"])),
+        max_mean
     )
 
     # HiStitchStep() - runs HiStitch, and originally inserted to db, now we
@@ -340,7 +318,7 @@ def HiStitch(
             out_path,
             dbs[0]["BINNING"],
             ccd_number,
-            conf,
+            conf["HiStitch"],
             flags.balance,
             flags.equalize,
         ).args
@@ -359,8 +337,16 @@ def HiStitch(
         HiFurrow_Fix(out_path, furrow_file, max_mean, keep=keep)
         furrow_file.rename(out_path)
 
-    logger.info("HiStitch done.")
-    return (truthchannel, balanceratio)
+    # insert ObsID, pid0.ccdname+pid0.ccdnumber, truthchannel, balanceratio
+    # into HiCat.CCD_Processing_Statistics
+    db = dict()
+    db["OBSERVATION_ID"] = str(chids[0].get_obsid())
+    db["CCD"] = chids[0].get_ccd()
+    db["CONTROL_CHANNEL"] = truthchannel
+    db["CHANNEL_MATCHING_CORRECTION"] = balanceratio
+
+    logger.info(f"HiStitch done: {out_path}")
+    return db, out_path
 
 
 def set_flags(
