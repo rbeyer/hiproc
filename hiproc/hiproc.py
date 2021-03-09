@@ -223,7 +223,9 @@ def edr2stitch(images, conf_dir, bitflipwidth=0, lis_tolerance=1, keep=False):
     #   takes *balance.cub
     #   creates *[IR|BG]*.balance.precolor.cub
     #   Can then run JitPlot on these *.balance.precolor.cub
-    HiColorInit.start([c.nextpath for c in cids], ".precolor.cub", keep=keep)
+    HiColorInit.HiColorInit(
+        [c.nextpath for c in cids], ".precolor.cub", keep=keep
+    )
 
     # HiJitReg
     #   takes tmp/*balance.cub tmp/*balance.precolor.cub

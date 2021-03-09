@@ -1,5 +1,28 @@
 #!/usr/bin/env python
-"""Prepares an observation for color co-registration and processing."""
+"""Prepares an observation for color co-registration and processing.
+
+Prepares images for coregistration. It takes the HiStitch CCD product balance
+cubes and scales the BG and IR CCDs to match the corresponding RED CCDs.
+If it can, the program deals with these two sets:
+
+* RED4 - BG12 - IR10
+* RED5 - BG13 - IR11
+
+HiColorInit must happen after HiccdStitch.
+
+
+Data Flow
+---------
+Input Products:
+
+* ``balance.cub`` files for the three or six of the CCDs lsited above, which
+    are the result of HiccdStitch.
+
+Output Products:
+
+* A ``.precolor.cub`` file for each of the BG and IR input balance.cub files.
+
+"""
 
 # Copyright 2007-2020, Arizona Board of Regents on behalf of the Lunar and
 # Planetary Laboratory at the University of Arizona.
@@ -64,16 +87,32 @@ class HiColorCube(hirise.CCDID):
         return f"{self.__class__.__name__}('{self.path}')"
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
-        description=__doc__, parents=[util.parent_parser()]
+        description=__doc__,
+        parents=[util.parent_parser()],
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "-o", "--output_suffix", required=False, default=".precolor.cub"
+        "-o", "--output_suffix",
+        required=False,
+        default=".precolor.cub",
+        help="The input color (BG & IR) color cubes will have their final "
+             "suffix removed, and this suffix added. Default: %(default)s"
     )
-    parser.add_argument("cubes", metavar="balance.cub-files", nargs="+")
+    parser.add_argument(
+        "cubes",
+        metavar="balance.cub-files",
+        nargs="+",
+        help="Either one or both sets of RED/IR/BG .balance.cub files. "
+             "However, that's tedious to type, so you could just type in "
+             "*.balance.cub here, and the program will sort out what it needs."
+    )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
@@ -85,7 +124,7 @@ def main():
         sys.exit()
 
     try:
-        start(args.cubes, args.output_suffix, keep=args.keep)
+        HiColorInit(args.cubes, args.output_suffix, keep=args.keep)
     except ValueError as err:
         logger.critical(err)
         sys.exit()
@@ -98,7 +137,9 @@ def main():
     return
 
 
-def start(cube_paths: list, output_suffix: str, keep=False):
+def HiColorInit(cube_paths: list, output_suffix: str, keep=False):
+
+    logger.info(f"HiColorInit start: {cube_paths}")
 
     cubes = list(map(HiColorCube, cube_paths))
     (red4, red5, ir10, ir11, bg12, bg13) = separate_ccds(cubes)
@@ -111,9 +152,11 @@ def start(cube_paths: list, output_suffix: str, keep=False):
             raise ValueError("RED4 dimensions not equal to RED5 dimensions!")
 
     if red4 is not None:
-        HiColorInit(red4, ir10, bg12, output_suffix, keep=keep)
+        process_set(red4, ir10, bg12, output_suffix, keep=keep)
     if red5 is not None:
-        HiColorInit(red5, ir11, bg13, output_suffix, keep=keep)
+        process_set(red5, ir11, bg13, output_suffix, keep=keep)
+
+    logger.info("HiColorInit done.")
     return
 
 
@@ -137,10 +180,10 @@ def separate_ccds(cubes: list) -> tuple:
             # Not one of the six that we care about,
             # so we'll silently ignore it.
             pass
-    return (red4, red5, ir10, ir11, bg12, bg13)
+    return red4, red5, ir10, ir11, bg12, bg13
 
 
-def HiColorInit(
+def process_set(
     red: HiColorCube,
     ir: HiColorCube,
     bg: HiColorCube,
@@ -236,4 +279,6 @@ def HiColorInit(
 
         if not keep:
             rescaled.unlink()
+
+        logger.info(f"Created {c.path.with_suffix(outsuffix)}")
     return

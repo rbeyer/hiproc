@@ -19,3 +19,6 @@ to the user to easily execute HiRISE processing procedures.
 
 .. autoprogram:: hiproc.HiccdStitch:arg_parser()
    :prog: HiccdStitch
+
+.. autoprogram:: hiproc.HiColorInit:arg_parser()
+   :prog: HiColorInit
