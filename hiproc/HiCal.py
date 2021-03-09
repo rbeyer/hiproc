@@ -412,11 +412,17 @@ def setup(cube: os.PathLike, db: dict, conf: dict):
         / (int(db["IMAGE_LINES"]) * int(db["LINE_SAMPLES"]))
         * 100.0
     )
-    if (
-        ccdchan == ("IR10", "1")
-        and lis_per > conf["HiCal"]["HiCal_Bypass_IR10_1"]
-    ):
-        raise UserWarning("Bypassing IR10_1.")
+    # if (
+    #     ccdchan == ("IR10", "1")
+    #     and lis_per > conf["HiCal"]["HiCal_Bypass_IR10_1"]
+    # ):
+    #     raise UserWarning("Bypassing IR10_1.")
+    if lis_per > conf["HiCal"]["HiCal_Bypass"]:
+        raise UserWarning(
+            f"The image area has a LIS percent ({lis_per}) greater than "
+            f"{conf['HiCal']['HiCal_Bypass']}, so this image will not be "
+            f"processed through HiCal."
+        )
 
     return in_cube, cid, ccdchan, lis_per
 
@@ -698,10 +704,16 @@ def conf_check(conf: dict) -> None:
     )
 
     util.conf_check_bounds(
-        "HiCal_Bypass_IR10_1",
+        "HiCal_Bypass",
         (0.0, 100.0),
-        conf["HiCal"]["HiCal_Bypass_IR10_1"],
+        conf["HiCal"]["HiCal_Bypass"],
     )
+
+    # util.conf_check_bounds(
+    #     "HiCal_Bypass_IR10_1",
+    #     (0.0, 100.0),
+    #     conf["HiCal"]["HiCal_Bypass_IR10_1"],
+    # )
 
     util.conf_check_count(
         "HiCal_Noise_Bin_DarkPixel_STD",
@@ -1667,8 +1679,9 @@ def NoiseFilter_zaptrigger(
         for i in range(zap_slice.start, zap_slice.stop):
             if vpnts[i] / max_vpnts < nonvalid_frac:
                 trigger = True
-                logger.info(f"Fraction of non-valid pixels > {nonvalid_frac}")
-                logger.info("Pause point pixels will be zapped.")
+    if trigger:
+        logger.info(f"Fraction of non-valid pixels > {nonvalid_frac}")
+        logger.info("Pause point pixels will be zapped.")
     return trigger
 
 
