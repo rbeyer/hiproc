@@ -1,6 +1,42 @@
 #!/usr/bin/env python
-"""Stitch together two HiRISE channel files to create a single CCD image
-file."""
+"""Stitch together two HiRISE channel files to create a single CCD image file.
+
+These are the functionalities that the HiStitch pipeline performs that are
+reproduced here:
+
+* Join (or stitch) together two channel products to form a whole CCD product.
+    The channel 1 product is on the left, channel 0 on the right.
+* When joining the two channel products, the ISIS histitch program first
+    obtains the image average of the two channel products at the
+    join area. The program then adjusts the average of channel 1
+    to match the average of channel 0 through a multiplicative
+    correction. This step produces a radiometrically seamless CCD
+    product.
+* For Bin 2 and 4 images a fix is applied to images that have experienced
+    furrowing. If furrowing has been detected, a highpass/lowpass
+    filter is applied to the furrow region for those pixels that
+    have not been set to the null pixel value in the HiCal
+    step.
+
+HiStitch is the third step in the HiRISE processing chain, after HiCal and
+results in data that is read for the next step: HiccdStitch.  If you are
+running HiCal individually without all EDRs from the Observation in the
+same directory, please be aware of the --bin2 and --bin4 options.
+
+
+Data Flow
+---------
+Input Products:
+
+* Two ``.cub`` files from the same CCD that have been processed through HiCal.
+* Two ``.json`` files that contain summary information about the .cub files.
+
+Output Products:
+
+* A stitched ``.cub`` file.
+* A ``.json`` file with summary information about the stitched image.
+
+"""
 
 # Copyright 2004-2020, Arizona Board of Regents on behalf of the Lunar and
 # Planetary Laboratory at the University of Arizona.
@@ -48,11 +84,12 @@ import hiproc.util as util
 logger = logging.getLogger(__name__)
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
         description=__doc__,
         parents=[util.parent_parser()],
         conflict_handler="resolve",
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
         "--db",
@@ -61,20 +98,34 @@ def main():
         help="The .json file to use.  Optionally, if it "
         "starts with a '.' it is considered an extension and "
         "will be swapped with the input file's extension to "
-        "find the .json file to use.",
+        "find the .json file to use. Default: %(default)s",
     )
     parser.add_argument(
         "--db2",
         required=False,
         default=".HiCat.json",
         help="The second .json file to use.  Optionally, if "
-        "it starts with a '.' it is considered an extension "
+        "it starts with a '.' it is considered a suffix "
         "and will be swapped with the second input file's "
-        "extension to find the .json file to use.",
+        "suffix to find the .json file to use. Default: %(default)s",
     )
-    parser.add_argument("--dbout", required=False, default=".HiCat.json")
     parser.add_argument(
-        "-o", "--output", required=False, default=".HiStitch.cub"
+        "--dbout",
+        required=False,
+        default=".HiCat.json",
+        help="The name of the output .json file to write.  Optionally, if "
+             "it starts with a '.' it is considered a suffix "
+             "and will be added to the CCD ID of the observation of the "
+             "input files. Default: %(default)s",
+    )
+    parser.add_argument(
+        "-o", "--output",
+        required=False,
+        default=".HiStitch.cub",
+        help="The name of the output .cub file to write.  Optionally, if "
+             "it starts with a '.' it is considered a suffix"
+             "and will be added to the CCD ID of the observation of the "
+             "input files. Default: %(default)s",
     )
     parser.add_argument(
         "-c",
@@ -85,17 +136,22 @@ def main():
             __name__,
             'data/HiStitch.conf'
         ),
+        help="Path to the HiStitch config file.  Defaults to "
+             "HiStitch.conf distributed with the library."
     )
     parser.add_argument("cube0", metavar="cube0.cub-file")
     parser.add_argument("cube1", metavar="cube1.cub-file", nargs="?")
+    return parser
 
+
+def main():
     # The original Perl needed the specific output of cubenorm from a
     # particular step in the HiCal pipeline before here.  However, rather
     # than keep track of those files, open them, and read them again, we
     # can (and did) perform the relevant check in HiCal.py, and then save
     # that in the db that we can check now.
 
-    args = parser.parse_args()
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 

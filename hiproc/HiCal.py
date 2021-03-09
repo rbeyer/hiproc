@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Generate radiometrically corrected HiRISE Channel products.
 
-These are the functionalities that the EDR_Stats pipeline does that are
+These are the functionalities that the EDR_Stats pipeline performs that are
 reproduced here:
 
 * Perform a radiometric calibration correction and conversion to "I/F" units
@@ -23,17 +23,19 @@ reproduced here:
   and extras products. For BG and IR-filter images that make up the
   color products, the furrowed pixels will be interpolated in the
   HiColorNorm pipeline step.
-* If an observation is determined to have furrows then an entry is
-  made in HiCat's Tags table (here in the .json files) to indicate
-  the level of furrowing that has occurred. The comment field in the
-  Tag table entry contains a number indicating the percent of the
-  first furrow column that had pixel values above the threshold furrow
-  value.
+* If an observation is determined to have furrows then an entry
+  with the key "zapped" is set to "true" in the output .json file.
 * Due to HiRISE instrument instability problems, the HiCal pipeline
   performs a noise reduction procedure to reduce the number of bad
   pixels in an image observation. The noise correction is applied
-  when the standard deviation of the dark pixel or mask regions exceed
-  a threshold, or if the number of LIS pixels exceeds a threshold.
+  when the standard deviation of the dark pixel or mask regions
+  exceed a threshold, or if the number of LIS pixels exceeds a
+  threshold.  A newer version of that processing can be engaged
+  if --bitflipwidth is set to a non-zero value.
+* Sometimes operating at lower temperatures can result in LIS pixels
+  in the calibration areas, but not in the image area that can result
+  in an erroneous calibration.  Some new processing to deal with that
+  can be engaged if --lisfix is set to a value less than 1.
 * A high-pass filter "cubenorm" step is applied to the calibrated
   image. Due to camera instabilities, residual vertical striping
   often exists in the imaging that is corrected by this empirical
@@ -41,8 +43,27 @@ reproduced here:
   and stored in the .json file.
 * The ISIS program "hidestripe" is applied to suppress horizontal
   stripping seen whenever an observation is acquired using mixed-binning
-  commanding. The standard deviation of this change is calculated and
-  stored in the .json file.
+  commanding. The standard deviation of this change is calculated
+  and stored in the .json file.
+
+
+HiCal is the second step in the HiRISE processing chain, after EDR_Stats and
+results in data that is read for the next step: HiStitch.  If you are
+running HiCal individually without all EDRs from the Observation in the
+same directory, please be aware of the --bin2 and --bin4 options.
+
+
+Data Flow
+---------
+Input Products:
+
+* A ``.cub`` file that has been converted from an EDR.
+* A ``.json`` file that contains summary information about the .cub file.
+
+Output Products:
+
+* A calibrated ``.cub`` file for each input ``.cub`` file processed.
+* Modifies each provided ``.json`` file.
 
 """
 
@@ -101,9 +122,11 @@ import hiproc.util as util
 logger = logging.getLogger(__name__)
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
-        description=__doc__, parents=[util.parent_parser()]
+        description=__doc__,
+        parents=[util.parent_parser()],
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("-o", "--output", required=False, default=".HiCal.cub")
     parser.add_argument(
@@ -117,7 +140,8 @@ def main():
                 'data/HiCal.conf'
             )
         ),
-        help="Configuration file to use, default: %(default)s"
+        help="Configuration file to use, Defaults to "
+             "HiCal.conf distributed with the library."
     )
     parser.add_argument(
         "--db",
@@ -159,7 +183,7 @@ def main():
                 'data/NoiseFilter.conf'
             )
         ),
-        help="Default: %(default)s"
+        help="Defaults to NoiseFilter.conf distributed with the library."
     )
     parser.add_argument(
         "--bin2",
@@ -214,8 +238,11 @@ def main():
         nargs="+",
         help="More than one can be listed here.",
     )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 

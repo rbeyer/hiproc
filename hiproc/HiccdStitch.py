@@ -1,6 +1,44 @@
 #!/usr/bin/env python
 """Stitch together the same HiRISE color-filter CCDs from an observation to
-create a single mosaicked image file."""
+create a single mosaicked image file.
+
+This program:
+
+* Optionally performs cubenorm processing on each CCD using a training area
+    that has been selected by the user. Cubenorm processing
+    is required whenever radiometric problems, such as vertical
+    striping, remain after the radiometric calibration step in the
+    HiCal Pipeline. The cubenorm processing is described in the
+    ISIS program cubenorm.
+* Balance the CCD products, created by HiStitch, to radiometrically match.
+    A multiplicative constant is applied to each CCD to force the
+    overlapping areas of adjacent CCDs to be identical. The resulting
+    balanced CCD products, have the naming convention ``*.balance.cub``.
+    These products are used by subsequent pipeline processing for
+    creating color products, RDR products, and DTM products.
+* Join (stitch together) the CCD products to form an image of the entire
+    observation.
+
+HiccdStitch is the fourth step in the HiRISE processing chain, after
+HiStitch. If an observation has RED, IR and BG CCDs, then this program would
+need to be run once for each set.
+
+
+Data Flow
+---------
+Input Products:
+
+* ``.cub`` files of the same color (RED, IR, or BG) which are the result of
+    HiStitch.
+* ``.json`` files that start with the CCD ID of each source .cub file.
+
+Output Products:
+
+* A stitched ``.cub`` file for that color.
+* A ``.balance.cub`` file for each input cube file.
+* A ``.json`` file with summary information about the stitched image.
+
+"""
 
 # Copyright 2006-2020, Arizona Board of Regents on behalf of the Lunar and
 # Planetary Laboratory at the University of Arizona.
@@ -180,12 +218,20 @@ class HiccdStitchCube(hirise.CCDID):
         return
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
-        description=__doc__, parents=[util.parent_parser()]
+        description=__doc__,
+        parents=[util.parent_parser()],
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "-o", "--output", required=False, default=".HiccdStitch.cub"
+        "-o", "--output",
+        required=False,
+        default=".HiccdStitch.cub",
+        help="The name of the output .cub file to write.  Optionally, if "
+             "it starts with a '.' it is considered a suffix"
+             "and will be added to the Observation ID of the "
+             "input files. Default: %(default)s",
     )
     parser.add_argument(
         "-c",
@@ -194,29 +240,67 @@ def main():
         type=argparse.FileType('r'),
         default=pkg_resources.resource_stream(
             __name__,
-            'data/HiccdStitch.conf'
+            'data/HiccdStitch.conf',
         ),
+        help="Path to the HiccdStitch config file.  Defaults to "
+             "HiccdStitch.conf distributed with the library."
     )
     parser.add_argument(
         "--db",
         required=False,
         default=".HiCat.json",
-        help="The .json file to use.  Optionally, if it "
+        help="The .json file to output.  Optionally, if it "
         "starts with a '.' it is considered an extension "
-        "and will be swapped with the input file's extension "
-        "to find the .json file to use.",
+        "and will be swapped with the output file's extension "
+        "to determine the .json filename to use. Default: %(default)s",
     )
-    parser.add_argument("--sline", required=False, default=None, type=int)
-    parser.add_argument("--eline", required=False, default=None, type=int)
-    parser.add_argument("--reduce", required=False, default=None, type=int)
-    parser.add_argument("--cubenorm", required=False, nargs="+", type=bool)
-    parser.add_argument("cubes", metavar=".cub-file", nargs="+")
+    parser.add_argument(
+        "--sline",
+        required=False,
+        default=None,
+        type=int,
+        help="If given, will be used as the starting line to crop the image "
+             "at in order to create a training area to use for cubenorm "
+             "processing."
+    )
+    parser.add_argument(
+        "--eline",
+        required=False,
+        default=None,
+        type=int,
+        help="If given, will be used as the ending line for cubenorm cropping, "
+             "see --sline for more information."
+    )
+    parser.add_argument(
+        "--cubenorm",
+        required=False,
+        nargs="+",
+        type=bool,
+        help="To engage cubenorm processing a list of true or false values "
+             "(could be 0 or 1) that must match the number of input cubes"
+             "must be given to indicate which of the input cubes should "
+             "have cubenorm processing applied.  If you only had four input"
+             "cubes, then ``--cubenorm 0 0 1 1`` would not run cubenorm "
+             "processing on the first two cubes, but would run it on the last"
+             "two, etc.  The default is not to run this processing on any."
+    )
+    parser.add_argument(
+        "cubes",
+        metavar=".cub-file",
+        nargs="+",
+        help="Cubes to assemble, which are presumably the output of HiStitch. "
+             "They must all be from the same detectors, so either all RED, "
+             "all IR, or all BG cubes."
+    )
+    return parser
 
+
+def main():
     # The Original Perl took a .pvl file as input which mostly just had the
     # filenames of the ccd files to stitch together.  We'll just take those
     # on the command line and into args.cubes.
 
-    args = parser.parse_args()
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 

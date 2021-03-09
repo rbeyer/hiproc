@@ -2,16 +2,31 @@
 """Create an ISIS cube from a HiRISE EDR .img file and record some
 statistics.
 
-These are the functionalities that the EDR_Stats pipeline does that are
+These are the functionalities that the EDR_Stats pipeline performs that are
 reproduced here:
 
 * Convert a HiRISE EDR Product to an ISIS cube for subsequent pipeline
   processing using the ISIS system for much of the work.
-* Gather image statistics about the observation and update HiCat's
-  EDR_Products table with those statistics (now written out to a .json file).
-* Create an image histogram and store it as an ASCII file for use by
-  other applications (optional).
+* Gather image statistics about the observation and write them out
+  to a .json file for other programs to use.
 * Calculate the Signal-to-Noise Ratio (SNR).
+
+In general, this program is the first, simple step of the HiRISE processing
+chain, and prepares data for the next step: HiCal.
+
+
+Data Flow
+---------
+Input Products:
+
+* Any HiRISE PDS EDR, typically ending in ``.img``.
+
+Output Products:
+
+* A ``.cub`` file for each ``.img`` file processed.
+* A ``.json`` file for each ``.img`` file processed containing summary
+    information about the image.
+
 """
 
 # Copyright 2004-2020, Arizona Board of Regents on behalf of the Lunar and
@@ -60,24 +75,45 @@ import hiproc.util as util
 logger = logging.getLogger(__name__)
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
-        description=__doc__, parents=[util.parent_parser()]
+        description=__doc__,
+        parents=[util.parent_parser()],
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "-o", "--output", required=False, default=".EDR_Stats.cub"
+        "-o", "--output",
+        required=False,
+        default=".EDR_Stats.cub",
+        help="Output filename.  Optionally, if it starts with a '.' it is "
+             "considered a suffix and will be swapped with the input"
+             "file's suffix to determine the file to write. "
+             "Default: %(default)s"
     )
     parser.add_argument(
         "--db",
         required=False,
         default=".HiCat.json",
         help="The .json file to output.  Optionally, if it "
-        "starts with a '.' it is considered an extension and "
-        "will be swapped with the input file's extension to "
-        "determine the file to write.",
+        "starts with a '.' it is considered a suffix and "
+        "will be swapped with the input file's suffix to "
+        "determine the file to write. Default: %(default)s",
     )
-    parser.add_argument("--histmin", required=False, default=0.01)
-    parser.add_argument("--histmax", required=False, default=99.99)
+    parser.add_argument(
+        "--histmin",
+        required=False,
+        default=0.01,
+        help="The minimum percentage above which DN are counted.  This only "
+             "affects the value of STD_DN_LEVELS in the output .json file. "
+             "If it is lower, more DN will be counted. Default: %(default)s"
+    )
+    parser.add_argument(
+        "--histmax",
+        required=False,
+        default=99.99,
+        help="The minimum percentage below which DN are counted. See --histmin "
+             "for more information. Default: %(default)s"
+    )
     parser.add_argument(
         "-g",
         "--gains",
@@ -87,7 +123,8 @@ def main():
             __name__,
             'data/EDR_Stats_gains_config.pvl'
         ),
-        help="Path to the gains config PVL file.",
+        help="Path to the gains config PVL file.  Defaults to "
+             "EDR_Stats_gains_config.pvl distributed with the library.",
     )
     parser.add_argument(
         "img",
@@ -95,8 +132,11 @@ def main():
         nargs="+",
         help="More than one can be listed here.",
     )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 

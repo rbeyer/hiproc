@@ -70,7 +70,7 @@ class ChannelCube(hirise.ChannelID):
         self.db = db
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
         description=__doc__, parents=[util.parent_parser()]
     )
@@ -103,8 +103,11 @@ def main():
         type=Path,
         default=Path(pkg_resources.resource_filename(__name__, 'data/')),
     )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 

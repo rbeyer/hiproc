@@ -7,6 +7,8 @@ Welcome to hiproc's documentation!
 
    readme
    installation
+   processing
+   console
    usage
    modules
    contributing
