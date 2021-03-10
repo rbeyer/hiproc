@@ -40,3 +40,6 @@ to the user to easily execute HiRISE processing procedures.
 
 .. autoprogram:: hiproc.HiBeautify:arg_parser()
    :prog: HiBeautify
+
+.. autoprogram:: hiproc.HiPrecisionInit:arg_parser()
+   :prog: HiPrecisionInit

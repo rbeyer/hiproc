@@ -1,9 +1,11 @@
 #!/usr/bin/env python
-"""Prepares an observation for HiPrecision processing.
+"""Examines slither files to determine whether HiJACK processing
+is needed, or if HiNoProj is sufficient.
 
-   This program is *substantially* less capable than its
-   Perl predecessor.  This is because most of the processing
-   tasks were moved into ResolveJitter / HiJACK.
+If the average of the absolute difference between the slither fit
+and the measurements in the slither.txt file is greater than the
+threshhold in the configuration file, this program will tell you
+that.
 """
 
 # Copyright 2008-2020, Arizona Board of Regents on behalf of the Lunar and
@@ -32,6 +34,11 @@
 # by Audrie Fennema and Sarah Mattson as employees of the University of
 # Arizona.
 
+# This program is *substantially* less capable than its
+# Perl predecessor.  This is because most of the processing
+# tasks were moved into the Python ResolveJitter / HiJACK
+# programs.
+
 import argparse
 import logging
 import os
@@ -45,9 +52,11 @@ import hiproc.util as util
 logger = logging.getLogger(__name__)
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
-        description=__doc__, parents=[util.parent_parser()]
+        description=__doc__,
+        parents=[util.parent_parser()],
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
         "-c",
@@ -58,36 +67,54 @@ def main():
             __name__,
             'data/HiPrecisionInit.conf'
         ),
+        help="Path to the HiPrecisionInit config file.  Defaults to "
+             "HiPrecisionInit.conf distributed with the library."
     )
-    parser.add_argument("slither_text", metavar="slither.txt-files", nargs="+")
+    parser.add_argument(
+        "slither_text",
+        metavar="slither.txt-files",
+        nargs="+",
+        help="The text files created by HiSlither."
+    )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     # Ignore args.log to always print info when run from the command line.
     util.set_logger("info", args.logfile, args.log)
 
-    start(args.slither_text, pvl.load(args.conf))
+    hijack, averages, thresh = check(
+        args.slither_text, pvl.load(args.conf)
+    )
+
+    print(f"Mean_Jitter_Magnitude_Threshold: {thresh}")
+    print(f"Average\tProcess \tFile Name")
+    for a, j, s in zip(averages, hijack, args.slither_text):
+        print("{:.2}\t{}\t{}".format(
+            a, "HiJACK  " if j else "HiNoProj", s
+        ))
+
+    if any(hijack):
+        print("Probably should run HiJACK.")
+    else:
+        print("Can safely run NoProj.")
 
     return
 
 
-def start(slither_paths: list, conf: dict):
+def check(slither_paths: list, conf: dict):
 
     yes_HiJACK = list()
+    avediffs = list()
     thresh = float(conf["HiPrecisionInit"]["Mean_Jitter_Magnitude_Threshold"])
-    logger.info(f"Mean_Jitter_Magnitude_Threshold: {thresh}")
-    logger.info(f"Average\tProcess \tFile Name")
     for s in slither_paths:
         (need, avediff) = needs_HiJACK(s, thresh)
-        if need:
-            terminus = "HiJACK  "
-        else:
-            terminus = "HiNoProj"
-
-        logger.info("{:.2}\t{}\t{}".format(avediff, terminus, s))
         yes_HiJACK.append(need)
+        avediffs.append(avediff)
 
-    return yes_HiJACK
+    return yes_HiJACK, avediffs, thresh
 
 
 def needs_HiJACK(slither_path: os.PathLike, threshold: float):

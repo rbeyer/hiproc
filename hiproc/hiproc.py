@@ -89,7 +89,7 @@ def arg_parser():
         "-j",
         "--jack",
         action="store_true",
-        help="Do not test if HiJACK is needed, but force " "HiJACK to run.",
+        help="Do not test if HiJACK is needed, but force HiJACK to run.",
     )
     parser.add_argument(
         "img",
@@ -137,7 +137,7 @@ def main():
 
             # HiPrecisionInit to determine if you need to HiNoProj or HiJACK
             #   takes *slither.txt
-            HiJACK_flags = HiPrecisionInit.start(
+            (HiJACK_flags, _, _) = HiPrecisionInit.check(
                 slithers, pvl.load(args.conf_dir / "HiPrecisionInit.conf")
             )
 

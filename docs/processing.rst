@@ -86,3 +86,7 @@ C2. ``HiBeautify``
 
 After running these steps, you will have IRB and RGB mosaics of the central color
 HiRISE CCDs.
+
+For "precision" processing, do the following:
+
+P1. ``HiPrecisionInit``
