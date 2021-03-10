@@ -74,3 +74,5 @@ preparatory steps are needed:
     If you want to visualize the output of HiJitReg, you can use the JitPlot program
     to do so.
 7. ``HiSlither``
+    If you want a summary of the HiSlither results, or to visualize them, you can use
+    the SlitherStats program.

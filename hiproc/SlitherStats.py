@@ -42,7 +42,7 @@ import hiproc.util as util
 logger = logging.getLogger(__name__)
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
         description=__doc__, parents=[util.parent_parser()]
     )
@@ -50,8 +50,11 @@ def main():
         "-p", "--plot", action="store_true", help="Display plots"
     )
     parser.add_argument("slithertxts", metavar="slither.txt files", nargs="+")
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
