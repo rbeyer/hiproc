@@ -22,3 +22,6 @@ to the user to easily execute HiRISE processing procedures.
 
 .. autoprogram:: hiproc.HiColorInit:arg_parser()
    :prog: HiColorInit
+
+.. autoprogram:: hiproc.HiJitReg:arg_parser()
+   :prog: HiJitReg

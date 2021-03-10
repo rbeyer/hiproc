@@ -239,7 +239,11 @@ def edr2stitch(images, conf_dir, bitflipwidth=0, lis_tolerance=1, keep=False):
             for c in balcubes:
                 for_jitreg.append(c.nextpath.with_suffix(".precolor.cub"))
 
-    HiJitReg.start(for_jitreg, pvl.load(conf_dir / "HiJitReg.conf"), keep=keep)
+    HiJitReg.HiJitReg(
+        for_jitreg,
+        pvl.load(conf_dir / "HiJitReg.conf"),
+        keep=keep
+    )
 
     # HiSlither
     #   takes same as HiJitReg (and assumes its products are available.

@@ -1,6 +1,52 @@
 #!/usr/bin/env python
 """HiJitReg registers color CCDs to corresponding red CCDs by using the
-ISIS tool hijitreg to perform a deconvolution of jittered image data."""
+ISIS tool hijitreg to perform a deconvolution of jittered image data.
+
+This program corrects for spacecraft jitter and prepares
+images for coregistration. Using the ISIS program hijitreg it creates
+a reference grid of control points (extension .control.pvl) from
+the RED product, and then attempts to locate those points within
+the BG and IR products.
+
+The configuration file for HiJitReg (HiJitReg.conf) describes the control
+point grid density (currently it's a 4-column, 200-line grid) and
+correlation tolerance. It also specifies the sizes of the search
+window and pattern window. The pattern window "walks" through the
+search window in order to locate the local maximum. The calculated
+translation is then recorded in the control net file for slithering.
+
+Some adaptability is built-in to HiJitReg. It will add columns if
+a channel is missing, and will triple the grid point density if
+less than 25% of the points register on the first pass. It will
+also increase the size of the search window if more than two points
+have the edge of their pattern box close to or beyond the edge of
+the search box ("edgy" points).
+
+It also uses a smoothing algorithm to ignore points that are
+out-of-bounds or are poorly registered. A JitterPlot is created
+showing the results.
+
+HiJigReg also works on one or both of the "color" sets:
+
+* RED4 - BG12 - IR10
+* RED5 - BG13 - IR11
+
+HiJitReg must be run after HiColorInit, and it creates a .hislither.pvl
+file which is then submitted to the HiSlither_Pipeline.
+
+Data Flow
+---------
+Input Products:
+
+* RED4 and 5 ``balance.cub`` files which are the result of HiccdStitch.
+* BG and IR ``precolor.cub`` files which are the result of HiColorInit.
+
+Output Products:
+
+* creates *regdef.pvl and *flat.tab and *control.pvl files for each
+    BG and IR cube provided.
+
+"""
 
 # Copyright 2004-2020, Arizona Board of Regents on behalf of the Lunar and
 # Planetary Laboratory at the University of Arizona.
@@ -53,9 +99,11 @@ import hiproc.HiColorInit as hicolor
 logger = logging.getLogger(__name__)
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
-        description=__doc__, parents=[util.parent_parser()]
+        description=__doc__,
+        parents=[util.parent_parser()],
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
         "-c",
@@ -66,19 +114,32 @@ def main():
             __name__,
             'data/HiJitReg.conf'
         ),
+        help="Path to the HiJitReg config file.  Defaults to "
+             "HiJitReg.conf distributed with the library."
     )
     parser.add_argument(
         "cubes",
         metavar="balance.cub and balance.precolor.cub files",
         nargs="+",
+        help="Either one or both sets of RED .balance.cub  and IR/BG "
+             ".balance.precolor.cub files. However, that's tedious to type,"
+             "so you could just type in *.balance*cub here, and the program "
+             "will sort out what it needs."
     )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
     try:
-        successful_ccds = start(args.cubes, pvl.load(args.conf), keep=args.keep)
+        successful_ccds = HiJitReg(
+            args.cubes,
+            pvl.load(args.conf),
+            keep=args.keep
+        )
     except RuntimeError as err:
         logger.critical("Unable to continue. " + str(err))
         sys.exit()
@@ -93,13 +154,6 @@ def main():
     for c in successful_ccds:
         print("\t{}".format(str(c)))
     return
-
-
-def start(cube_paths: list, conf: dict, keep=False):
-    cubes = list(map(hicolor.HiColorCube, cube_paths))
-    (red4, red5, ir10, ir11, bg12, bg13) = hicolor.separate_ccds(cubes)
-
-    return HiJitReg(red4, red5, ir10, ir11, bg12, bg13, conf, keep=keep)
 
 
 class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
@@ -469,19 +523,29 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
             pvl.dump(new_pvl, stream, encoder=pvl.encoder.ISISEncoder())
 
 
-def HiJitReg(
-    red4, red5, ir10, ir11, bg12, bg13, conf: dict, keep=False
-) -> list:
+def HiJitReg(cube_paths: list, conf: dict, keep=False) -> list:
+    cubes = list(map(hicolor.HiColorCube, cube_paths))
+    red4, red5, ir10, ir11, bg12, bg13 = hicolor.separate_ccds(cubes)
+
+    ccds = list()
+    for c in red4, red5, ir10, ir11, bg12, bg13:
+        if c is not None:
+            ccds.append(str(c))
+
+    logger.info(f"HiJitReg start: {ccds}")
+
     successful_ccds = list()
     if red4 is not None:
         for c in [ir10, bg12]:
             if c is not None:
                 if jitter_iter(red4, c, conf, keep=keep):
+                    logger.info(f"Iterations completed for {c}")
                     successful_ccds.append(c)
     if red5 is not None:
         for c in [ir11, bg13]:
             if c is not None:
                 if jitter_iter(red5, c, conf, keep=keep):
+                    logger.info(f"Iterations completed for {c}")
                     successful_ccds.append(c)
 
     # Not going to check to make sure that at most one pair fails.
@@ -489,6 +553,7 @@ def HiJitReg(
     if bg12 not in successful_ccds and bg13 not in successful_ccds:
         raise RuntimeError("Registration failed for both BG halves.")
 
+    logger.info(f"HiJitReg done: {successful_ccds}")
     return successful_ccds
 
 

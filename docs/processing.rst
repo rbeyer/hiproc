@@ -70,3 +70,4 @@ want to create color mosaics, or engage the "high precision" processing, a few m
 preparatory steps are needed:
 
 5. ``HiColorInit``
+6. ``HiJitReg``
