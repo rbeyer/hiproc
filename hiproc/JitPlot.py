@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-"""JitPlot converts the control network that HiJitReg creates and outputs
-a simple text data file that can be plotted.
+"""JitPlot converts the files that HiJitReg creates and displays
+a plot which represents them.
 """
 
 # Copyright 2004-2020, Arizona Board of Regents on behalf of the Lunar and
@@ -34,7 +34,6 @@ import argparse
 import logging
 import pkg_resources
 import statistics
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -47,7 +46,7 @@ import hiproc.HiJitReg as hjr
 logger = logging.getLogger(__name__)
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
         description=__doc__, parents=[util.parent_parser()]
     )
@@ -60,12 +59,23 @@ def main():
             __name__,
             'data/HiJitReg.conf'
         ),
+        help="Path to the HiJitReg config file.  Defaults to "
+             "HiJitReg.conf distributed with the library."
     )
     parser.add_argument(
-        "cubes", metavar="balance.precolor.cub files", nargs="+"
+        "cubes",
+        metavar="balance.precolor.cub files",
+        nargs="+",
+        help="Either one or both sets of RED .balance.cub  and IR/BG "
+             ".balance.precolor.cub files. However, that's tedious to type,"
+             "so you could just type in *.balance*cub here, and the program "
+             "will sort out what it needs."
     )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
@@ -84,6 +94,7 @@ def main():
         if c is None:
             continue
 
+        logger.info(f"Working on {c}")
         j = hjr.JitterCube(c, conf)
         j.reset()
 

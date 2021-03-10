@@ -71,3 +71,5 @@ preparatory steps are needed:
 
 5. ``HiColorInit``
 6. ``HiJitReg``
+    If you want to visualize the output of HiJitReg, you can use the JitPlot program
+    to do so.
