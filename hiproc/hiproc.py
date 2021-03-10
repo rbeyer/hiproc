@@ -249,7 +249,7 @@ def edr2stitch(images, conf_dir, bitflipwidth=0, lis_tolerance=1, keep=False):
     #   takes same as HiJitReg (and assumes its products are available.
     #   creates *slither.txt, *slither.cub, and *COLOR[4|5].cub
     #   Can then run SliterStats on the *slither.txt
-    HiSlither.start(for_jitreg)
+    HiSlither.HiSlither(for_jitreg)
 
     return chids
 

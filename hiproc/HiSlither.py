@@ -1,6 +1,47 @@
 #!/usr/bin/env python
 """HiSlither uses the output of HiJitReg to perform the registration of
-   color CCDs to red CCDs and output a color cube."""
+color CCDs to red CCDs and output a color cube.
+
+The HiSlither pipeline does a "rubber-sheet stretch" of the IR and
+BG to correct for jitter and match the RED based on the control net
+output (extension .control.pvl) of HiJitReg. It then stacks the IR,
+RED, and BG and on top of one another (in IR-RED-BG order).
+
+The ISIS program slither computes an image transformation that
+shifts lines and samples as needed according to the control net
+file (extension .control.pvl) created by HiJitReg. It also creates
+a text file (extension .slither.txt) containing the transformation
+statistics, and a text file (extension .control.csv) from the
+smoothing algorithm that checks for "bad" (those that may cause
+misregistration) control points. The transformation for each of the
+valid control points in a row is averaged together to arrive at a
+transformation for the entire row (line). Between rows, the
+transformation is interpolated.
+
+The ISIS program hicubeit merges the IR, RED, and BG cubes on top
+of one another to create two separate 3-band color products (extension
+_COLOR4.cub and _COLOR5.cub).
+
+The ISIS program trim removes the inner overlap from the color halves.
+
+
+
+Data Flow
+---------
+Input Products:
+
+* RED4 and 5 ``balance.cub`` files which are the result of HiccdStitch.
+* BG and IR ``precolor.cub`` files which are the result of HiColorInit.
+* The *regdef.pvl and *flat.tab and *control.pvl files created by HiJitReg.
+
+Output Products:
+
+* creates a ``slither.txt`` and ``slither.cub`` file for each of the color
+    inputs.
+* creates ``COLOR4.cub`` and ``COLOR5.cub`` files which are the multi-band
+    aligned images that match RED4 - BG12 - IR10 and RED5 - BG13 - IR11.
+
+"""
 
 # Copyright 2007-2020, Arizona Board of Regents on behalf of the Lunar and
 # Planetary Laboratory at the University of Arizona.
@@ -40,33 +81,52 @@ import hiproc.HiJitReg as hjr
 logger = logging.getLogger(__name__)
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
-        description=__doc__, parents=[util.parent_parser()]
+        description=__doc__,
+        parents=[util.parent_parser()],
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
         "cubes",
         metavar="RED balance.cub and color balance.precolor.cub files",
         nargs="+",
+        help="Either one or both sets of RED .balance.cub  and IR/BG "
+             ".balance.precolor.cub files. However, that's tedious to type,"
+             "so you could just type in *.balance*cub here, and the program "
+             "will sort out what it needs."
     )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    start(args.cubes, keep=args.keep)
+    HiSlither(args.cubes, keep=args.keep)
     return
 
 
-def start(cube_paths: list, keep=False):
+def HiSlither(cube_paths: list, keep=False):
     cubes = list(map(hicolor.HiColorCube, cube_paths))
     (red4, red5, ir10, ir11, bg12, bg13) = hicolor.separate_ccds(cubes)
 
+    ccds = list()
+    for c in red4, red5, ir10, ir11, bg12, bg13:
+        if c is not None:
+            ccds.append(str(c))
+
+    logger.info(f"HiSlither start: {ccds}")
+
+    completed = list()
     if cube_check(red4, ir10, bg12):
-        HiSlither(red4, ir10, bg12, keep=keep)
+        completed.append(str(process_set(red4, ir10, bg12, keep=keep)))
 
     if cube_check(red5, ir11, bg13):
-        HiSlither(red5, ir11, bg13, keep=keep)
+        completed.append(str(process_set(red5, ir11, bg13, keep=keep)))
+
+    logger.info(f"HiSlither done: {completed}")
 
     return
 
@@ -92,7 +152,7 @@ def cube_check(
     return True
 
 
-def HiSlither(
+def process_set(
     red: hicolor.HiColorCube,
     ir: hicolor.HiColorCube,
     bg: hicolor.HiColorCube,

@@ -28,3 +28,6 @@ to the user to easily execute HiRISE processing procedures.
 
 .. autoprogram:: hiproc.JitPlot:arg_parser()
    :prog: JitPlot
+
+.. autoprogram:: hiproc.HiSlither:arg_parser()
+   :prog: HiSlither
