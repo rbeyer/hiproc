@@ -1,5 +1,24 @@
 #!/usr/bin/env python
-"""Creates special color products ("pretty pictures")."""
+"""Creates special color products ("pretty pictures").
+
+This creates a synthetic RGB product and an enhanced IRB product that
+are cosmetically improved over the raw/normalized color products.
+HiBeautify takes the .hicolornorm.pvl file (created by HiColorNorm)
+as its input. It uses the HiColorNorm cubes (extension _COLOR4.cub
+and _COLOR5.cub).
+
+Data Flow
+---------
+Input Products:
+
+* ``COLOR4.HiColorNorm`` and ``COLOR5.HiColorNorm`` files which are the
+    result of HiColorNorm.
+
+Output Products:
+
+* IRB and RGB cubes
+
+"""
 
 # Copyright 2007-2020, Arizona Board of Regents on behalf of the Lunar and
 # Planetary Laboratory at the University of Arizona.
@@ -28,8 +47,8 @@
 
 import argparse
 import logging
-import os
 import pkg_resources
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -42,17 +61,31 @@ import hiproc.HiColorNorm as hcn
 logger = logging.getLogger(__name__)
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
         description=__doc__,
         parents=[util.parent_parser()],
         conflict_handler="resolve",
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "-o_irb", "--output_irb", required=False, default="_IRB.cub"
+        "-o_irb",
+        "--output_irb",
+        required=False,
+        default="_IRB.cub",
+        help="The filename to be used for the output IRB cube.  If it "
+             "begins with an underscore ('_') it will be assumed to be a "
+             "suffix that will be appended to a name derived from the "
+             "observation. Default: %(default)s"
     )
     parser.add_argument(
-        "-o_rgb", "--output_rgb", required=False, default="_RGB.cub"
+        "-o_rgb", "--output_rgb",
+        required=False,
+        default="_RGB.cub",
+        help="The filename to be used for the output RGB cube.  If it "
+             "begins with an underscore ('_') it will be assumed to be a "
+             "suffix that will be appended to a name derived from the "
+             "observation. Default: %(default)s"
     )
     parser.add_argument(
         "-c",
@@ -61,8 +94,10 @@ def main():
         type=argparse.FileType('r'),
         default=pkg_resources.resource_stream(
             __name__,
-            'data/HiBeautify.conf'
+            'data/HiBeautify.conf',
         ),
+        help="Path to the HiBeautify config file.  Defaults to "
+             "HiBeautify.conf distributed with the library."
     )
     # parser.add_argument('-f', '--frost', action='store_true',
     #                     help='Use the frost/ice color stretch, and disable '
@@ -72,49 +107,52 @@ def main():
     #                     'auto-detection of frost/ice.')
     parser.add_argument(
         "cubes",
-        metavar=(
-            "the COLOR4.HiColorNorm.cub and " "COLOR5.HiColorNorm.cub files"
-        ),
+        type=Path,
         nargs=2,
+        metavar="HiColorNorm-cube",
+        help="The COLOR4.HiColorNorm.cub and COLOR5.HiColorNorm.cub files."
     )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    start(
-        args.cubes,
-        pvl.load(args.conf),
-        args.output_irb,
-        args.output_rgb,
-        keep=args.keep
-    )
+    try:
+        HiBeautify(
+            args.cubes,
+            pvl.load(args.conf),
+            args.output_irb,
+            args.output_rgb,
+            keep=args.keep
+        )
+    except subprocess.CalledProcessError as err:
+        print("Had an ISIS error:")
+        print(" ".join(err.cmd))
+        print(err.stdout)
+        print(err.stderr)
+        raise err
 
 
-def start(
+def HiBeautify(
     cube_paths: list,
     conf: dict,
     out_irb="_IRB.cub",
     out_rgb="_RGB.cub",
-    keep=False,
+    keep=False
 ):
+    logger.info(f"HiBeautify start: {', '.join(map(str, cube_paths))}")
 
     # GetConfigurationParameters()
     cubes = list(map(hcn.ColorCube, cube_paths))
-
     cubes.sort()
 
-    outirb_path = hcn.set_outpath(out_irb, cubes)
-    outrgb_path = hcn.set_outpath(out_rgb, cubes)
+    irb_out_p = hcn.set_outpath(out_irb, cubes)
+    rgb_out_p = hcn.set_outpath(out_rgb, cubes)
 
-    # HiBeautify(cubes, outcub_paths, conf, frost=args.frost, keep=args.keep)
-    HiBeautify(cubes, (outirb_path, outrgb_path), conf, keep=keep)
-
-
-def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
     temp_token = datetime.now().strftime("HiBeautify-%y%m%d%H%M%S")
-    irb_out_p = Path(outcub_paths[0])
-    rgb_out_p = Path(outcub_paths[1])
     to_del = isis.PathSet()
 
     # Create an IRB mosaic from the HiColorNorm halves.
@@ -128,23 +166,18 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
     if cubes[0].ccdnumber == "4":
         outsample = 1
     total_width = int(2 * cubes[0].samps - (48 / cubes[0].red_bin))
-    import subprocess
 
-    try:
-        isis.handmos(
-            cubes[0].path,
-            mosaic=irb_out_p,
-            outline=1,
-            outsample=outsample,
-            outband=1,
-            create="Y",
-            nlines=cubes[0].lines,
-            nsamp=total_width,
-            nbands=3,
-        )
-    except subprocess.CalledProcessError as err:
-        print(err.stdout)
-        print(err.stderr)
+    isis.handmos(
+        cubes[0].path,
+        mosaic=irb_out_p,
+        outline=1,
+        outsample=outsample,
+        outband=1,
+        create="Y",
+        nlines=cubes[0].lines,
+        nsamp=total_width,
+        nbands=3,
+    )
 
     if len(cubes) == 1:
         logger.info("Warning, missing one half!")
@@ -187,6 +220,13 @@ def HiBeautify(cubes: list, outcub_paths: list, conf: dict, keep=False):
         A=conf["Beautify"]["Synthetic_A_Coefficient"],
         B=conf["Beautify"]["Synthetic_B_Coefficient"],
     )
+
+    # Adjust the BandBin group
+    isis.editlab(
+        rgbsynthb_p, grpname="BandBin", keyword="Name", value="Synthetic Blue"
+    )
+    isis.editlab(rgbsynthb_p, grpname="BandBin", keyword="Center", value="0")
+    isis.editlab(rgbsynthb_p, grpname="BandBin", keyword="Width", value="0")
 
     # HiBeautify gathers and writes a bunch of statistics to PVL that is
     # important to the HiRISE GDS, but not relevant to just producing pixels

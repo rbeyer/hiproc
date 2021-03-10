@@ -37,3 +37,6 @@ to the user to easily execute HiRISE processing procedures.
 
 .. autoprogram:: hiproc.HiColorNorm:arg_parser()
    :prog: HiColorNorm
+
+.. autoprogram:: hiproc.HiBeautify:arg_parser()
+   :prog: HiBeautify

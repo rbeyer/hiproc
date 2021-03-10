@@ -65,9 +65,10 @@ In general, the initial flow is always the same:
 3. ``HiStitch``
 4. ``HiccdStitch``
 
-Depending on what your goals are for processing, you could stop here.  However, if you
-want to create color mosaics, or engage the "high precision" processing, a few more
-preparatory steps are needed:
+At this point, you will have "stitched" and "balance" files for
+each CCD.  Depending on what your goals are for processing, you
+could stop here.  However, if you want to create color mosaics, or
+engage the "high precision" processing, a few more steps are needed:
 
 5. ``HiColorInit``
 6. ``HiJitReg``
@@ -81,4 +82,7 @@ If you want to create composite color mosaics from HiRISE data, then you would u
 these steps
 
 C1. ``HiColorNorm``
+C2. ``HiBeautify``
 
+After running these steps, you will have IRB and RGB mosaics of the central color
+HiRISE CCDs.
