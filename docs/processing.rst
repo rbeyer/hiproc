@@ -81,12 +81,14 @@ engage the "high precision" processing, a few more steps are needed:
 If you want to create composite color mosaics from HiRISE data, then you would use
 these steps
 
-C1. ``HiColorNorm``
-C2. ``HiBeautify``
+* ``HiColorNorm``
+* ``HiBeautify``
 
 After running these steps, you will have IRB and RGB mosaics of the central color
 HiRISE CCDs.
 
 For "precision" processing, do the following:
 
-P1. ``HiPrecisionInit``
+* ``HiPrecisionInit`` to determine if you need to run HiJACK or just HiNoProj
+* ``HiNoProj`` or ``HiJACK``
+

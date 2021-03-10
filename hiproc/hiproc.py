@@ -295,7 +295,7 @@ def precision(obsid, conf_dir: Path, parent: Path, hijack=False, keep=False):
         # HiNoProj - alternate to HiccdStitch, starts with balance cubes
         #   takes only REDS: *RED*balance.cub
         #   creates PSP_010502_2090_RED.NOPROJ.cub
-        HiNoProj.start(
+        HiNoProj.HiNoProj(
             red_bal_cubs,
             pvl.load(conf_dir / "HiNoProj.conf"), keep=keep
         )

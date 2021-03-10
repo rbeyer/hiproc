@@ -1,6 +1,18 @@
 #!/usr/bin/env python
 """Resamples images from individual CCDs to ideal camera geometry and
-mosaicks them into a single cube."""
+mosaicks them into a single cube.
+
+Data Flow
+---------
+Input Products:
+
+* RED ``balance.cub`` files which are the result of HiccdStitch.
+
+Output Product:
+
+* ``NOPROJ.cub``
+
+"""
 
 # Copyright 2008-2020, Arizona Board of Regents on behalf of the Lunar and
 # Planetary Laboratory at the University of Arizona.
@@ -41,6 +53,7 @@ from pathlib import Path
 import pvl
 
 import kalasiris as isis
+import hiproc.hirise as hirise
 import hiproc.util as util
 import hiproc.HiColorInit as hci
 import hiproc.HiColorNorm as hcn
@@ -56,12 +69,20 @@ class Cube(hci.HiColorCube):
         self.samp_offset = 0
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
-        description=__doc__, parents=[util.parent_parser()]
+        description=__doc__,
+        parents=[util.parent_parser()],
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "-o", "--output", required=False, default="_RED.NOPROJ.cub"
+        "-o", "--output",
+        required=False,
+        default="_RED.NOPROJ.cub",
+        help="The filename to be used for the output noproj cube.  If it "
+             "begins with an underscore ('_') it will be assumed to be a "
+             "suffix that will be appended to a name derived from the "
+             "observation. Default: %(default)s"
     )
     parser.add_argument(
         "-c",
@@ -72,16 +93,33 @@ def main():
             __name__,
             'data/HiNoProj.conf'
         ),
+        help="Path to the HiNoProj config file.  Defaults to "
+             "HiNoProj.conf distributed with the library."
     )
-    parser.add_argument("-b", "--base_ccd_number", required=False, default=5)
-    parser.add_argument("cubes", metavar="balance.cub-files", nargs="+")
+    parser.add_argument(
+        "-b", "--base_ccd_number",
+        required=False,
+        default=5,
+        help="The CCD number that will be given to the MATCH parameter of "
+             "ISIS noproj. Default: %(default)s"
+    )
+    parser.add_argument(
+        "cubes",
+        type=Path,
+        metavar="balance.cub-files",
+        nargs="+",
+        help="The RED .balance.cub files created by HiccdStitch."
+    )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
     try:
-        start(
+        HiNoProj(
             args.cubes,
             pvl.load(args.conf),
             args.output,
@@ -97,51 +135,6 @@ def main():
         print(err.stderr)
         raise err
     return
-
-
-def start(
-    cube_paths: os.PathLike,
-    conf: dict,
-    output="_RED.NOPROJ.cub",
-    base_ccd_number=5,
-    keep=False,
-):
-
-    cubes = list(map(Cube, cube_paths))
-    cubes.sort()
-
-    if not all(c.ccdname == "RED" for c in cubes):
-        raise ValueError("Not all of the input files are RED CCD files.")
-
-    sequences = list()
-    for k, g in itertools.groupby(
-        (int(c.ccdnumber) for c in cubes),
-        lambda x, c=itertools.count(): next(c) - x,
-    ):
-        sequences.append(list(g))
-
-    if len(sequences) != 1:
-        raise ValueError(
-            "The given cubes are not a single run of sequential "
-            "HiRISE CCDs, instead there are "
-            f"{len(sequences)} groups with these "
-            f"CCD numbers: {sequences}."
-        )
-
-    base_ccd = list(
-        filter(lambda x: x.ccdnumber == str(base_ccd_number), cubes)
-    )
-    if len(base_ccd) != 1:
-        raise ValueError(
-            f"The base ccd, number {base_ccd_number}, "
-            "is not one of the given cubes."
-        )
-
-    conf_check(conf["HiNoProj"])
-
-    outcub_path = hcn.set_outpath(output, cubes)
-
-    HiNoProj(cubes, base_ccd[0], outcub_path, conf["HiNoProj"], keep=keep)
 
 
 def conf_check(conf: dict) -> None:
@@ -318,12 +311,54 @@ def fix_labels(
 
 
 def HiNoProj(
-    cubes: list, base_cube, outcub_path: os.PathLike, conf: dict, keep=False
+    cubes: list,
+    conf: dict,
+    output="_RED.NOPROJ.cub",
+    base=5,
+    keep=False
 ):
+    logger.info(f"HiNoProj start: {', '.join(map(str, cubes))}")
+
+    cubes = list(map(Cube, cubes))
+    cubes.sort()
+
+    if not all(c.ccdname == "RED" for c in cubes):
+        raise ValueError("Not all of the input files are RED CCD files.")
+
+    sequences = list()
+    for k, g in itertools.groupby(
+        (int(c.ccdnumber) for c in cubes),
+        lambda x, c=itertools.count(): next(c) - x,
+    ):
+        sequences.append(list(g))
+
+    if len(sequences) != 1:
+        raise ValueError(
+            "The given cubes are not a single run of sequential "
+            "HiRISE CCDs, instead there are "
+            f"{len(sequences)} groups with these "
+            f"CCD numbers: {sequences}."
+        )
+
+    if not isinstance(base, int):
+        base = hirise.get_CCDID_fromfile(base)
+    base_ccd = list(
+        filter(lambda x: x.ccdnumber == str(base), cubes)
+    )
+    if len(base_ccd) != 1:
+        raise ValueError(
+            f"The base ccd, number {base}, "
+            "is not one of the given cubes."
+        )
+    base_cube = base_ccd[0]
+
+    conf_check(conf["HiNoProj"])
+    conf = conf["HiNoProj"]
+
+    out_p = hcn.set_outpath(output, cubes)
 
     temp_token = datetime.now().strftime("HiNoProj-%y%m%d%H%M%S")
     to_del = isis.PathSet()
-    out_p = Path(outcub_path)
 
     polar = False
     if conf["Shape"] == "USER":
@@ -377,5 +412,7 @@ def HiNoProj(
 
     if not keep:
         to_del.unlink()
+
+    logger.info(f"HiNoProj done: {out_p}")
 
     return

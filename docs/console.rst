@@ -43,3 +43,6 @@ to the user to easily execute HiRISE processing procedures.
 
 .. autoprogram:: hiproc.HiPrecisionInit:arg_parser()
    :prog: HiPrecisionInit
+
+.. autoprogram:: hiproc.HiNoProj:arg_parser()
+   :prog: HiNoProj
