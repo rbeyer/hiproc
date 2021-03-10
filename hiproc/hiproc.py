@@ -262,7 +262,7 @@ def color(
     # HiColorNorm - only for color
     #   takes *COLOR[4|5].cub
     #   creates *UNFILTERED_COLOR[4|5].cub and *COLOR[4|5].HiColorNorm.cub
-    HiColorNorm.start(
+    HiColorNorm.HiColorNorm(
         colors,
         "_COLOR.cub",
         pvl.load(conf_dir / "HiColorNorm.conf"),

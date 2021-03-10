@@ -1,5 +1,22 @@
 #!/usr/bin/env python
-"""Normalizes HiRISE Color products."""
+"""Normalizes HiRISE Color products.
+
+This program will normalize the BG and IR color across the left and right
+halves of each set of color CCDs. It uses the HiSlither COLOR4 and COLOR5 cubes.
+
+
+Data Flow
+---------
+Input Products:
+
+* ``COLOR4`` and ``COLOR5`` files which are the result of HiSlither.
+
+Output Products:
+
+* creates UNFILTERED versions of the COLOR4 and COLOR5 files.
+* creates HiColorNorm versions of the COLOR4 and COLOR5 files.
+
+"""
 
 # Copyright 2006-2020, Arizona Board of Regents on behalf of the Lunar and
 # Planetary Laboratory at the University of Arizona.
@@ -150,7 +167,8 @@ class ColorCube(hirise.ObservationID):
             if color_code in pid:
                 if len(db_paths) > 0:
                     for p in db_paths:
-                        dbs.append(json.load(p))
+                        with open(p, "r") as f:
+                            dbs.append(json.load(f))
                 else:
                     for p in parent.glob(f"{pid}*.cub"):
                         temp_d = dict()
@@ -198,13 +216,22 @@ class ColorCube(hirise.ObservationID):
             return 1
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
         description=__doc__,
         parents=[util.parent_parser()],
         conflict_handler="resolve",
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("-o", "--output", required=False, default="_COLOR.cub")
+    parser.add_argument(
+        "-o", "--output",
+        required=False,
+        default="_COLOR.cub",
+        help="The filename to be used for the output color cube.  If it "
+             "begins with an underscore ('_') it will be assumed to be a "
+             "suffix that will be appended to a name derived from the "
+             "observation. Default: %(default)s"
+    )
     parser.add_argument(
         "-c",
         "--conf",
@@ -214,6 +241,8 @@ def main():
             __name__,
             'data/HiColorNorm.conf'
         ),
+        help="Path to the HiColorNorm config file.  Defaults to "
+             "HiColorNorm.conf distributed with the library."
     )
     parser.add_argument(
         "-n",
@@ -223,14 +252,21 @@ def main():
         help="Stops creation of an unfiltered cube.",
     )
     parser.add_argument(
-        "cubes", metavar="the COLOR4.cub and COLOR5.cub files", nargs=2
+        "cubes",
+        type=Path,
+        nargs=2,
+        metavar="COLOR-cube",
+        help="The COLOR4.cub and COLOR5.cub files"
     )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    (ir_ratio, bg_ratio) = start(
+    (ir_ratio, bg_ratio) = HiColorNorm(
         args.cubes,
         args.output,
         pvl.load(args.conf),
@@ -244,34 +280,6 @@ def main():
     #       table that puts in the
     #       HICOLORNORM_RATIO_CORRECTION_STANDARD_DEVIATION for each FILTER
     # At the moment, we're not doing that here.
-
-
-def start(
-    cube_paths,
-    out_path,
-    conf,
-    make_unfiltered=True,
-    db_list=None,
-    keep=False,
-):
-
-    # GetConfigurationParameters()
-    conf_check(conf)
-
-    cubes = list(map(ColorCube, cube_paths, repeat(db_list)))
-
-    cubes.sort()
-
-    outcub_path = set_outpath(out_path, cubes)
-
-    return HiColorNorm(
-        cubes,
-        outcub_path,
-        conf,
-        FurrowCheck(cubes),
-        unfiltered=make_unfiltered,
-        keep=keep,
-    )
 
 
 def conf_check(conf: dict) -> None:
@@ -311,11 +319,27 @@ def set_outpath(out: os.PathLike, cubes) -> Path:
 
 
 def HiColorNorm(
-    cubes, outcub_path, conf, furrow_flag, unfiltered=True, keep=False
+    cubes: list,
+    output,
+    conf: dict,
+    make_unfiltered=True,
+    db_list=None,
+    keep=False
 ):
+    logger.info(f"HiColorNorm start: {cubes}")
+
+    # GetConfigurationParameters()
+    conf_check(conf)
+
+    cubes = list(map(ColorCube, cubes, repeat(db_list)))
+    cubes.sort()
+
+    outcub_path = set_outpath(output, cubes)
 
     temp_token = datetime.now().strftime("HiColorNorm-%y%m%d%H%M%S")
     out_p = Path(outcub_path)
+
+    furrow_flag = FurrowCheck(cubes)
 
     to_del = isis.PathSet()
 
@@ -350,10 +374,10 @@ def HiColorNorm(
         )
 
     ir_ratio_stddev = per_band(
-        cubes, out_p, temp_token, "IR", furrow_flag, unfiltered, keep=keep
+        cubes, out_p, temp_token, "IR", furrow_flag, make_unfiltered, keep=keep
     )
     bg_ratio_stddev = per_band(
-        cubes, out_p, temp_token, "BG", furrow_flag, unfiltered, keep=keep
+        cubes, out_p, temp_token, "BG", furrow_flag, make_unfiltered, keep=keep
     )
 
     if conf["HiColorNorm"]["HiColorNorm_Make_Stitch"]:
@@ -375,12 +399,12 @@ def HiColorNorm(
                 c.crop_path[cc].unlink()
                 c.nrm_path[cc].unlink()
 
-    return (ir_ratio_stddev, bg_ratio_stddev)
+    logger.info(f"HiColorNorm done.")
+    return ir_ratio_stddev, bg_ratio_stddev
 
 
 def FurrowCheck(cubes, db_path=None) -> bool:
     # If any of these cubes have been flagged as having furrows
-    furrow = False
     if db_path is None:
         db_path = list()
         for c in cubes:
@@ -431,7 +455,7 @@ def per_color(cube, temp_token, color_code, keep=False):
     if not keep:
         rat_p.unlink()
 
-    return (mask_p, crop_p)
+    return mask_p, crop_p
 
 
 def make_LR_mosaic(

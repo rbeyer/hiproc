@@ -76,3 +76,9 @@ preparatory steps are needed:
 7. ``HiSlither``
     If you want a summary of the HiSlither results, or to visualize them, you can use
     the SlitherStats program.
+
+If you want to create composite color mosaics from HiRISE data, then you would use
+these steps
+
+C1. ``HiColorNorm``
+

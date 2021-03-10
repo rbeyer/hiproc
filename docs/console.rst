@@ -34,3 +34,6 @@ to the user to easily execute HiRISE processing procedures.
 
 .. autoprogram:: hiproc.SlitherStats:arg_parser()
    :prog: SlitherStats
+
+.. autoprogram:: hiproc.HiColorNorm:arg_parser()
+   :prog: HiColorNorm
