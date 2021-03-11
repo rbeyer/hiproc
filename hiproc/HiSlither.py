@@ -71,6 +71,8 @@ Output Products:
 import argparse
 import logging
 import math
+import subprocess
+import sys
 from datetime import datetime
 
 import kalasiris as isis
@@ -104,7 +106,13 @@ def main():
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    HiSlither(args.cubes, keep=args.keep)
+    try:
+        HiSlither(args.cubes, keep=args.keep)
+    except subprocess.CalledProcessError as err:
+        print(util.isis_error_format(err), file=sys.stderr)
+        if args.verbose >= 2:
+            raise err
+        sys.exit(err.returncode)
     return
 
 
@@ -117,7 +125,7 @@ def HiSlither(cube_paths: list, keep=False):
         if c is not None:
             ccds.append(str(c))
 
-    logger.info(f"HiSlither start: {ccds}")
+    logger.info(f"HiSlither start: {', '.join(map(str, ccds))}")
 
     completed = list()
     if cube_check(red4, ir10, bg12):
@@ -126,7 +134,7 @@ def HiSlither(cube_paths: list, keep=False):
     if cube_check(red5, ir11, bg13):
         completed.append(str(process_set(red5, ir11, bg13, keep=keep)))
 
-    logger.info(f"HiSlither done: {completed}")
+    logger.info(f"HiSlither done: {', '.join(completed)}")
 
     return
 
@@ -138,15 +146,15 @@ def cube_check(
         return False
 
     if red is None or bg is None:
-        have_ccds = [filter(lambda x: x is not None, [red, ir, bg])]
-        if len(have_ccds) == 1:
-            have_str = str(have_ccds[0])
-        else:
-            have_str = "{} and {}".format(*have_ccds)
-        logger.info(
-            "For a slither set, we need at least a RED and BG CCD."
-            + f"We only have: {have_str}"
-        )
+        # have_ccds = list(filter(lambda x: x is not None, [red, ir, bg]))
+        # if len(have_ccds) == 1:
+        #     have_str = str(have_ccds[0])
+        # else:
+        #     have_str = "{} and {}".format(*have_ccds)
+        # logger.info(
+        #     f"For a slither set, we need at least a RED and BG CCD. "
+        #     f"We only have: {have_str}, so no set will be made from these."
+        # )
         return False
 
     return True
@@ -229,7 +237,7 @@ def run_slither(cube):
     return s
 
 
-def make_dummy_IR(red, bg):
+def make_dummy_IR(red: hicolor.HiColorCube, bg: hicolor.HiColorCube):
     bg_slither_path = get_slither_path(bg)
     ir_name = bg_slither_path.name.replace(
         bg.get_ccd(), "IR" + str(int(bg.ccdnumber) - 2)
@@ -244,7 +252,7 @@ def make_dummy_IR(red, bg):
 
     ir_ccd = "IR" + str(int(red.ccdnumber) + 6)
 
-    isis.mask(red, mask=red, to=ir_path, preserve="outside")
+    isis.mask(red.path, mask=red.path, to=ir_path, preserve="outside")
     isis.editlab(
         ir_path,
         options="modkey",
