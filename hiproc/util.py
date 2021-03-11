@@ -19,6 +19,7 @@ import argparse
 import collections
 import logging
 import os
+import subprocess
 from pathlib import Path
 
 import hiproc
@@ -109,11 +110,17 @@ def set_logger(verblvl=None, filename=None, loglvl=0) -> None:
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
+    # # kalasiris logger
+    # k_logger = logging.getLogger("kalasiris")
+    # k_logger.setLevel(lvl)
+    # k_logger.addHandler(ch)
+
     if filename is not None:
         fh = logging.FileHandler(filename)
         fh.setLevel(lvl)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
+        # k_logger.addHandler(fh)
 
     return
 
@@ -233,3 +240,12 @@ def pause_slicer(samp: int, width: int) -> slice:
         s_start = samp + width
         s_stop = samp
     return slice(s_start, s_stop)
+
+
+def isis_error_format(err: subprocess.CalledProcessError):
+    return (f"""\
+Had an ISIS Error:
+{' '.join(err.cmd)}
+{err.stdout}
+{err.stderr}
+""")
