@@ -532,7 +532,7 @@ def HiJitReg(cube_paths: list, conf: dict, keep=False) -> list:
         if c is not None:
             ccds.append(str(c))
 
-    logger.info(f"HiJitReg start: {ccds}")
+    logger.info(f"HiJitReg start: {', '.join(map(str, ccds))}")
 
     successful_ccds = list()
     if red4 is not None:
@@ -553,7 +553,7 @@ def HiJitReg(cube_paths: list, conf: dict, keep=False) -> list:
     if bg12 not in successful_ccds and bg13 not in successful_ccds:
         raise RuntimeError("Registration failed for both BG halves.")
 
-    logger.info(f"HiJitReg done: {successful_ccds}")
+    logger.info(f"HiJitReg done: {', '.join(map(str, successful_ccds))}")
     return successful_ccds
 
 
