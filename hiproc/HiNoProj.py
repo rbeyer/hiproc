@@ -225,18 +225,26 @@ def copy_and_spice(
 def get_offsets(
     cube: os.PathLike, match: os.PathLike, flat: os.PathLike
 ) -> tuple:
-    isis.hijitreg(cube, match=match, flat=flat)
+    args = isis.hijitreg(cube, match=match, flat=flat).args
 
     with open(flat, "r") as f:
         flat_text = f.read()
 
-        match = re.search(r"#\s+Average Line Offset:\s+(\S+)", flat_text)
-        avg_line_offset = float(match.group(1))
+        try:
+            m = re.search(r"#\s+Average Line Offset:\s+(\S+)", flat_text)
+            avg_line_offset = float(m.group(1))
 
-        match = re.search(r"#\s+Average Sample Offset:\s+(\S+)", flat_text)
-        avg_samp_offset = float(match.group(1))
+            m = re.search(r"#\s+Average Sample Offset:\s+(\S+)", flat_text)
+            avg_samp_offset = float(m.group(1))
+        except ValueError as err:
+            sargs = args if isinstance(args, str) else " ".join(args)
+            raise ValueError(
+                f"The {flat} file does not seem to have any entries.  This "
+                f"means that {sargs} produced no registration matches between "
+                f"{cube} and {match}"
+            ) from err
 
-    return (avg_line_offset, avg_samp_offset)
+    return avg_line_offset, avg_samp_offset
 
 
 def add_offsets(
