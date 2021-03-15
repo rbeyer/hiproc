@@ -1,6 +1,27 @@
 #!/usr/bin/env python
 """Resamples images from individual CCDs to ideal camera geometry and
-mosaicks them into a single cube."""
+mosaicks them into a single cube.
+
+Data Flow
+---------
+Input Products:
+
+* All color ``balance.cub`` files which are the result of HiccdStitch.
+
+Output Products:
+
+* regdef.pvl, flat.tab and control.pvl files relating all files to RED4 or 5
+* smear and jitter files from resolve_jitter
+* jittery.bc file from ISIS hijitter
+* dejittered.cub from ISIS hijitter
+* The following dejittered noproj mosaics:
+    * _RED4-5.NOPROJ.cub
+    * RED.NOPROJ.cub
+    * _IR.NOPROJ.cub
+    * _BG.NOPROJ.cub
+    * _IRB.NOPROJ.cub
+
+"""
 
 # Copyright 2008-2020, Arizona Board of Regents on behalf of the Lunar and
 # Planetary Laboratory at the University of Arizona.
@@ -38,6 +59,7 @@ import os
 import pkg_resources
 import shutil
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -50,6 +72,7 @@ import kalasiris as isis
 import hiproc.util as util
 import hiproc.HiJitReg as hjr
 import hiproc.HiNoProj as hnp
+import hiproc.resolve_jitter as rj
 
 logger = logging.getLogger(__name__)
 
@@ -58,36 +81,58 @@ resolve_jitter_path = (
 )
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
-        description=__doc__, parents=[util.parent_parser()]
+        description=__doc__,
+        parents=[util.parent_parser()],
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("-o", "--out_dir", required=False, default="./HiJACK")
+    parser.add_argument(
+        "-o", "--out_dir",
+        required=False,
+        default="./HiJACK",
+        help="The directory where HiJACK output will be placed.  If it "
+             "doesn't already exist, it will be created. Default: %(default)s"
+    )
     parser.add_argument(
         "-c",
         "--conf_dir",
         required=False,
         type=Path,
         default=Path(pkg_resources.resource_filename( __name__, 'data/')),
-        help="Directory where ResolveJitter.conf "
-        "and HiJACK.conf can be found.",
+        help="Directory where ResolveJitter.conf and HiJACK.conf can be "
+             "found. Defaults to the directory distributed with the library.",
     )
     parser.add_argument(
         "-n",
         "--noplot",
         action="store_false",
         dest="plot",
-        help="Will stop the display of before and after " "jitter plots.",
+        help="Will stop the display of before and after jitter plots.",
     )
-    parser.add_argument("-b", "--base_ccd_number", required=False, default=5)
-    parser.add_argument("cubes", metavar="balance.cub-files", nargs="+")
+    parser.add_argument(
+        "-b", "--base_ccd_number",
+        required=False,
+        default=5,
+        help="The CCD number that will be used in a variety of ways to set "
+             "parameters for the resulting image. Default: %(default)s"
+    )
+    parser.add_argument(
+        "cubes",
+        metavar="balance.cub-files",
+        nargs="+",
+        help="All of the .balance.cub files created by HiccdStitch."
+    )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    args = arg_parser().parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
     try:
-        start(
+        HiJACK(
             args.cubes,
             args.conf_dir,
             args.out_dir,
@@ -96,28 +141,22 @@ def main():
             keep=args.keep,
         )
     except ValueError as err:
-        print(err)
+        print(err, file=sys.stderr)
+        if args.verbose >= 2:
+            raise err
+        sys.exit(1)
     except subprocess.CalledProcessError as err:
-        print("Had an ISIS error:")
-        print(err.cmd)
-        print(err.stdout)
-        print(err.stderr)
-        raise err
+        print(util.isis_error_format(err), file=sys.stderr)
+        if args.verbose >= 2:
+            raise err
+        sys.exit(err.returncode)
     return
 
 
-def start(
-    cube_paths: list,
-    confdir: os.PathLike,
-    outdir="./HiJACK",
+def check(
+    cubes: list,
     base_ccd_number=5,
-    plot=True,
-    keep=False,
 ):
-
-    cubes = list(map(hnp.Cube, cube_paths))
-    cubes.sort()
-
     sequences = list()
     for k, g in itertools.groupby(
         (
@@ -151,12 +190,11 @@ def start(
     )
     if len(red45) != 2:
         raise ValueError(
-            "The RED3 and RED5 cubes are not in the given"
+            "The RED4 and RED5 cubes are not in the given"
             "list of files: {}".format(*cubes)
         )
 
-    HiJACK(cubes, base_ccd[0], outdir, confdir, plot=plot, keep=keep)
-    return
+    return base_ccd[0]
 
 
 def match_red(cubes: list, base_cube, flat_path, elargement_ratio=1.0006):
@@ -198,7 +236,7 @@ def match_red(cubes: list, base_cube, flat_path, elargement_ratio=1.0006):
             isis.reduce(
                 c.path,
                 to=c.next_path,
-                sscale=mag,
+                sscale=1/mag,
                 lscale=bin_ratio,
                 mode="SCALE",
             )
@@ -362,7 +400,7 @@ def make_flats(cubes, common_cube, conf, temp_token, keep=False):
                     )
             else:
                 raise RuntimeError(
-                    f"Flat file for {c} is not within " "tolerances."
+                    f"Flat file for {c} is not within tolerances."
                 )
 
     else:
@@ -392,20 +430,37 @@ def ResolveJitter(
     # keep_regdefs() writes 'KEEP' into the files status of the regdef files.
     # Not sure that this is required, so skipping.
 
-    # run resolveJitter3HiJACK.m or resolveJitter4HiJACK.cc
-    rj_args = [
-        resolve_jitter_path,
-        str(jitter_path.parent),
-        str(common_cube.get_obsid()),
-        str(conf["AutoRegistration"]["ControlNet"]["Control_Lines"]),
-    ]
+    # # run resolveJitter3HiJACK.m or resolveJitter4HiJACK.cc
+    # rj_args = [
+    #     resolve_jitter_path,
+    #     str(jitter_path.parent),
+    #     str(common_cube.get_obsid()),
+    #     str(conf["AutoRegistration"]["ControlNet"]["Control_Lines"]),
+    # ]
 
-    for f in flats:
-        rj_args.append(f.relative_to(jitter_path.parent))
-        rj_args.append("-1")
+    # for f in flats:
+    #     rj_args.append(f.relative_to(jitter_path.parent))
+    #     rj_args.append("-1")
 
-    logger.info(rj_args)
-    subprocess.run(rj_args, check=True)
+    # logger.info(rj_args)
+    # subprocess.run(rj_args, check=True)
+
+    print(jitter_path)
+    print(flats[1])
+    rj.start(
+        flats[0],
+        False,
+        flats[1],
+        False,
+        flats[2],
+        False,
+        line_interval=conf["AutoRegistration"]["ControlNet"]["Control_Lines"],
+        outdir=jitter_path.parent,
+        outprefix=common_cube.get_obsid(),
+        plotshow=False,
+        plotsave=True,
+        writecsv=False
+    )
 
     # Just double-check that the file we expect was created:
     if not jitter_path.exists():
@@ -486,13 +541,19 @@ def plot_flats(pre_flat, dejit_flat):
 
 
 def HiJACK(
-    cubes: list,
-    base_cube,
-    outdir: os.PathLike,
+    cube_paths: list,
     conf_dir: os.PathLike,
+    outdir=Path("./HiJACK"),
+    base_ccd_number=5,
     plot=True,
     keep=False,
 ):
+    cubes = list(map(hnp.Cube, cube_paths))
+    cubes.sort()
+
+    logger.info(f"HiJACK start: {', '.join(map(str, cubes))}")
+
+    base_cube = check(cubes, base_ccd_number)
 
     temp_token = datetime.now().strftime("HiJACK-%y%m%d%H%M%S")
     outdir_p = Path(outdir)
@@ -513,7 +574,8 @@ def HiJACK(
     )
     match_red(cubes, base_cube, flat_path)
 
-    jitter_path = outdir_p / (str(cubes[0].get_obsid()) + "_jitter_cpp.txt")
+    # jitter_path = outdir_p / (str(cubes[0].get_obsid()) + "_jitter_cpp.txt")
+    jitter_path = outdir_p / (str(cubes[0].get_obsid()) + "_jitter_py.txt")
     if not jitter_path.exists():
         resolvejitter_conf = Path(conf_dir) / "ResolveJitter.conf"
         ResolveJitter(
@@ -657,5 +719,7 @@ def HiJACK(
         flat_path.unlink()
         red_flat_files.unlink()
         to_del.unlink()
+
+    logger.info(f"HiJACK done")
 
     return

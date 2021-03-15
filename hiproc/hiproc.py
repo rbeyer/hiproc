@@ -40,6 +40,8 @@ import argparse
 import itertools
 import logging
 import pkg_resources
+import subprocess
+import sys
 from pathlib import Path
 
 import pvl
@@ -120,38 +122,46 @@ def main():
 
     db_list = None
     try:
-        get_cubes(f"{oid}*balance.cub", parent)
-    except FileNotFoundError:
-        chancubes = edr2stitch(imgs, args.conf_dir, keep=args.keep)
-        db_list = [x.db for x in chancubes]
+        try:
+            get_cubes(f"{oid}*balance.cub", parent)
+        except FileNotFoundError:
+            chancubes = edr2stitch(imgs, args.conf_dir, keep=args.keep)
+            db_list = [x.db for x in chancubes]
 
-    if args.color:
-        color(oid, args.conf_dir, parent, db_list, keep=args.keep)
+        if args.color:
+            color(oid, args.conf_dir, parent, db_list, keep=args.keep)
 
-    if args.precision or args.jack:
-        jack = False
-        if args.jack:
-            jack = True
-        else:
-            slithers = list(parent.glob(f"*.slither.txt"))
-
-            # HiPrecisionInit to determine if you need to HiNoProj or HiJACK
-            #   takes *slither.txt
-            (HiJACK_flags, _, _) = HiPrecisionInit.check(
-                slithers, pvl.load(args.conf_dir / "HiPrecisionInit.conf")
-            )
-
-            if any(HiJACK_flags):
+        if args.precision or args.jack:
+            jack = False
+            if args.jack:
                 jack = True
+            else:
+                slithers = list(parent.glob(f"*.slither.txt"))
 
-        precision(oid, args.conf_dir, parent, hijack=jack, keep=args.keep)
+                # HiPrecisionInit to determine if you need to HiNoProj or
+                # HiJACK takes *slither.txt
+                (HiJACK_flags, _, _) = HiPrecisionInit.check(
+                    slithers, pvl.load(args.conf_dir / "HiPrecisionInit.conf")
+                )
+
+                if any(HiJACK_flags):
+                    jack = True
+
+            precision(oid, args.conf_dir, parent, hijack=jack, keep=args.keep)
+
+    except subprocess.CalledProcessError as err:
+        print(util.isis_error_format(err), file=sys.stderr)
+        if args.verbose >= 2:
+            raise err
+        sys.exit(err.returncode)
+    return
 
 
 def get_cubes(glob: str, parent: Path) -> list:
     cubes = list(parent.glob(glob))
     if len(cubes) == 0:
         raise FileNotFoundError(
-            "Did not find any files that match " f"{glob} in {parent}."
+            f"Did not find any files that match {glob} in {parent}."
         )
     return cubes
 
@@ -289,7 +299,13 @@ def precision(obsid, conf_dir: Path, parent: Path, hijack=False, keep=False):
         # HiJACK - starts with balance cubes, needs all the colors
         #   takes all color balance.cubs
         #   creates a whole slow of files in HiJACK/
-        HiJACK.start(bal_cubs, conf_dir, outdir=(parent / "HiJACK"), keep=keep)
+        HiJACK.HiJACK(
+            bal_cubs,
+            conf_dir,
+            outdir=(parent / "HiJACK"),
+            plot=False,
+            keep=keep
+        )
     else:
         red_bal_cubs = get_cubes(f"{obsid}_RED*balance.cub", parent)
         # HiNoProj - alternate to HiccdStitch, starts with balance cubes
@@ -297,7 +313,8 @@ def precision(obsid, conf_dir: Path, parent: Path, hijack=False, keep=False):
         #   creates PSP_010502_2090_RED.NOPROJ.cub
         HiNoProj.HiNoProj(
             red_bal_cubs,
-            pvl.load(conf_dir / "HiNoProj.conf"), keep=keep
+            pvl.load(conf_dir / "HiNoProj.conf"),
+            keep=keep
         )
 
     return

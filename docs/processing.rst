@@ -90,5 +90,6 @@ HiRISE CCDs.
 For "precision" processing, do the following:
 
 * ``HiPrecisionInit`` to determine if you need to run HiJACK or just HiNoProj
-* ``HiNoProj`` or ``HiJACK``
+* ``HiNoProj`` or ``HiJACK`` - HiJACK currently has issues, because the Python version of ``resolve_jitter`` isn't
+  working yet.
 

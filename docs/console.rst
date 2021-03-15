@@ -46,3 +46,6 @@ to the user to easily execute HiRISE processing procedures.
 
 .. autoprogram:: hiproc.HiNoProj:arg_parser()
    :prog: HiNoProj
+
+.. autoprogram:: hiproc.HiJACK:arg_parser()
+   :prog: HiJACK
