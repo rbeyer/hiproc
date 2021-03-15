@@ -49,3 +49,7 @@ to the user to easily execute HiRISE processing procedures.
 
 .. autoprogram:: hiproc.HiJACK:arg_parser()
    :prog: HiJACK
+
+.. autoprogram:: hiproc.resolve_jitter:arg_parser()
+   :prog: HiJACK
+

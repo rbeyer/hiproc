@@ -74,7 +74,7 @@ from hiproc.FlatFile import FlatFile
 logger = logging.getLogger(__name__)
 
 
-def main():
+def arg_parser():
     parser = argparse.ArgumentParser(
         description=__doc__, parents=[util.parent_parser()]
     )
@@ -154,7 +154,11 @@ def main():
         nargs="*",
         help="Three flat.txt files that are the output of ISIS hijitreg.",
     )
+    return parser
 
+
+def main():
+    parser = arg_parser()
     args = parser.parse_args()
 
     util.set_logger(args.verbose, args.logfile, args.log)
@@ -218,14 +222,15 @@ def main():
             writecsv=args.csv,
         )
     except subprocess.CalledProcessError as err:
-        print("Had an ISIS error:", file=sys.stderr)
-        print(" ".join(err.cmd), file=sys.stderr)
-        print(err.stdout, file=sys.stderr)
-        print(err.stderr, file=sys.stderr)
-        sys.exit(1)
+        print(util.isis_error_format(err), file=sys.stderr)
+        if args.verbose >= 2:
+            raise err
+        sys.exit(err.returncode)
     except Exception as err:
         traceback.print_exc(file=sys.stderr)
         print(err, file=sys.stderr)
+        if args.verbose >= 2:
+            raise err
         sys.exit(1)
     return
 
@@ -286,14 +291,16 @@ def start(
     )
 
     # The outputs
-    print(f"Average error is {min_avg_error} at min index {min_k}")
-    print(f"linerate is {linerate}")
-    print(f"TDI = {tdi}")
+    logger.info(f"Average error is {min_avg_error} at min index {min_k}")
+    logger.info(f"linerate is {linerate}")
+    logger.info(f"TDI = {tdi}")
 
     # To do: Remove the py suffix from output filenames.
 
     if outprefix is None:
         outprefix = str(oid)
+    else:
+        outprefix = str(outprefix)
 
     # Characterize the smear:
     (
