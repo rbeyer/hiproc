@@ -88,7 +88,6 @@ import os
 import shutil
 import subprocess
 import sys
-import traceback
 from collections import abc
 from pathlib import Path
 
@@ -107,74 +106,83 @@ import hiproc.util as util
 logger = logging.getLogger(__name__)
 
 
+def arg_parser():
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        parents=[util.parent_parser()],
+    )
+    parser.add_argument(
+        "-o", "--output",
+        required=False,
+        default=".bitflip.cub",
+        help="The name of the output .cub file to write.  Optionally, if "
+             "it starts with a '.' it is considered a suffix "
+             "and the input file will have its suffix removed, and this will "
+             "be added input files. Default: %(default)s",
+    )
+    parser.add_argument(
+        "-w",
+        "--width",
+        required=False,
+        default=5,
+        type=int,
+        help="The number of medstd widths for bit-flip "
+        "cleaning. (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--line",
+        required=False,
+        action="store_true",
+        help="Performs statistics along the line "
+        "direction instead of column for the image area.",
+    )
+    parser.add_argument(
+        "-r",
+        "--replacement",
+        required=False,
+        type=int,
+        help="By default, the program will replace "
+        "identified pixels with an appropriate NULL data "
+        "value, but if provided this value will be used "
+        "instead.",
+    )
+    parser.add_argument(
+        "-p",
+        "--plot",
+        required=False,
+        action="store_true",
+        help="Displays interactive plot for each area.",
+    )
+    parser.add_argument(
+        "--saveplot",
+        required=False,
+        nargs="?",
+        default=False,
+        const=True,
+        help="Saves plot for each area to a file.  If a directory is "
+        "provided it will be used to save the plots to, otherwise "
+        "the directory of the input file will be used.",
+    )
+    parser.add_argument(
+        "-n",
+        "--dryrun",
+        required=False,
+        action="store_true",
+        help="Does not produce a cleaned output file.",
+    )
+    parser.add_argument("file", help="ISIS Cube file or PDS IMG to clean.")
+    return parser
+
+
 def main():
+    args = arg_parser().parse_args()
+
+    util.set_logger(args.verbose, args.logfile, args.log)
+
+    out_p = util.path_w_suffix(args.output, args.file)
+
     try:
-        parser = argparse.ArgumentParser(
-            description=__doc__,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            parents=[util.parent_parser()],
-        )
-        parser.add_argument(
-            "-o", "--output", required=False, default=".bitflip.cub"
-        )
-        parser.add_argument(
-            "-w",
-            "--width",
-            required=False,
-            default=5,
-            type=int,
-            help="The number of medstd widths for bit-flip "
-            "cleaning. (default: %(default)s)",
-        )
-        parser.add_argument(
-            "--line",
-            required=False,
-            action="store_true",
-            help="Performs statistics along the line "
-            "direction instead of column for the image area.",
-        )
-        parser.add_argument(
-            "-r",
-            "--replacement",
-            required=False,
-            type=int,
-            help="By default, the program will replace "
-            "identified pixels with an appropriate NULL data "
-            "value, but if provided this value will be used "
-            "instead.",
-        )
-        parser.add_argument(
-            "-p",
-            "--plot",
-            required=False,
-            action="store_true",
-            help="Displays interactive plot for each area.",
-        )
-        parser.add_argument(
-            "--saveplot",
-            required=False,
-            nargs="?",
-            default=False,
-            const=True,
-            help="Saves plot for each area to a file.  If a directory is "
-            "provided it will be used to save the plots to, otherwise "
-            "the directory of the input file will be used.",
-        )
-        parser.add_argument(
-            "-n",
-            "--dryrun",
-            required=False,
-            action="store_true",
-            help="Does not produce a cleaned output file.",
-        )
-        parser.add_argument("file", help="ISIS Cube file or PDS IMG to clean.")
-
-        args = parser.parse_args()
-
-        util.set_logger(args.verbose, args.logfile, args.log)
-
-        out_p = util.path_w_suffix(args.output, args.file)
-
         clean(
             args.file,
             out_p,
@@ -189,14 +197,14 @@ def main():
 
         sys.exit(0)
     except subprocess.CalledProcessError as err:
-        print("Had an ISIS error:", file=sys.stderr)
-        print(" ".join(err.cmd), file=sys.stderr)
-        print(err.stdout, file=sys.stderr)
-        print(err.stderr, file=sys.stderr)
-        sys.exit(1)
+        print(util.isis_error_format(err), file=sys.stderr)
+        if args.verbose >= 2:
+            raise err
+        sys.exit(err.returncode)
     except Exception as err:
-        traceback.print_exc(file=sys.stderr)
         print(err, file=sys.stderr)
+        if args.verbose >= 2:
+            raise err
         sys.exit(1)
 
 

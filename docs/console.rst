@@ -8,6 +8,9 @@ to the user to easily execute HiRISE processing procedures.
 .. autoprogram:: hiproc.hiproc:arg_parser()
    :prog: hiproc
 
+.. autoprogram:: hiproc.bitflips:arg_parser()
+   :prog: bitflips
+
 .. autoprogram:: hiproc.EDR_Stats:arg_parser()
    :prog: EDR_Stats
 
