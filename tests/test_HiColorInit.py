@@ -17,6 +17,7 @@
 
 # import contextlib
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import hiproc.HiColorInit as hci
@@ -66,24 +67,20 @@ class TestMock(unittest.TestCase):
     @patch("hiproc.HiColorInit.isis.editlab")
     @patch("hiproc.HiColorInit.Path.unlink")
     @patch("hiproc.HiColorInit.isis.getkey_k", side_effect=getkey)
-    def test_HiColorInit_enlarge(
+    def test_HiColorInit_reduce1(
         self, m_getkey, m_unlink, m_editlab, m_handmos, m_enlarge, m_reduce
     ):
-        red = hci.HiColorCube("dummy/PSP_010502_2090_RED4")
-        ir = hci.HiColorCube("dummy/PSP_010502_2090_IR10")
-        bg = hci.HiColorCube("dummy/PSP_010502_2090_BG12")
-        ir.bin = 4
-        bg.bin = 4
+        red = Path("dummy/PSP_010502_2090_RED4")
+        ir = Path("dummy/PSP_010502_2090_IR10")
+        bg = Path("dummy/PSP_010502_2090_BG12")
         suffix = ".dummy.cub"
-        hci.HiColorInit(red, ir, bg, suffix, keep=True)
-        self.assertEqual(2, m_enlarge.call_count)
-        self.assertAlmostEqual(
-            1.998800719568259, m_enlarge.call_args[1]["sscale"]
-        )
-        m_reduce.assert_not_called()
+        hci.HiColorInit([red, ir, bg], suffix, keep=True)
+        self.assertEqual(2, m_reduce.call_count)
+        self.assertAlmostEqual(m_reduce.call_args[1]["sscale"], 1.0006)
+        m_enlarge.assert_not_called()
         self.assertEqual(2, m_editlab.call_count)
         self.assertTrue(str(m_editlab.call_args[0][0]).endswith(suffix))
-        self.assertAlmostEqual(200, m_handmos.call_args[1]["outline"])
+        self.assertAlmostEqual(m_handmos.call_args[1]["nlines"], 1024)
         m_unlink.assert_not_called()
 
     @patch("hiproc.HiColorInit.isis.reduce")
@@ -92,13 +89,13 @@ class TestMock(unittest.TestCase):
     @patch("hiproc.HiColorInit.isis.editlab")
     @patch("hiproc.HiColorInit.Path.unlink")
     @patch("hiproc.HiColorInit.isis.getkey_k", side_effect=getkey)
-    def test_HiColorInit_reduce(
+    def test_HiColorInit_reduce2(
         self, m_getkey, m_unlink, m_editlab, m_handmos, m_enlarge, m_reduce
     ):
-        red = hci.HiColorCube("dummy/PSP_010502_2090_RED4")
-        ir = hci.HiColorCube("dummy/PSP_010502_2090_IR10")
+        red = Path("dummy/PSP_010502_2090_RED4")
+        ir = Path("dummy/PSP_010502_2090_IR10")
         s = ".dummy.cub"
-        hci.HiColorInit(red, ir, None, s)
+        hci.HiColorInit([red, ir], s)
         m_reduce.assert_called_once()
         self.assertAlmostEqual(1.0006, m_reduce.call_args[1]["sscale"])
         m_enlarge.assert_not_called()

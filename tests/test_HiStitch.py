@@ -278,10 +278,12 @@ class TestHiStitch(unittest.TestCase):
             ),
             "HiStitch_Equalize_Width": 1501,
             "HiStitch_Equalize_Correction": "MULTIPLY",
+            "HiStitch_Clean_Files": "KEEP",
+            "HiStitch_Normalization_Minimum": 0,
+            "HiStitch_Normalization_Maximum": 16000,
+            "HiStitch_Minimum_Percent": 0
         }
-        self.my_dbs = list()
-        self.my_dbs.append(
-            {
+        self.my_db0 = {
                 "IMAGE_MEAN": 6491.34508964,
                 "LOW_SATURATED_PIXELS": 0,
                 "CAL_MASK_STANDARD_DEVIATION": 17.97,
@@ -289,10 +291,8 @@ class TestHiStitch(unittest.TestCase):
                 "GAP_PIXELS_PERCENT": 0,
                 "BINNING": 2,
                 "zapped": False,
-            }
-        )
-        self.my_dbs.append(
-            {
+        }
+        self.my_db1 = {
                 "IMAGE_MEAN": 9.34508964,
                 "LOW_SATURATED_PIXELS": 0,
                 "CAL_MASK_STANDARD_DEVIATION": 17.97,
@@ -300,8 +300,8 @@ class TestHiStitch(unittest.TestCase):
                 "GAP_PIXELS_PERCENT": 0,
                 "BINNING": 2,
                 "zapped": False,
-            }
-        )
+        }
+        self.my_dbs = [self.my_db0, self.my_db1]
 
     def test_set_flags(self):
         b = 1, 2, 4, 8, 16
@@ -357,6 +357,11 @@ class TestHiStitch(unittest.TestCase):
                 width=1501,
             )
 
+    @unittest.skip("Need more work to make a good test here.")
+    @patch(
+        "hiproc.hirise.get_ChannelID_fromfile",
+        return_value="PSP_010502_2090_RED4_0"
+    )
     @patch("hiproc.HiStitch.Path.rename")
     @patch("hiproc.HiStitch.isis.fx")
     @patch("hiproc.HiStitch.isis.mask")
@@ -377,9 +382,10 @@ class TestHiStitch(unittest.TestCase):
         mock_mask,
         mock_fx,
         mock_rename,
+        mock_cid_fromfile
     ):
         cubes = ("dummy1.in", "dummy2.in")
-        out_c = "dummy.out"
+        out_c = Path("dummy.out")
 
         def getkey(cube, group, key):
             values = {
@@ -388,14 +394,29 @@ class TestHiStitch(unittest.TestCase):
                 "Summing": 2,
                 "Lines": 1024,
                 "Samples": 1024,
+                "PRODUCT_ID": "PSP_010502_2090_RED4_0"
             }
-            return values[key]
+            if key == "ChannelNumber":
+                return cube.stem[-1]
+            else:
+                return values[key]
+
+        db0 = self.my_db0
+        db0["PRODUCT_ID"] = "PSP_010502_2090_RED4_0"
+        db1 = self.my_db1
+        db1["PRODUCT_ID"] = "PSP_010502_2090_RED4_1"
 
         with patch("hiproc.HiStitch.isis.getkey_k", side_effect=getkey):
             self.assertEqual(
                 (0, 3),
                 hs.HiStitch(
-                    cubes, out_c, self.my_c, self.my_dbs, 5, keep=True
+                    Path("dummy0.in"),
+                    Path("dummy1.in"),
+                    db0,
+                    db1,
+                    out_c,
+                    {"HiStitch": self.my_c},
+                    keep=True
                 ),
             )
 

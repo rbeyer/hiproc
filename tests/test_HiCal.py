@@ -549,18 +549,22 @@ class TestHiCal(unittest.TestCase):
     def test_HiCal(self):
         outcube = Path("test_HiCal-out.cub")
         ccdchan = (self.pid.get_ccd(), self.pid.channel)
-        hical = hc.HiCal(
+        db = hc.HiCal(
             self.cube,
             outcube,
-            ccdchan,
+            self.db,
             self.conf,
             conf_path,
-            self.db,
-            destripe=False,
+            bin2=False,
+            bin4=False,
             keep=False,
         )
-        self.assertEqual((None, False, "Standard"), hical[1:])
-        # This stddev was with HiGainFx in the mix:
-        # self.assertAlmostEqual(0.006452488, hical[0])
-        self.assertAlmostEqual(0.00204738, hical[0])
+        print(db)
+        self.assertAlmostEqual(
+            db["HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION"],
+            0.00204738,
+        )
+        self.assertIsNone(db["DESTRIPED_DIFFERENCE_STANDARD_DEVIATION"])
+        self.assertFalse(db["zapped"])
+        self.assertEqual(db["hical_status"], "Standard")
         outcube.unlink()

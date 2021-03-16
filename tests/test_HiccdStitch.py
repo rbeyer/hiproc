@@ -235,6 +235,9 @@ class TestMock(unittest.TestCase):
             "HiccdStitch_Normalization_Maximum": 1.5,
             "HiccdStitch_Control_CCD": [5, 11, 13],
             "HiccdStitch_SNR_Threshold": 50,
+            "HiccdStitch_Clean": "KEEP",
+            "HiccdStitch_Version_Enable": False,
+            "HiccdStitch_Balance_Method": "AVERAGE"
         }
         self.conf = {"HiccdStitch": hiconf}
 

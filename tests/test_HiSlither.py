@@ -91,7 +91,7 @@ class TestHiSlither(unittest.TestCase):
     @patch("hiproc.HiSlither.isis.hicubeit")
     @patch("hiproc.HiSlither.run_slither")
     @patch("hiproc.HiColorInit.isis.getkey_k", side_effect=getkey)
-    def test_HiSlither(self, m_getkey, m_sli, m_hicubeit, m_trim):
+    def test_process_set(self, m_getkey, m_sli, m_hicubeit, m_trim):
         r = hci.HiColorCube("dummy/PSP_010502_2090_RED5.HiStitch.balance.cub")
         i = hci.HiColorCube(
             "dummy/PSP_010502_2090_IR11.HiStitch.balance.precolor.cub"
@@ -100,7 +100,7 @@ class TestHiSlither(unittest.TestCase):
             "dummy/PSP_010502_2090_BG13.HiStitch.balance.precolor.cub"
         )
         self.assertEqual(
-            sli.HiSlither(r, i, b, keep=True),
+            sli.process_set(r, i, b, keep=True),
             Path("dummy/PSP_010502_2090_COLOR5.cub"),
         )
         _, trim_args = m_trim.call_args

@@ -390,6 +390,7 @@ class TestHiColorNorm(unittest.TestCase):
         self.assertEqual(num_cubes, m_algebra.call_count)
         self.assertEqual(num_cubes, m_handmos.call_count)
 
+    @patch("hiproc.HiColorNorm.ColorCube.get_binning", return_value=2)
     @patch("hiproc.HiColorNorm.isis.hiccdstitch")
     @patch("hiproc.HiColorNorm.per_band", return_value=3)
     @patch(
@@ -399,24 +400,30 @@ class TestHiColorNorm(unittest.TestCase):
     @patch("hiproc.HiColorNorm.isis.cubeit")
     @patch("hiproc.HiColorNorm.Path.write_text")
     @patch("hiproc.HiColorNorm.isis.mask")
+    @patch("hiproc.HiColorNorm.isis.getkey_k", side_effect=getkey)
     def test_HiColorNorm(
-        self, m_mask, m_Pathwrite, m_cubeit, m_pc, m_pb, m_hcs
+        self, m_getkey, m_mask, m_Pathwrite, m_cubeit, m_pc, m_pb, m_hcs, m_gb
     ):
         conf = {
             "HiColorNorm": {
                 "HiColorNorm_Crop_Top": 1000,
                 "HiColorNorm_Crop_Bot": 2000,
                 "HiColorNorm_Make_Stitch": True,
+                "HiColorNorm_NoiseFilter_IR10": True,
+                "HiColorNorm_Normalization_Minimum": 0,
+                "HiColorNorm_Normalization_Maximum": 16000,
             }
         }
         self.assertEqual(
             (3, 3),
             hcn.HiColorNorm(
-                self.cubes,
+                [
+                    Path("dummy/PSP_010502_2090_COLOR4"),
+                    Path("dummy/PSP_010502_2090_COLOR5")
+                ],
                 "out_path.cub",
                 conf,
-                True,
-                unfiltered=True,
+                make_unfiltered=True,
                 keep=True,
             ),
         )

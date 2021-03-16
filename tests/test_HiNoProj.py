@@ -178,17 +178,19 @@ class TestHiNoProj(unittest.TestCase):
         m_handside,
         m_edit,
     ):
-        c2 = hnp.Cube("dummy/PSP_010502_2090_RED2.HiStitch.balance.cub")
-        c3 = hnp.Cube("dummy/PSP_010502_2090_RED3.HiStitch.balance.cub")
-        c4 = hnp.Cube("dummy/PSP_010502_2090_RED4.HiStitch.balance.cub")
-        c5 = hnp.Cube("dummy/PSP_010502_2090_RED5.HiStitch.balance.cub")
-        c6 = hnp.Cube("dummy/PSP_010502_2090_RED6.HiStitch.balance.cub")
+        c2 = Path("dummy/PSP_010502_2090_RED2.HiStitch.balance.cub")
+        c3 = Path("dummy/PSP_010502_2090_RED3.HiStitch.balance.cub")
+        c4 = Path("dummy/PSP_010502_2090_RED4.HiStitch.balance.cub")
+        c5 = Path("dummy/PSP_010502_2090_RED5.HiStitch.balance.cub")
+        c6 = Path("dummy/PSP_010502_2090_RED6.HiStitch.balance.cub")
 
         cubes = (c2, c3, c4, c5, c6)
 
-        conf = {"Shape": "SYSTEM"}
+        conf = {"HiNoProj": {
+            "Shape": "SYSTEM"
+        }}
 
-        hnp.HiNoProj(cubes, c4, "dummy/mosaic.cub", conf, keep=True)
+        hnp.HiNoProj(cubes, conf, "dummy/mosaic.cub", 4, keep=True)
         self.assertEqual(len(cubes), m_spice.call_count)
         self.assertEqual(len(cubes), m_sfit.call_count)
         self.assertEqual(len(cubes), m_noproj.call_count)

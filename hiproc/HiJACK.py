@@ -445,8 +445,8 @@ def ResolveJitter(
     # logger.info(rj_args)
     # subprocess.run(rj_args, check=True)
 
-    print(jitter_path)
-    print(flats[1])
+    # print(jitter_path)
+    # print(flats[1])
     rj.start(
         flats[0],
         False,

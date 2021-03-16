@@ -298,23 +298,28 @@ class TestHiJitReg(unittest.TestCase):
                         hjr.jitter_iter(self.r, self.c, self.conf, keep=True)
                     )
 
+    @patch("hiproc.HiColorInit.isis.getkey_k", side_effect=getkey)
     @patch("hiproc.HiJitReg.jitter_iter", return_value=True)
-    def test_HiJitReg(self, m_jit_it):
-        c04 = c05 = c10 = c11 = c12 = c13 = None
+    def test_HiJitReg(self, m_jit_it, m_getkey):
+        c04 = Path("dummy/PSP_010502_2090_RED4")
+        c05 = Path("dummy/PSP_010502_2090_RED5")
+        c10 = Path("dummy/PSP_010502_2090_IR10")
+        c11 = Path("dummy/PSP_010502_2090_IR11")
+        c12 = Path("dummy/PSP_010502_2090_BG12")
+        c13 = Path("dummy/PSP_010502_2090_BG13")
         conf = dict(dummy="yes")
-        self.assertRaises(
-            RuntimeError, hjr.HiJitReg, c04, c05, c10, c11, c12, c13, conf
-        )
-        c04 = "RED4"
-        c12 = "BG12"
-        c13 = "BG13"
+        # self.assertRaises(
+        #     RuntimeError, hjr.HiJitReg, [c04, c05, c10, c11, c12, c13], conf
+        # )
         self.assertListEqual(
-            ["BG12"], hjr.HiJitReg(c04, c05, c10, c11, c12, c13, conf)
+            [hci.HiColorCube(c12)], hjr.HiJitReg([c04, c12, c13], conf)
         )
-        c05 = "RED5"
-        c10 = "IR10"
-        c11 = "IR11"
         self.assertListEqual(
-            ["IR10", "BG12", "IR11", "BG13"],
-            hjr.HiJitReg(c04, c05, c10, c11, c12, c13, conf),
+            [
+                hci.HiColorCube(c10),
+                hci.HiColorCube(c12),
+                hci.HiColorCube(c11),
+                hci.HiColorCube(c13)
+            ],
+            hjr.HiJitReg([c04, c05, c10, c11, c12, c13], conf),
         )

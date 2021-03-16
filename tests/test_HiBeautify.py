@@ -39,17 +39,32 @@ def getkey(cube, group, key):
 
 
 class TestHiBeautify(unittest.TestCase):
+    # @patch("hiproc.HiColorNorm.ColorCube.get_binning", return_value=2)
+    # @patch("hiproc.HiColorNorm.isis.getkey_k", side_effect=getkey)
+    # def setUp(self, m_getkey, m_get_binning):
+    #     c4 = hcn.ColorCube("dummy/PSP_010502_2090_COLOR4.HiColorNorm")
+    #     c5 = hcn.ColorCube("dummy/PSP_010502_2090_COLOR5.HiColorNorm")
+    #     self.cubes = [c4, c5]
+
     @patch("hiproc.HiColorNorm.ColorCube.get_binning", return_value=2)
     @patch("hiproc.HiColorNorm.isis.getkey_k", side_effect=getkey)
-    def setUp(self, m_getkey, m_get_binning):
-        c4 = hcn.ColorCube("dummy/PSP_010502_2090_COLOR4.HiColorNorm")
-        c5 = hcn.ColorCube("dummy/PSP_010502_2090_COLOR5.HiColorNorm")
-        self.cubes = [c4, c5]
-
     @patch("hiproc.HiBeautify.isis.cubeit_k")
     @patch("hiproc.HiBeautify.isis.algebra")
     @patch("hiproc.HiBeautify.isis.handmos")
-    def test_HiBeautify(self, m_handmos, m_algebra, m_cubeit_k):
+    @patch("hiproc.HiBeautify.isis.editlab")
+    def test_HiBeautify(
+        self,
+        m_editlab,
+        m_handmos,
+        m_algebra,
+        m_cubeit_k,
+        m_getkey,
+        m_get_binning
+    ):
+        cubes = [
+            Path("dummy/PSP_010502_2090_COLOR4.HiColorNorm"),
+            Path("dummy/PSP_010502_2090_COLOR5.HiColorNorm")
+        ]
         conf = {
             "Beautify": {
                 "Synthetic_A_Coefficient": 2,
@@ -58,13 +73,13 @@ class TestHiBeautify(unittest.TestCase):
         }
         outirb = Path("outirb.cub")
         outrgb = Path("outrgb.cub")
-        hbeaut.HiBeautify(self.cubes, (outirb, outrgb), conf, keep=True)
+        hbeaut.HiBeautify(cubes, conf, outirb, outrgb, keep=True)
 
         self.assertEqual(
             m_handmos.call_args_list,
             [
                 call(
-                    self.cubes[0].path,
+                    cubes[0],
                     create="Y",
                     mosaic=outirb,
                     nbands=3,
@@ -75,7 +90,7 @@ class TestHiBeautify(unittest.TestCase):
                     outsample=1,
                 ),
                 call(
-                    self.cubes[1].path,
+                    cubes[1],
                     mosaic=outirb,
                     outband=1,
                     outline=1,
