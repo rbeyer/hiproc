@@ -252,6 +252,7 @@ class TestResolveJitter(unittest.TestCase):
         rj.mask_frequencies(0.01, ddt, overxx, overyy)
         # Not sure how to test these large arrays :(
 
+    @unittest.skip("Slow to run.")
     @patch('hiproc.resolve_jitter.Path')
     def test_pixel_smear(self, m_path):
         # This test is now slow because it basically engages the whole
