@@ -366,51 +366,22 @@ def main():
             keep=args.keep,
         )
     except subprocess.CalledProcessError as err:
-        print("Had an ISIS error:")
-        print(" ".join(err.cmd))
-        print(err.stdout)
-        print(err.stderr)
-        raise err
+        print(util.isis_error_format(err), file=sys.stderr)
+        if args.verbose >= 2:
+            raise err
+        sys.exit(err.returncode)
+    except Exception as err:
+        print(err, file=sys.stderr)
+        if args.verbose >= 2:
+            raise err
+        sys.exit(1)
 
     db_path = util.path_w_suffix(args.db, outpath)
 
     with open(db_path, "w") as f:
         json.dump(db, f, indent=0, sort_keys=True)
 
-
-def start(
-    cubes: list,
-    conf: dict,
-    output: os.PathLike,
-    sline=None,
-    eline=None,
-    keep=False,
-):
-
-    # Perl: GetConfigurationParameters()
-    # conf = pvl.load(str(conf_path))
-    conf_check(conf)
-
-    outcub_path = set_outpath(output, cubes)
-
-    # Perl: GetImageDims()
-    cubes = GetImageDims(cubes, conf, sline, eline)
-
-    cubes = HiccdStitch(cubes, outcub_path, conf, keep=keep)
-
-    # Afterwards inserts into CCD_Processing_Statistics table.
-    db = {"OBSERVATION_ID": str(cubes[0].get_obsid())}
-    for c in cubes:
-        ccd_db = {
-            "CCDID": str(c),
-            "RADIOMETRIC_MATCHING_CORRECTION": c.correction,
-            "LEFT_OVERLAP_AVERAGE": c.lstats,
-            "RIGHT_OVERLAP_AVERAGE": c.rstats,
-            "CUBENORM_COLUMN_CORRECTION_STANDARD_DEVIATION": c.cubenorm_stddev,
-        }
-        db[c.get_ccd()] = ccd_db
-
-    return (db, outcub_path)
+    return
 
 
 def HiccdStitch(
@@ -421,7 +392,7 @@ def HiccdStitch(
     eline=None,
     keep=False
 ) -> tuple:
-    logger.info(f"HiccdStitch start: {cubes}")
+    logger.info(f"HiccdStitch start: {', '.join(map(str, cubes))}")
 
     # Perl: GetConfigurationParameters()
     # conf = pvl.load(str(conf_path))
