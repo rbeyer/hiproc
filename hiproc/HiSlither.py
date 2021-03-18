@@ -30,15 +30,15 @@ Data Flow
 ---------
 Input Products:
 
-* RED4 and 5 ``balance.cub`` files which are the result of HiccdStitch.
-* BG and IR ``precolor.cub`` files which are the result of HiColorInit.
-* The *regdef.pvl and *flat.tab and *control.pvl files created by HiJitReg.
+- RED4 and 5 ``balance.cub`` files which are the result of HiccdStitch.
+- BG and IR ``precolor.cub`` files which are the result of HiColorInit.
+- The regdef.pvl, flat.tab, and control.pvl files created by HiJitReg.
 
 Output Products:
 
-* creates a ``slither.txt`` and ``slither.cub`` file for each of the color
+- creates a ``slither.txt`` and ``slither.cub`` file for each of the color
     inputs.
-* creates ``COLOR4.cub`` and ``COLOR5.cub`` files which are the multi-band
+- creates ``COLOR4.cub`` and ``COLOR5.cub`` files which are the multi-band
     aligned images that match RED4 - BG12 - IR10 and RED5 - BG13 - IR11.
 
 """
@@ -91,10 +91,10 @@ def arg_parser():
         "cubes",
         metavar="RED balance.cub and color balance.precolor.cub files",
         nargs="+",
-        help="Either one or both sets of RED .balance.cub  and IR/BG "
-             ".balance.precolor.cub files. However, that's tedious to type,"
-             "so you could just type in *.balance*cub here, and the program "
-             "will sort out what it needs."
+        help=r"Either one or both sets of RED .balance.cub  and IR/BG "
+             r".balance.precolor.cub files. However, that's tedious to type,"
+             r"so you could just type in *.balance*cub here, and the program "
+             r"will sort out what it needs."
     )
     return parser
 

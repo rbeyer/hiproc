@@ -28,8 +28,8 @@ showing the results.
 
 HiJigReg also works on one or both of the "color" sets:
 
-* RED4 - BG12 - IR10
-* RED5 - BG13 - IR11
+- RED4 - BG12 - IR10
+- RED5 - BG13 - IR11
 
 HiJitReg must be run after HiColorInit, and it creates a .hislither.pvl
 file which is then submitted to the HiSlither_Pipeline.
@@ -38,12 +38,12 @@ Data Flow
 ---------
 Input Products:
 
-* RED4 and 5 ``balance.cub`` files which are the result of HiccdStitch.
-* BG and IR ``precolor.cub`` files which are the result of HiColorInit.
+- RED4 and 5 ``balance.cub`` files which are the result of HiccdStitch.
+- BG and IR ``precolor.cub`` files which are the result of HiColorInit.
 
 Output Products:
 
-* creates *regdef.pvl and *flat.tab and *control.pvl files for each
+- creates regdef.pvl and flat.tab and control.pvl files for each
     BG and IR cube provided.
 
 """
@@ -121,8 +121,8 @@ def arg_parser():
         nargs="+",
         help="Either one or both sets of RED .balance.cub  and IR/BG "
              ".balance.precolor.cub files. However, that's tedious to type,"
-             "so you could just type in *.balance*cub here, and the program "
-             "will sort out what it needs."
+             "so you could just type in *.balance*cub here, and the "
+             "program will sort out what it needs."
     )
     return parser
 

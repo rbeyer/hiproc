@@ -4,19 +4,19 @@ create a single mosaicked image file.
 
 This program:
 
-* Optionally performs cubenorm processing on each CCD using a training area
+- Optionally performs cubenorm processing on each CCD using a training area
     that has been selected by the user. Cubenorm processing
     is required whenever radiometric problems, such as vertical
     striping, remain after the radiometric calibration step in the
     HiCal Pipeline. The cubenorm processing is described in the
     ISIS program cubenorm.
-* Balance the CCD products, created by HiStitch, to radiometrically match.
+- Balance the CCD products, created by HiStitch, to radiometrically match.
     A multiplicative constant is applied to each CCD to force the
     overlapping areas of adjacent CCDs to be identical. The resulting
     balanced CCD products, have the naming convention ``*.balance.cub``.
     These products are used by subsequent pipeline processing for
     creating color products, RDR products, and DTM products.
-* Join (stitch together) the CCD products to form an image of the entire
+- Join (stitch together) the CCD products to form an image of the entire
     observation.
 
 HiccdStitch is the fourth step in the HiRISE processing chain, after
@@ -28,15 +28,15 @@ Data Flow
 ---------
 Input Products:
 
-* ``.cub`` files of the same color (RED, IR, or BG) which are the result of
+- ``.cub`` files of the same color (RED, IR, or BG) which are the result of
     HiStitch.
-* ``.json`` files that start with the CCD ID of each source .cub file.
+- ``.json`` files that start with the CCD ID of each source .cub file.
 
 Output Products:
 
-* A stitched ``.cub`` file for that color.
-* A ``.balance.cub`` file for each input cube file.
-* A ``.json`` file with summary information about the stitched image.
+- A stitched ``.cub`` file for that color.
+- A ``.balance.cub`` file for each input cube file.
+- A ``.json`` file with summary information about the stitched image.
 
 """
 
@@ -286,7 +286,7 @@ def arg_parser():
     )
     parser.add_argument(
         "cubes",
-        metavar=".cub-file",
+        metavar="cub-file",
         nargs="+",
         help="Cubes to assemble, which are presumably the output of HiStitch. "
              "They must all be from the same detectors, so either all RED, "

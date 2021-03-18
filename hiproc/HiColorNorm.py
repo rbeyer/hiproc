@@ -9,12 +9,12 @@ Data Flow
 ---------
 Input Products:
 
-* ``COLOR4`` and ``COLOR5`` files which are the result of HiSlither.
+- ``COLOR4`` and ``COLOR5`` files which are the result of HiSlither.
 
 Output Products:
 
-* creates UNFILTERED versions of the COLOR4 and COLOR5 files.
-* creates HiColorNorm versions of the COLOR4 and COLOR5 files.
+- creates UNFILTERED versions of the COLOR4 and COLOR5 files.
+- creates HiColorNorm versions of the COLOR4 and COLOR5 files.
 
 """
 

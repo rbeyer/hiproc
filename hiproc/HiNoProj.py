@@ -6,11 +6,11 @@ Data Flow
 ---------
 Input Products:
 
-* RED ``balance.cub`` files which are the result of HiccdStitch.
+- RED ``balance.cub`` files which are the result of HiccdStitch.
 
 Output Product:
 
-* ``NOPROJ.cub``
+- ``NOPROJ.cub``
 
 """
 

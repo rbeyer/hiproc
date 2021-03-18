@@ -11,12 +11,12 @@ Data Flow
 ---------
 Input Products:
 
-* ``COLOR4.HiColorNorm`` and ``COLOR5.HiColorNorm`` files which are the
+- ``COLOR4.HiColorNorm`` and ``COLOR5.HiColorNorm`` files which are the
     result of HiColorNorm.
 
 Output Products:
 
-* IRB and RGB cubes
+- IRB and RGB cubes
 
 """
 

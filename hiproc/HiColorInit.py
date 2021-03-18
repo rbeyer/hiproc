@@ -5,8 +5,8 @@ Prepares images for coregistration. It takes the HiStitch CCD product balance
 cubes and scales the BG and IR CCDs to match the corresponding RED CCDs.
 If it can, the program deals with these two sets:
 
-* RED4 - BG12 - IR10
-* RED5 - BG13 - IR11
+- RED4 - BG12 - IR10
+- RED5 - BG13 - IR11
 
 HiColorInit must happen after HiccdStitch.
 
@@ -15,12 +15,12 @@ Data Flow
 ---------
 Input Products:
 
-* ``balance.cub`` files for the three or six of the CCDs lsited above, which
+- ``balance.cub`` files for the three or six of the CCDs lsited above, which
     are the result of HiccdStitch.
 
 Output Products:
 
-* A ``.precolor.cub`` file for each of the BG and IR input balance.cub files.
+- A ``.precolor.cub`` file for each of the BG and IR input balance.cub files.
 
 """
 

@@ -4,16 +4,16 @@
 These are the functionalities that the EDR_Stats pipeline performs that are
 reproduced here:
 
-* Perform a radiometric calibration correction and conversion to "I/F" units
+- Perform a radiometric calibration correction and conversion to "I/F" units
   using the ISIS ``hical`` program.
-* As part of the radiometric calibration, the current pipeline implementation
+- As part of the radiometric calibration, the current pipeline implementation
   applies a separate gain line-drift correction, referred to as HiGainFx.
   This original line-drift correction is used in lieu of the correction found
   in the current ISIS "hical" program, but it has been de-activated here,
   because it was running 'in addition to' and not 'instead of' the correction
   in ``hical``.  Also, the current ``hical`` does a more rigorous correction
   than the early HiGainFx.
-* Perform furrow correction. The image columns at the channel join
+- Perform furrow correction. The image columns at the channel join
   are checked for furrows. Pixels in the furrow region (at the channel
   join) whose DN values have gone above a threshold are set to the
   null pixel value as these pixels can not be calibrated. If a
@@ -23,25 +23,25 @@ reproduced here:
   and extras products. For BG and IR-filter images that make up the
   color products, the furrowed pixels will be interpolated in the
   HiColorNorm pipeline step.
-* If an observation is determined to have furrows then an entry
+- If an observation is determined to have furrows then an entry
   with the key "zapped" is set to "true" in the output .json file.
-* Due to HiRISE instrument instability problems, the HiCal pipeline
+- Due to HiRISE instrument instability problems, the HiCal pipeline
   performs a noise reduction procedure to reduce the number of bad
   pixels in an image observation. The noise correction is applied
   when the standard deviation of the dark pixel or mask regions
   exceed a threshold, or if the number of LIS pixels exceeds a
   threshold.  A newer version of that processing can be engaged
   if --bitflipwidth is set to a non-zero value.
-* Sometimes operating at lower temperatures can result in LIS pixels
+- Sometimes operating at lower temperatures can result in LIS pixels
   in the calibration areas, but not in the image area that can result
   in an erroneous calibration.  Some new processing to deal with that
   can be engaged if --lisfix is set to a value less than 1.
-* A high-pass filter "cubenorm" step is applied to the calibrated
+- A high-pass filter "cubenorm" step is applied to the calibrated
   image. Due to camera instabilities, residual vertical striping
   often exists in the imaging that is corrected by this empirical
   method. The average standard deviation of this change is calculated
   and stored in the .json file.
-* The ISIS program "hidestripe" is applied to suppress horizontal
+- The ISIS program "hidestripe" is applied to suppress horizontal
   stripping seen whenever an observation is acquired using mixed-binning
   commanding. The standard deviation of this change is calculated
   and stored in the .json file.
@@ -57,13 +57,13 @@ Data Flow
 ---------
 Input Products:
 
-* A ``.cub`` file that has been converted from an EDR.
-* A ``.json`` file that contains summary information about the .cub file.
+- A ``.cub`` file that has been converted from an EDR.
+- A ``.json`` file that contains summary information about the .cub file.
 
 Output Products:
 
-* A calibrated ``.cub`` file for each input ``.cub`` file processed.
-* Modifies each provided ``.json`` file.
+- A calibrated ``.cub`` file for each input ``.cub`` file processed.
+- Modifies each provided ``.json`` file.
 
 """
 

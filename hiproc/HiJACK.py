@@ -6,20 +6,20 @@ Data Flow
 ---------
 Input Products:
 
-* All color ``balance.cub`` files which are the result of HiccdStitch.
+- All color ``balance.cub`` files which are the result of HiccdStitch.
 
 Output Products:
 
-* regdef.pvl, flat.tab and control.pvl files relating all files to RED4 or 5
-* smear and jitter files from resolve_jitter
-* jittery.bc file from ISIS hijitter
-* dejittered.cub from ISIS hijitter
-* The following dejittered noproj mosaics:
-    * _RED4-5.NOPROJ.cub
-    * RED.NOPROJ.cub
-    * _IR.NOPROJ.cub
-    * _BG.NOPROJ.cub
-    * _IRB.NOPROJ.cub
+- regdef.pvl, flat.tab and control.pvl files relating all files to RED4 or 5
+- smear and jitter files from resolve_jitter
+- jittery.bc file from ISIS hijitter
+- dejittered.cub from ISIS hijitter
+- The following dejittered noproj mosaics:
+    - _RED4-5.NOPROJ.cub
+    - RED.NOPROJ.cub
+    - _IR.NOPROJ.cub
+    - _BG.NOPROJ.cub
+    - _IRB.NOPROJ.cub
 
 """
 

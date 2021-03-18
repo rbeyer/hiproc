@@ -19,12 +19,12 @@ Data Flow
 ---------
 Input Products:
 
-* Any HiRISE PDS EDR, typically ending in ``.img``.
+- Any HiRISE PDS EDR, typically ending in ``.img``.
 
 Output Products:
 
-* A ``.cub`` file for each ``.img`` file processed.
-* A ``.json`` file for each ``.img`` file processed containing summary
+- A ``.cub`` file for each ``.img`` file processed.
+- A ``.json`` file for each ``.img`` file processed containing summary
     information about the image.
 
 """

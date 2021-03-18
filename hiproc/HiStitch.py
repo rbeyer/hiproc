@@ -4,15 +4,15 @@
 These are the functionalities that the HiStitch pipeline performs that are
 reproduced here:
 
-* Join (or stitch) together two channel products to form a whole CCD product.
+- Join (or stitch) together two channel products to form a whole CCD product.
     The channel 1 product is on the left, channel 0 on the right.
-* When joining the two channel products, the ISIS histitch program first
+- When joining the two channel products, the ISIS histitch program first
     obtains the image average of the two channel products at the
     join area. The program then adjusts the average of channel 1
     to match the average of channel 0 through a multiplicative
     correction. This step produces a radiometrically seamless CCD
     product.
-* For Bin 2 and 4 images a fix is applied to images that have experienced
+- For Bin 2 and 4 images a fix is applied to images that have experienced
     furrowing. If furrowing has been detected, a highpass/lowpass
     filter is applied to the furrow region for those pixels that
     have not been set to the null pixel value in the HiCal
@@ -28,13 +28,13 @@ Data Flow
 ---------
 Input Products:
 
-* Two ``.cub`` files from the same CCD that have been processed through HiCal.
-* Two ``.json`` files that contain summary information about the .cub files.
+- Two ``.cub`` files from the same CCD that have been processed through HiCal.
+- Two ``.json`` files that contain summary information about the .cub files.
 
 Output Products:
 
-* A stitched ``.cub`` file.
-* A ``.json`` file with summary information about the stitched image.
+- A stitched ``.cub`` file.
+- A ``.json`` file with summary information about the stitched image.
 
 """
 
