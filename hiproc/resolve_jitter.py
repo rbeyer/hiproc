@@ -10,6 +10,9 @@ written to a text file. Another output is the pixel smear, also
 written to a file.
 
 The C++ version of this runs ~5x faster, FYI.
+
+WARNING: This program and its modules may not be fully functional and
+may return poor results.
 """
 
 # Copyright (C) 2013-2020 Arizona Board of Regents on behalf of the Lunar and
