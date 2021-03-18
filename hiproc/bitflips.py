@@ -62,7 +62,7 @@ to mitigate the bit-flip pixels once they have been identified.
    with this data.
 """
 
-# Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
+# Copyright 2020-2021, Ross A. Beyer (rbeyer@seti.org)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1281,27 +1281,30 @@ def find_prominence_boundaries(
     # prominences between them, which shouldn't be allowed,
     # so this adjusts that.
     if not max_prom_left <= central_i <= max_prom_right:
-        sorted_prom_idxs = np.argsort(maxprops["prominences"])
-        max_prom_idx = get_largest_prominence_with(
-            central_i,
-            sorted_prom_idxs[:-1],
-            maxprops["left_ips"],
-            maxprops["right_ips"],
-        )
+        try:
+            sorted_prom_idxs = np.argsort(maxprops["prominences"])
+            max_prom_idx = get_largest_prominence_with(
+                central_i,
+                sorted_prom_idxs[:-1],
+                maxprops["left_ips"],
+                maxprops["right_ips"],
+            )
 
-        # Adjust the prominences:
-        if maxima_i[sorted_prom_idxs[-1]] > central_i:
-            max_prom_left = maxprops["left_ips"][max_prom_idx]
-        else:
-            # print("less than max")
-            max_prom_right = maxprops["right_ips"][max_prom_idx]
+            # Adjust the prominences:
+            if maxima_i[sorted_prom_idxs[-1]] > central_i:
+                max_prom_left = maxprops["left_ips"][max_prom_idx]
+            else:
+                # print("less than max")
+                max_prom_right = maxprops["right_ips"][max_prom_idx]
 
-        # Don't allow searching between the central DN and the mode.
-        if central_min_i > min(central_i, maxima_i[sorted_prom_idxs[-1]]):
-            central_min_i = min(central_i, maxima_i[sorted_prom_idxs[-1]])
+            # Don't allow searching between the central DN and the mode.
+            if central_min_i > min(central_i, maxima_i[sorted_prom_idxs[-1]]):
+                central_min_i = min(central_i, maxima_i[sorted_prom_idxs[-1]])
 
-        if central_max_i < max(central_i, maxima_i[sorted_prom_idxs[-1]]):
-            central_max_i = max(central_i, maxima_i[sorted_prom_idxs[-1]])
+            if central_max_i < max(central_i, maxima_i[sorted_prom_idxs[-1]]):
+                central_max_i = max(central_i, maxima_i[sorted_prom_idxs[-1]])
+        except ValueError:
+            pass
 
     # print(f"max_prom_left/right: {max_prom_left}, {max_prom_right}")
     # print(
