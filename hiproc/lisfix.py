@@ -32,9 +32,6 @@ import argparse
 import logging
 import os
 import shutil
-import subprocess
-import sys
-import traceback
 from collections import abc
 from pathlib import Path
 
@@ -51,39 +48,33 @@ from hiproc.hirise import get_ChannelID_fromfile
 logger = logging.getLogger(__name__)
 
 
+def arg_parser():
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        parents=[util.parent_parser()],
+    )
+    parser.add_argument(
+        "-o", "--output", required=False, default=".lisfix.cub"
+    )
+    parser.add_argument("file", help="ISIS Cube file.")
+    return parser
+
+
 def main():
-    try:
-        parser = argparse.ArgumentParser(
-            description=__doc__,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            parents=[util.parent_parser()],
-        )
-        parser.add_argument(
-            "-o", "--output", required=False, default=".lisfix.cub"
-        )
-        parser.add_argument("file", help="ISIS Cube file.")
+    args = arg_parser().parse_args()
 
-        args = parser.parse_args()
+    util.set_logger(args.verbose, args.logfile, args.log)
 
-        util.set_logger(args.verbose, args.logfile, args.log)
+    out_p = util.path_w_suffix(args.output, args.file)
 
-        out_p = util.path_w_suffix(args.output, args.file)
-
+    with util.main_exceptions(args.verbose):
         fix(
             args.file,
             out_p,
         )
-        sys.exit(0)
-    except subprocess.CalledProcessError as err:
-        print("Had an ISIS error:", file=sys.stderr)
-        print(" ".join(err.cmd), file=sys.stderr)
-        print(err.stdout, file=sys.stderr)
-        print(err.stderr, file=sys.stderr)
-        sys.exit(1)
-    except Exception as err:
-        traceback.print_exc(file=sys.stderr)
-        print(err, file=sys.stderr)
-        sys.exit(1)
+
+    return
 
 
 def fix(
