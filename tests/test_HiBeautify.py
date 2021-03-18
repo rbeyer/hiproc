@@ -19,7 +19,6 @@ import unittest
 from unittest.mock import call, patch
 from pathlib import Path
 
-import hiproc.HiColorNorm as hcn
 import hiproc.HiBeautify as hbeaut
 
 

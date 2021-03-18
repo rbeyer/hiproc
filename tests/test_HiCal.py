@@ -57,7 +57,7 @@ gains = pvl.load(
         "data/EDR_Stats_gains_config.pvl"
     )
 )
-conf_path = pkg_resources.resource_filename( "hiproc", "data/HiCal.conf")
+conf_path = pkg_resources.resource_filename("hiproc", "data/HiCal.conf")
 conf = pvl.load(conf_path)
 # hgf_conf = Path("data") / "HiGainFx.conf"
 nf_conf = pvl.load(
@@ -548,7 +548,7 @@ class TestHiCal(unittest.TestCase):
 
     def test_HiCal(self):
         outcube = Path("test_HiCal-out.cub")
-        ccdchan = (self.pid.get_ccd(), self.pid.channel)
+        # ccdchan = (self.pid.get_ccd(), self.pid.channel)
         db = hc.HiCal(
             self.cube,
             outcube,

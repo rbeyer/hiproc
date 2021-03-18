@@ -34,8 +34,8 @@ Added
 
 Changed
 +++++++
-- Implemented better handling for configuration files so that they will get distributed with
-  the package.
+- Implemented better handling for configuration files so that they
+  will get distributed with the package.
 
 
 0.5.0 (2021-03-05)
@@ -44,9 +44,10 @@ Changed
 Added
 +++++
 * lisfix: Added the lisfix module.
-* bitflips: Sometimes the very end of the histogram (although not a formal minima) is the appropriate choice, and
-  is now considered.
-* bitflips: Added capability to ignore minor maxima at the ends of the histogram to "roll down" to a better solution.
+* bitflips: Sometimes the very end of the histogram (although not a formal minima) is the
+  appropriate choice, and is now considered.
+* bitflips: Added capability to ignore minor maxima at the ends of the histogram to "roll down"
+  to a better solution.
 
 Changed
 +++++++

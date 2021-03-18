@@ -284,22 +284,22 @@ class TestHiStitch(unittest.TestCase):
             "HiStitch_Minimum_Percent": 0
         }
         self.my_db0 = {
-                "IMAGE_MEAN": 6491.34508964,
-                "LOW_SATURATED_PIXELS": 0,
-                "CAL_MASK_STANDARD_DEVIATION": 17.97,
-                "IMAGE_DARK_STANDARD_DEVIATION": 18.05,
-                "GAP_PIXELS_PERCENT": 0,
-                "BINNING": 2,
-                "zapped": False,
+            "IMAGE_MEAN": 6491.34508964,
+            "LOW_SATURATED_PIXELS": 0,
+            "CAL_MASK_STANDARD_DEVIATION": 17.97,
+            "IMAGE_DARK_STANDARD_DEVIATION": 18.05,
+            "GAP_PIXELS_PERCENT": 0,
+            "BINNING": 2,
+            "zapped": False,
         }
         self.my_db1 = {
-                "IMAGE_MEAN": 9.34508964,
-                "LOW_SATURATED_PIXELS": 0,
-                "CAL_MASK_STANDARD_DEVIATION": 17.97,
-                "IMAGE_DARK_STANDARD_DEVIATION": 18.05,
-                "GAP_PIXELS_PERCENT": 0,
-                "BINNING": 2,
-                "zapped": False,
+            "IMAGE_MEAN": 9.34508964,
+            "LOW_SATURATED_PIXELS": 0,
+            "CAL_MASK_STANDARD_DEVIATION": 17.97,
+            "IMAGE_DARK_STANDARD_DEVIATION": 18.05,
+            "GAP_PIXELS_PERCENT": 0,
+            "BINNING": 2,
+            "zapped": False,
         }
         self.my_dbs = [self.my_db0, self.my_db1]
 

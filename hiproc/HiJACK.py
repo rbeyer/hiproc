@@ -97,7 +97,7 @@ def arg_parser():
         "--conf_dir",
         required=False,
         type=Path,
-        default=Path(pkg_resources.resource_filename( __name__, 'data/')),
+        default=Path(pkg_resources.resource_filename(__name__, 'data/')),
         help="Directory where ResolveJitter.conf and HiJACK.conf can be "
              "found. Defaults to the directory distributed with the library.",
     )
@@ -224,7 +224,7 @@ def match_red(cubes: list, base_cube, flat_path, elargement_ratio=1.0006):
             isis.reduce(
                 c.path,
                 to=c.next_path,
-                sscale=1/mag,
+                sscale=1 / mag,
                 lscale=bin_ratio,
                 mode="SCALE",
             )

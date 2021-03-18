@@ -465,7 +465,7 @@ def HiCal(
     logger.info(f"destripe: {destripe}")
 
     flags = set_flags(
-        hconf, db, ccdchan, b.index(int(db["BINNING"])),  bitflipwidth > 0
+        hconf, db, ccdchan, b.index(int(db["BINNING"])), bitflipwidth > 0
     )
     logger.info(flags)
 
