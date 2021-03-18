@@ -28,6 +28,10 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+
+0.6.0 (2021-03-18)
+------------------
+
 Added
 +++++
 - More complete documentation for the programs and their parameters.
