@@ -155,15 +155,16 @@ def main():
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    (db, outcub_path) = HiStitch(
-        args.cube0,
-        args.cube1,
-        get_db(util.pid_path_w_suffix(args.db, args.cube0)),
-        get_db(util.pid_path_w_suffix(args.db2, args.cube1)),
-        args.output,
-        pvl.load(args.conf),
-        keep=args.keep,
-    )
+    with util.main_exceptions(args.verbose):
+        (db, outcub_path) = HiStitch(
+            args.cube0,
+            args.cube1,
+            get_db(util.pid_path_w_suffix(args.db, args.cube0)),
+            get_db(util.pid_path_w_suffix(args.db2, args.cube1)),
+            args.output,
+            pvl.load(args.conf),
+            keep=args.keep,
+        )
 
     db_path = set_outpath(
         args.dbout, hirise.get_CCDID_fromfile(outcub_path), outcub_path.parent

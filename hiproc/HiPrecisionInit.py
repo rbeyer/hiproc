@@ -85,9 +85,10 @@ def main():
     # Ignore args.log to always print info when run from the command line.
     util.set_logger("info", args.logfile, args.log)
 
-    hijack, averages, thresh = check(
-        args.slither_text, pvl.load(args.conf)
-    )
+    with util.main_exceptions(args.verbose):
+        hijack, averages, thresh = check(
+            args.slither_text, pvl.load(args.conf)
+        )
 
     print(f"Mean_Jitter_Magnitude_Threshold: {thresh}")
     print(f"Average\tProcess \tFile Name")

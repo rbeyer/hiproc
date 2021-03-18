@@ -266,13 +266,14 @@ def main():
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    (ir_ratio, bg_ratio) = HiColorNorm(
-        args.cubes,
-        args.output,
-        pvl.load(args.conf),
-        make_unfiltered=args.Make_Unfiltered,
-        keep=args.keep,
-    )
+    with util.main_exceptions(args.verbose):
+        (ir_ratio, bg_ratio) = HiColorNorm(
+            args.cubes,
+            args.output,
+            pvl.load(args.conf),
+            make_unfiltered=args.Make_Unfiltered,
+            keep=args.keep,
+        )
 
     # Original Perl connects to HiCat to query the binning for CCDs
     #   and also whether there were furrows in the IR or BG components

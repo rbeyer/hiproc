@@ -48,7 +48,6 @@ Output Products:
 import argparse
 import logging
 import pkg_resources
-import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -120,7 +119,7 @@ def main():
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    try:
+    with util.main_exceptions(args.verbose):
         HiBeautify(
             args.cubes,
             pvl.load(args.conf),
@@ -128,12 +127,7 @@ def main():
             args.output_rgb,
             keep=args.keep
         )
-    except subprocess.CalledProcessError as err:
-        print("Had an ISIS error:")
-        print(" ".join(err.cmd))
-        print(err.stdout)
-        print(err.stderr)
-        raise err
+    return
 
 
 def HiBeautify(

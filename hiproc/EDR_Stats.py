@@ -33,7 +33,7 @@ Output Products:
 # Planetary Laboratory at the University of Arizona.
 #   - Orignal Perl program.
 #
-# Copyright 2020, Ross A. Beyer (rbeyer@seti.org)
+# Copyright 2020-2021, Ross A. Beyer (rbeyer@seti.org)
 #   - Elements of this Python program are are based on the original Perl
 #     but the logic here is rewritten from scratch to emulate functionality.
 #
@@ -152,9 +152,10 @@ def main():
     for i in args.img:
         out_p = util.path_w_suffix(args.output, i)
 
-        histats = EDR_Stats(
-            i, out_p, gainsinfo, args.histmin, args.histmax, keep=args.keep
-        )
+        with util.main_exceptions(args.verbose):
+            histats = EDR_Stats(
+                i, out_p, gainsinfo, args.histmin, args.histmax, keep=args.keep
+            )
 
         # DB stuff
         # for k, v in histats.items():

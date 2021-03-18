@@ -85,8 +85,6 @@ import os
 import pkg_resources
 import re
 import statistics
-import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -134,21 +132,12 @@ def main():
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    try:
+    with util.main_exceptions(args.verbose):
         successful_ccds = HiJitReg(
             args.cubes,
             pvl.load(args.conf),
             keep=args.keep
         )
-    except RuntimeError as err:
-        logger.critical("Unable to continue. " + str(err))
-        sys.exit()
-    except subprocess.CalledProcessError as err:
-        print("Had an ISIS error:")
-        print(" ".join(err.cmd))
-        print(err.stdout)
-        print(err.stderr)
-        raise err
 
     print("Successful CCDs are:")
     for c in successful_ccds:

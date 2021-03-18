@@ -59,9 +59,10 @@ class main_exceptions:
 
     """
 
-    def __init__(self, verbose=0, file=sys.stderr):
+    def __init__(self, verbose=0, file=sys.stderr, logger=None):
         self.verbose = verbose
         self.file = file
+        self.logger = logger
 
     def __enter__(self):
         return None
@@ -84,6 +85,12 @@ class main_exceptions:
                     return False
                 else:
                     sys.exit(exc_val.returncode)
+            if issubclass(exc_type, Warning):
+                if self.logger is None:
+                    print(exc_val, file=self.file)
+                else:
+                    self.logger.warning(exc_val)
+                return True
             else:
                 print(exc_val, file=self.file)
                 if self.verbose >= 2:

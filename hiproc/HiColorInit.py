@@ -51,7 +51,6 @@ Output Products:
 
 import argparse
 import logging
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -123,17 +122,9 @@ def main():
         )
         sys.exit()
 
-    try:
+    with util.main_exceptions(args.verbose):
         HiColorInit(args.cubes, args.output_suffix, keep=args.keep)
-    except ValueError as err:
-        logger.critical(err)
-        sys.exit()
-    except subprocess.CalledProcessError as err:
-        print("Had an ISIS error:")
-        print(" ".join(err.cmd))
-        print(err.stdout)
-        print(err.stderr)
-        raise err
+
     return
 
 

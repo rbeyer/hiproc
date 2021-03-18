@@ -46,7 +46,6 @@ import os
 import pkg_resources
 import re
 import shutil
-import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -118,7 +117,7 @@ def main():
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    try:
+    with util.main_exceptions(args.verbose):
         HiNoProj(
             args.cubes,
             pvl.load(args.conf),
@@ -126,14 +125,6 @@ def main():
             args.base_ccd_number,
             keep=args.keep,
         )
-    except ValueError as err:
-        print(err)
-    except subprocess.CalledProcessError as err:
-        print("Had an ISIS error:")
-        print(err.cmd)
-        print(err.stdout)
-        print(err.stderr)
-        raise err
     return
 
 

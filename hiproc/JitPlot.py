@@ -81,55 +81,56 @@ def main():
 
     conf = pvl.load(args.conf)
 
-    cubes = list(map(hicolor.HiColorCube, args.cubes))
-    (red4, red5, ir10, ir11, bg12, bg13) = hicolor.separate_ccds(cubes)
+    with util.main_exceptions(args.verbose):
+        cubes = list(map(hicolor.HiColorCube, args.cubes))
+        (red4, red5, ir10, ir11, bg12, bg13) = hicolor.separate_ccds(cubes)
 
-    plt.ioff()
-    fig, axes = plt.subplots(1, 4, sharex=True, sharey=True)
+        plt.ioff()
+        fig, axes = plt.subplots(1, 4, sharex=True, sharey=True)
 
-    axes[0].set_ylabel("Line")
-    fig.text(0.5, 0.04, "Error Magnitude (pixels)", ha="center", va="center")
+        axes[0].set_ylabel("Line")
+        fig.text(0.5, 0.04, "Error Magnitude (pixels)", ha="center", va="center")
 
-    for c, ax in zip([ir10, ir11, bg12, bg13], axes):
-        if c is None:
-            continue
+        for c, ax in zip([ir10, ir11, bg12, bg13], axes):
+            if c is None:
+                continue
 
-        logger.info(f"Working on {c}")
-        j = hjr.JitterCube(c, conf)
-        j.reset()
+            logger.info(f"Working on {c}")
+            j = hjr.JitterCube(c, conf)
+            j.reset()
 
-        (accepted, rejected, smoothed) = filter_and_smooth(j)
+            (accepted, rejected, smoothed) = filter_and_smooth(j)
 
-        ax.set_title(j.get_ccd())
-        size = 5
-        if len(accepted) > 0:
-            acceptA = np.array(accepted)
-            ax.scatter(
-                acceptA[:, 1],
-                acceptA[:, 0],
-                s=size,
-                label="Accepted",
-                facecolors="none",
-                edgecolors="black",
-            )
-        if len(rejected) > 0:
-            rejectedA = np.array(rejected)
-            ax.scatter(
-                rejectedA[:, 1],
-                rejectedA[:, 0],
-                c="red",
-                s=size,
-                label="Rejected",
-            )
-        if len(smoothed) > 0:
-            smoothedA = np.array(smoothed)
-            ax.scatter(
-                smoothedA[:, 1],
-                smoothedA[:, 0],
-                c="blue",
-                s=size,
-                label="Smoothed",
-            )
+            ax.set_title(j.get_ccd())
+            size = 5
+            if len(accepted) > 0:
+                acceptA = np.array(accepted)
+                ax.scatter(
+                    acceptA[:, 1],
+                    acceptA[:, 0],
+                    s=size,
+                    label="Accepted",
+                    facecolors="none",
+                    edgecolors="black",
+                )
+            if len(rejected) > 0:
+                rejectedA = np.array(rejected)
+                ax.scatter(
+                    rejectedA[:, 1],
+                    rejectedA[:, 0],
+                    c="red",
+                    s=size,
+                    label="Rejected",
+                )
+            if len(smoothed) > 0:
+                smoothedA = np.array(smoothed)
+                ax.scatter(
+                    smoothedA[:, 1],
+                    smoothedA[:, 0],
+                    c="blue",
+                    s=size,
+                    label="Smoothed",
+                )
     fig.suptitle(str(j.get_obsid()))
     bottom, top = plt.ylim()
     plt.ylim(top, bottom)

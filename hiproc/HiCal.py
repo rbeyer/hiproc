@@ -103,7 +103,6 @@ import logging
 import os
 import pkg_resources
 import statistics
-import subprocess
 import sys
 import warnings
 from datetime import datetime
@@ -269,7 +268,7 @@ def main():
         with open(db_path, "r") as f:
             db = json.load(f)
 
-        try:
+        with util.main_exceptions(args.verbose, logger=logger):
             if args.info:
                 print(f"HiCal Information for {c}:")
                 print("\n".join(norun_info(c, db, conf, args.bin2, args.bin4)))
@@ -291,19 +290,6 @@ def main():
                     json.dump(db, f, indent=0, sort_keys=True)
 
                 logger.info(f"Wrote {db_path}")
-
-        except UserWarning as err:
-            logger.warning(err)
-            continue
-        except ValueError as err:
-            logger.critical(err)
-            sys.exit()
-        except subprocess.CalledProcessError as err:
-            print("Had an ISIS error:")
-            print(" ".join(err.cmd))
-            print(err.stdout)
-            print(err.stderr)
-            raise err
 
     return
 
