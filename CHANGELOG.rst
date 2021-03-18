@@ -28,6 +28,15 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+Added
++++++
+- More complete documentation for the programs and their parameters.
+
+Changed
++++++++
+- Implemented better handling for configuration files so that they will get distributed with
+  the package.
+
 
 0.5.0 (2021-03-05)
 ------------------
