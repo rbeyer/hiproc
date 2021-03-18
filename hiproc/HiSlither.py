@@ -71,8 +71,6 @@ Output Products:
 import argparse
 import logging
 import math
-import subprocess
-import sys
 from datetime import datetime
 
 import kalasiris as isis
@@ -106,13 +104,8 @@ def main():
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    try:
+    with util.main_exceptions(args.verbose):
         HiSlither(args.cubes, keep=args.keep)
-    except subprocess.CalledProcessError as err:
-        print(util.isis_error_format(err), file=sys.stderr)
-        if args.verbose >= 2:
-            raise err
-        sys.exit(err.returncode)
     return
 
 

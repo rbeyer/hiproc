@@ -55,9 +55,7 @@ import logging
 import math
 import os
 import pkg_resources
-import subprocess
 import sys
-import traceback
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -206,7 +204,7 @@ def main():
         fp2 = set_file_path(outdir, fp2)
         fp3 = set_file_path(outdir, fp3)
 
-    try:
+    with util.main_exceptions(args.verbose):
         start(
             fp1,
             which1,
@@ -221,17 +219,6 @@ def main():
             plotsave=args.saveplot,
             writecsv=args.csv,
         )
-    except subprocess.CalledProcessError as err:
-        print(util.isis_error_format(err), file=sys.stderr)
-        if args.verbose >= 2:
-            raise err
-        sys.exit(err.returncode)
-    except Exception as err:
-        traceback.print_exc(file=sys.stderr)
-        print(err, file=sys.stderr)
-        if args.verbose >= 2:
-            raise err
-        sys.exit(1)
     return
 
 

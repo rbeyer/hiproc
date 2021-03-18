@@ -356,7 +356,7 @@ def main():
     for c in cubes:
         c.gather_from_db()
 
-    try:
+    with util.main_exceptions(args.verbose):
         (db, outpath) = HiccdStitch(
             cubes,
             args.output,
@@ -365,16 +365,6 @@ def main():
             args.eline,
             keep=args.keep,
         )
-    except subprocess.CalledProcessError as err:
-        print(util.isis_error_format(err), file=sys.stderr)
-        if args.verbose >= 2:
-            raise err
-        sys.exit(err.returncode)
-    except Exception as err:
-        print(err, file=sys.stderr)
-        if args.verbose >= 2:
-            raise err
-        sys.exit(1)
 
     db_path = util.path_w_suffix(args.db, outpath)
 

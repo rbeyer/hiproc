@@ -40,8 +40,6 @@ import argparse
 import itertools
 import logging
 import pkg_resources
-import subprocess
-import sys
 from pathlib import Path
 
 import pvl
@@ -121,7 +119,7 @@ def main():
         imgs = args.img
 
     db_list = None
-    try:
+    with util.main_exceptions(args.verbose):
         try:
             get_cubes(f"{oid}*balance.cub", parent)
         except FileNotFoundError:
@@ -149,11 +147,6 @@ def main():
 
             precision(oid, args.conf_dir, parent, hijack=jack, keep=args.keep)
 
-    except subprocess.CalledProcessError as err:
-        print(util.isis_error_format(err), file=sys.stderr)
-        if args.verbose >= 2:
-            raise err
-        sys.exit(err.returncode)
     return
 
 

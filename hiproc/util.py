@@ -20,6 +20,8 @@ import collections
 import logging
 import os
 import subprocess
+import sys
+import textwrap
 from pathlib import Path
 
 import hiproc
@@ -37,6 +39,59 @@ ch_width = (
     (17, 17, 17),  # Number of pixels to cut from pause point
     (-17, -17, -17),
 )
+
+
+class main_exceptions:
+    """This is a context manager that does the "standard handling"
+    of exceptions at the top level in the main() functions in all of
+    the programs in this library.  This is just a way to keep that code
+    in one place rather than having to repeat the identical try-except blocks
+    in each program.
+
+    Using this context manager will cause information about exceptions to
+    be printed to sys.stderr (or an alternate file-like of your choosing)
+    and may cause sys.exit() to be called.
+
+    Use it like this::
+
+     with util.main_exceptions(args.verbose):
+         isis.cubeit(fromlist=f, to='stacked.cub')
+
+    """
+
+    def __init__(self, verbose=0, file=sys.stderr):
+        self.verbose = verbose
+        self.file = file
+
+    def __enter__(self):
+        return None
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            if issubclass(exc_type, subprocess.CalledProcessError):
+                print(
+                    textwrap.dedent(
+                        f"""\
+                        Had a subprocess error:
+                        {' '.join(exc_val.cmd)}
+                        {exc_val.stdout}
+                        {exc_val.stderr}
+                        """
+                    ),
+                    file=self.file
+                )
+                if self.verbose >= 2:
+                    return False
+                else:
+                    sys.exit(exc_val.returncode)
+            else:
+                print(exc_val, file=self.file)
+                if self.verbose >= 2:
+                    return False
+                else:
+                    sys.exit(1)
+
+        return
 
 
 def parent_parser() -> argparse.ArgumentParser:
@@ -240,12 +295,3 @@ def pause_slicer(samp: int, width: int) -> slice:
         s_start = samp + width
         s_stop = samp
     return slice(s_start, s_stop)
-
-
-def isis_error_format(err: subprocess.CalledProcessError):
-    return (f"""\
-Had an ISIS Error:
-{' '.join(err.cmd)}
-{err.stdout}
-{err.stderr}
-""")

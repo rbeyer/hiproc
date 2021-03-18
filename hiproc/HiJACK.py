@@ -58,8 +58,6 @@ import logging
 import os
 import pkg_resources
 import shutil
-import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -131,7 +129,7 @@ def main():
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    try:
+    with util.main_exceptions(args.verbose):
         HiJACK(
             args.cubes,
             args.conf_dir,
@@ -140,16 +138,6 @@ def main():
             plot=args.plot,
             keep=args.keep,
         )
-    except ValueError as err:
-        print(err, file=sys.stderr)
-        if args.verbose >= 2:
-            raise err
-        sys.exit(1)
-    except subprocess.CalledProcessError as err:
-        print(util.isis_error_format(err), file=sys.stderr)
-        if args.verbose >= 2:
-            raise err
-        sys.exit(err.returncode)
     return
 
 

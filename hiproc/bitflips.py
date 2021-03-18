@@ -86,7 +86,6 @@ import logging
 import math
 import os
 import shutil
-import subprocess
 import sys
 from collections import abc
 from pathlib import Path
@@ -182,7 +181,7 @@ def main():
 
     out_p = util.path_w_suffix(args.output, args.file)
 
-    try:
+    with util.main_exceptions(args.verbose):
         clean(
             args.file,
             out_p,
@@ -194,18 +193,7 @@ def main():
             dryrun=args.dryrun,
             keep=args.keep,
         )
-
-        sys.exit(0)
-    except subprocess.CalledProcessError as err:
-        print(util.isis_error_format(err), file=sys.stderr)
-        if args.verbose >= 2:
-            raise err
-        sys.exit(err.returncode)
-    except Exception as err:
-        print(err, file=sys.stderr)
-        if args.verbose >= 2:
-            raise err
-        sys.exit(1)
+    sys.exit(0)
 
 
 def clean(
