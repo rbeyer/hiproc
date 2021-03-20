@@ -31,12 +31,8 @@ However, it does depend on the following:
 - scipy
 - matplotlib
 
-The HiJACK program also requires an external ``resolveJitter``
-program that has not been publicly released, but isn't that far
-off.  There is a MATLAB version that has the appropriate licensing,
-and there is a C++ version.  The C++ version could also be made to
-have the appropriate licensing, it just hasn't gone through a release
-process.  Maybe I'll write it in Python, too, and distribute it here.
+The HiJACK program also requires the ``resolveJitter`` program that
+is still buggy, and is not working reliably.
 
 Warning !
 ---------
@@ -61,47 +57,6 @@ These programs have been tested against their upstream Perl counterparts:
     so this is in flux.
 
 
-Details
--------
-The image processing pipelines that the HiRISE team operates
-internally to produce higher order products are more than just the
-'simple' programs available in ISIS.  Those processes that run in
-the HiRISE Operations Center (HiROC) are a complicated dance of
-primarily Perl and ISIS run by a custom job management system, all
-of which interacts with the HiRISE catalog (HiCat) database.
-
-This makes the HiROC system excellent for processing the Gigabytes
-of new data that arrive daily from Mars, and allows the team to
-perform massive reprocessing of the entire data set, as needed, and
-to produce on a large scale a variety of derived data products.
-
-However, that same complexity makes it difficult to reproduce exactly
-what that system is doing on a small scale.
-
-The programs here are meant to replicate the HiRISE processing chain
-on a local scale, so that individual algorithms and processes can
-be investigated, without needing a massive data processing system and
-lots of infrastructure.
-
-The programs here have similar names to HiRISE pipelines (hence the
-perhaps strange intercapped naming conventions), but only focus on
-the data processing.  The HiRISE pipeline programs do a lot of other
-tasks relevant to being part of a massive ground data system, and
-clearly, those functionalities aren't replicated here.
-
-The HiROC system begins by watching the MRO project's raw data server for
-new products with the ``FEI_Watchdog`` program, and then the HiDog pipeline
-fetches those products down to HiROC and the the EDRgen pipeline converts
-them into ``.img`` EDR products.
-
-Since that is the most basic form of the data available from the PDS, we
-will start there, and assume that you have downloaded a set of EDR ``.img``
-files from the PDS.
-
-As a final note, this library currently uses ``.json`` files to manage
-passing information between programs, instead of a relational database system.
-
-
 Contributing
 ------------
 
@@ -113,11 +68,12 @@ environment.
 Naming
 ------
 
-The ISIS software has a number of "proc" programs (`mocproc`,
-`thmproc`, etc.) that are meant to be run to process raw images
-to higher-level, more usable versions.  Naming this library `hiproc`
-is an echo to that, and while there is a `hiproc` program that is
-available, this library provides a great deal more.
+The ISIS software has a number of processing or "proc" programs
+(`mocproc`, `thmproc`, etc.) that are meant to be run to process
+raw images to higher-level, more usable versions.  Naming this
+library `hiproc` is an echo to that. There is a `hiproc` program
+that is available after installation that provides a streamlined
+one-stop-program, but this package provides a great deal more.
 
 
 .. _PlanetaryPy: https://github.com/planetarypy
