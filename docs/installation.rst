@@ -8,19 +8,28 @@ Installation
 .. Stable release
    --------------
 
-   To install hiproc, run this command in your terminal:
+To install hiproc, run this command in your terminal:
 
-   .. code-block:: console
+    .. code-block:: console
 
-       $ pip install hiproc
+        $ pip install hiproc
 
-   This is the preferred method to install hiproc, as it will always install the most recent stable release.
+This is the preferred method to install hiproc, as it will always
+install the most recent stable release.
 
-   If you don't have `pip`_ installed, this `Python installation guide`_ can guide
-   you through the process.
+However, hiproc depends on the Python gdal implementation, which has a C library
+requirement, and may not install properly if it is not present, and doesn't always
+smoothly install via pip alone.  If you have issues with hiproc installation, you
+may want to try installing the Python gdal separately or via conda, and then attempt
+to pip install hiproc again.
 
-   .. _pip: https://pip.pypa.io
-   .. _Python installation guide: http://docs.python-guide.org/en/latest/starting/installation/
+If you don't have `pip`_ installed, this `Python installation guide`_ can guide
+you through the process.
+
+Eventually I'll get a conda install going.
+
+.. _pip: https://pip.pypa.io
+.. _Python installation guide: http://docs.python-guide.org/en/latest/starting/installation/
 
 
 From sources
