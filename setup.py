@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 requirements = [
     "gdal>=3.0.1",
     "kalasiris>=1.8.0",
-    "matplotlib==3.2.1",
+    "matplotlib>=3.2.1",
     "numpy>=1.18.1",
     "pvl>=1.0.1",
     "scipy>=1.4.1"
