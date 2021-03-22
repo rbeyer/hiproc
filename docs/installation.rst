@@ -28,8 +28,18 @@ you through the process.
 
 Eventually I'll get a conda install going.
 
+This package depends on `kalasiris`_ which is just a wrapper around
+`ISIS`_, which has some complicated interactions with other
+environments.  You will need to install ISIS separately in another
+conda environment, and then review the strategies detailed in the
+kalasiris page on `ISIS Interaction`_ to ensure that you can get
+everything working.
+
 .. _pip: https://pip.pypa.io
 .. _Python installation guide: http://docs.python-guide.org/en/latest/starting/installation/
+.. _kalasiris: https://github.com/rbeyer/kalasiris
+.. _ISIS: https://isis.astrogeology.usgs.gov/
+.. _ISIS Interaction: https://kalasiris.readthedocs.io/en/latest/usage.html#isis-interaction
 
 
 From sources
