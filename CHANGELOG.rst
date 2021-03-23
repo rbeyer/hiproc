@@ -28,6 +28,17 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+0.6.1 (2021-03-23)
+------------------
+
+Added
++++++
+- lisfix will return a non-zero exit code if it chooses not to fix the input cube.
+
+Changed
++++++++
+- Updated documentation in various places.
+
 
 0.6.0 (2021-03-18)
 ------------------

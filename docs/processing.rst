@@ -23,11 +23,11 @@ be investigated, without needing a massive data processing system and
 lots of infrastructure.
 
 The programs here have similar names to HiRISE pipelines (hence the
-perhaps strange CamelCase naming conventions), but only focus on
-the data processing.  The HiRISE pipeline programs of the same name
-do a lot of other tasks relevant to being part of a massive ground
-data system, and clearly, those functionalities aren't replicated
-here.
+CamelCase naming conventions that aren't exactly Pythonic), but
+only focus on the data processing.  The HiRISE pipeline programs
+of the same name do a lot of other tasks relevant to being part of
+a massive ground data system, and clearly, those functionalities
+aren't replicated here.
 
 The HiROC system begins by watching the MRO project's raw data server for
 new products with the ``FEI_Watchdog`` program, and then the HiDog pipeline
