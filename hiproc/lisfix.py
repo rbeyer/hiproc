@@ -6,7 +6,9 @@ For a variety of reasons, but highlighted with the August 2020
 change of ADC settings, the HiRISE LUT process can clip the DN
 histogram resulting in good data in the image area, but mostly LIS
 values in the reverse-clock and buffer areas, which are crucial for
-calibration.
+calibration.  This program attempts to replace "missing" data in those
+areas with values derived from the ramp area, the dark area, and models
+of expected reverse-clock medians.
 """
 
 # Copyright 2020-2021, Ross A. Beyer (rbeyer@seti.org)
@@ -32,6 +34,7 @@ import argparse
 import logging
 import os
 import shutil
+import sys
 from collections import abc
 from pathlib import Path
 
@@ -69,10 +72,13 @@ def main():
     out_p = util.path_w_suffix(args.output, args.file)
 
     with util.main_exceptions(args.verbose):
-        fix(
+        fixed = fix(
             args.file,
             out_p,
         )
+
+    if not fixed:
+        sys.exit(f"{args.file} did not need lisfix cleaning.")
 
     return
 
