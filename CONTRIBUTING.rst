@@ -68,11 +68,23 @@ Ready to contribute? Here's how to set up `hiproc` for local development.
 
     $ git clone git@github.com:your_name_here/hiproc.git
 
-3. Install your local copy into a virtualenv. Assuming you have virtualenvwrapper installed, this is how you set up your fork for local development::
+3. Install your local copy into a virtualenv. Assuming you have
+   virtualenvwrapper installed, this is how you set up your fork for
+   local development::
 
     $ mkvirtualenv hiproc
     $ cd hiproc/
     $ python setup.py develop
+
+   If you are a conda user::
+
+    $ cd hiproc/
+    $ conda env create -n hiproc -f environment.yml
+    $ conda activate hiproc
+    $ pip install --no-deps -e .
+
+   The last `pip install` installs pvl in "editable" mode which facilitates
+   testing.
 
 4. Create a branch for local development::
 
@@ -106,9 +118,8 @@ Before you submit a pull request, check that it meets these guidelines:
 2. If the pull request adds functionality, the docs should be updated. Put
    your new functionality into a function with a docstring, and add the
    feature to the list in README.rst.
-3. The pull request should work for Python 3.5, 3.6, 3.7 and 3.8, and for PyPy. Check
-   https://travis-ci.org/rbeyer/hiproc/pull_requests
-   and make sure that the tests pass for all supported Python versions.
+3. The pull request should work for Python 3.5, 3.6, 3.7 and 3.8, and for PyPy.
+   Make sure that the tests pass for all supported Python versions.
 
 Tips
 ----
