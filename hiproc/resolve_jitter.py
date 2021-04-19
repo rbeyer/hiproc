@@ -335,8 +335,8 @@ Sample                 Line                   ET"""
     t_shift = [t1 - t0, t2 - t0, t3 - t0]
     jittercheckx_shift = [
         jittercheckx[0] + rh0["x1"],
-        jittercheckx[1] + rh0["x1"],
-        jittercheckx[2] + rh0["x1"],
+        jittercheckx[1] + rh0["x2"],
+        jittercheckx[2] + rh0["x3"],
     ]
     jitterchecky_shift = [
         jitterchecky[0] + rh0["y1"],
