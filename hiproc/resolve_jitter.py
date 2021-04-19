@@ -317,12 +317,12 @@ def start(
     jitter_p = outdir / (outprefix + "_jitter_py.txt")
     jitter_text = [
         f"""# Using image {oid} the jitter was found with an
-Average Error of {min_avg_error}
-Maximum Cross-track pixel smear {max_smear_sample}
-Maximum Down-track pixel smear {max_smear_line}
-Maximum Pixel Smear Magnitude {max_smear_mag}
-
-Sample                 Line                   ET"""
+# Average Error of {min_avg_error}
+# Maximum Cross-track pixel smear {max_smear_sample}
+# Maximum Down-track pixel smear {max_smear_line}
+# Maximum Pixel Smear Magnitude {max_smear_mag}
+#
+# Sample                 Line                   ET"""
     ]
     for s, l, e in zip(sample, line, nfftime):
         jitter_text.append(f"""{s}     {l}     {e}""")

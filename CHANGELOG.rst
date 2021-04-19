@@ -28,6 +28,11 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+Fixed
++++++
+- resolve_jitter output header lines properly commented, now doesn't bomb HiJACK's run
+  of hijitter.
+
 0.6.1 (2021-03-23)
 ------------------
 
