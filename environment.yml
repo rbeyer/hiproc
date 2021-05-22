@@ -1,0 +1,28 @@
+# This is the environment.yml file to use in order to get set up to develop
+# with conda.  Would be nice if this file and the standard requirements.txt
+# could somehow be combined.
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - bump2version
+  - cookiecutter
+  - flake8
+  - pypy3.6
+  - python=3.6
+  - pytest
+  - pytest-cov
+  - sphinx
+  - sphinxcontrib
+  - sphinxcontrib-apidoc
+  - sphinxcontrib-autoprogram
+  - tox
+  - twine
+# Dependencies above are kind of standard Python development tools
+# below are those specific to hiproc
+  - gdal>=3.0.1
+  - kalasiris>=1.8.0
+  - matplotlib
+  - numpy
+  - pvl>=1.0.1
+  - scipy
