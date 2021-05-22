@@ -21,6 +21,23 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
 
+try:
+    import kalasiris
+except KeyError as err:
+    # print(err)
+    if "'ISISROOT'" == str(err):
+        print('Not running in an ISIS enabled environment.')
+        print('Using fakeISISROOT/ to build the docs.')
+        # Use the fake ISISROOT
+        os.environ['ISISROOT'] = 'fakeISISROOT'
+        os.environ['ISISDATA'] = 'fakeISISROOT'
+        # Since we aren't actually going to run the programs in
+        # this case, the code should never need ISIS3DATA, so it
+        # shouldn't matter what it is set to.
+        import kalasiris
+    else:
+        raise
+
 import hiproc
 
 
