@@ -605,10 +605,15 @@ def HiJACK(
 
     jitterck_p = outdir_p / (str(cubes[0].get_obsid()) + ".jittery.bc")
 
-    hijitregdef_p = (
-        Path(os.environ["ISIS3DATA"])
-        / "mro/calibration/hijitreg.p1745.s3070.def"
-    )
+    try:
+        datadir = Path(os.environ["ISISDATA"])
+    except KeyError:
+        try:
+            datadir = Path(os.environ["ISIS3DATA"])
+        except KeyError:
+            raise KeyError("Neither ISISDATA nor ISIS3DATA are in os.environ.")
+
+    hijitregdef_p = (datadir / "mro/calibration/hijitreg.p1745.s3070.def")
 
     # inlist_p = to_del.add(isis.fromlist.make(inlist,
     #                                          (outdir_p /
