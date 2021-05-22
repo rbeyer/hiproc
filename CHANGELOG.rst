@@ -28,10 +28,16 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+Added
++++++
+- Improved documentation
+- environment.yml for conda development
+
 Fixed
 +++++
 - resolve_jitter output header lines properly commented, now doesn't bomb HiJACK's run
   of hijitter.
+- now, additionally supporting ISIS 4.1.1 through 5.0.0
 
 0.6.1 (2021-03-23)
 ------------------

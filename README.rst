@@ -2,6 +2,10 @@
 hiproc
 ======
 
+.. image:: https://img.shields.io/pypi/v/hiproc.svg
+        :target: https://pypi.python.org/pypi/hiproc
+        :alt: PyPI version
+
 
 A library to help process HiRISE EDRs with ISIS.
 
@@ -55,6 +59,17 @@ These programs have been tested against their upstream Perl counterparts:
     applied, so it is commented out here.  We're also working
     to integrate the bitflip cleaning into the upstream Perl,
     so this is in flux.
+
+- HiStitch: not verified
+- HiccdStitch: not verified
+- HiColorInit: not verified
+- HiJitReg: not verified
+- HiSlither: not verified
+- HiColorNorm: not verified
+- HiBeautify: not verified
+- HiPrecisionInit: not verified
+- HiNoProj: not verified
+- HiJACK: not verified
 
 
 Contributing

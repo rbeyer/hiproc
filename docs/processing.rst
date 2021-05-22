@@ -67,7 +67,10 @@ In general, the initial flow is always the same:
 
 At this point, you will have "stitched" and "balance" files for
 each CCD.  Depending on what your goals are for processing, you
-could stop here.  However, if you want to create color mosaics, or
+could stop here.  You can also get to this point via just using
+``hiproc`` which runs the above four steps.
+
+However, if you want to create color mosaics, or
 engage the "high precision" processing, a few more steps are needed:
 
 5. ``HiColorInit``
@@ -85,11 +88,15 @@ these steps
 * ``HiBeautify``
 
 After running these steps, you will have IRB and RGB mosaics of the central color
-HiRISE CCDs.
+HiRISE CCDs.  Alternately, you can just run ``hiproc -c`` which runs all of the above
+steps from scratch, or just the additional steps needed, if you've already run plain
+``hiproc``.
 
 For "precision" processing, do the following:
 
 * ``HiPrecisionInit`` to determine if you need to run HiJACK or just HiNoProj
-* ``HiNoProj`` or ``HiJACK`` - HiJACK currently has issues, because the Python version of ``resolve_jitter`` isn't
-  working yet.
+* ``HiNoProj`` or ``HiJACK``
 
+Alternately, you can just run ``hiproc -p`` (or ``hiproc -j`` if you want to force
+HiJACK processing), which does the above from scratch, or just the additional steps
+needed, if you've already run hiproc to produce basic or color products.
