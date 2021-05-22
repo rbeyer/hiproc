@@ -511,7 +511,7 @@ def plot_flats(pre_flat, dejit_flat):
 
     plt.ioff()
     fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True)
-    fig.suptitle(f"Jitter Corrected Offsets")
+    fig.suptitle("Jitter Corrected Offsets")
 
     ax0.set_ylabel("Sample Offsets (pixels)")
     ax0.scatter(pre_time, (pre_samp - pre_regs), label=pre_flat)
@@ -713,6 +713,6 @@ def HiJACK(
         red_flat_files.unlink()
         to_del.unlink()
 
-    logger.info(f"HiJACK done")
+    logger.info("HiJACK done")
 
     return

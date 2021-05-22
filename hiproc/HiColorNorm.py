@@ -364,7 +364,7 @@ def HiColorNorm(
             )
             mask_list.append(tmp_p)
 
-        c.final_path = c.path.with_suffix(f".HiColorNorm.cub")
+        c.final_path = c.path.with_suffix(".HiColorNorm.cub")
         isis.cubeit_k(mask_list, to=c.final_path)
 
         (cubes[i].mask_path["IR"], cubes[i].crop_path["IR"]) = per_color(
@@ -400,7 +400,7 @@ def HiColorNorm(
                 c.crop_path[cc].unlink()
                 c.nrm_path[cc].unlink()
 
-    logger.info(f"HiColorNorm done.")
+    logger.info("HiColorNorm done.")
     return ir_ratio_stddev, bg_ratio_stddev
 
 

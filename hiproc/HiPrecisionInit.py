@@ -91,7 +91,7 @@ def main():
         )
 
     print(f"Mean_Jitter_Magnitude_Threshold: {thresh}")
-    print(f"Average\tProcess \tFile Name")
+    print("Average\tProcess \tFile Name")
     for a, j, s in zip(averages, hijack, args.slither_text):
         print("{:.2}\t{}\t{}".format(
             a, "HiJACK  " if j else "HiNoProj", s

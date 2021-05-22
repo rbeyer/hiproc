@@ -320,7 +320,7 @@ class ChannelID(CCDID):
             try:
                 chan = self.format_chan(maybechan)
             except ValueError as err:
-                raise ValueError(f"The last item, " + str(err))
+                raise ValueError("The last item, " + str(err))
 
             if len(items) == 1:
                 if isinstance(items[0], CCDID):
