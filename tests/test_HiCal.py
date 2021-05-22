@@ -25,6 +25,7 @@ from unittest.mock import patch
 import pvl
 
 import kalasiris as isis
+import kalasiris.version as isisversion
 import hiproc.hirise as hirise
 import hiproc.EDR_Stats as edr
 import hiproc.HiCal as hc
@@ -186,12 +187,18 @@ class TestBasic(unittest.TestCase):
         )
 
     def test_getHistVal(self):
+
+        if tuple(isisversion.version_info()[:3]) < (4, 3, 0):
+            col = "DN"
+        else:
+            col = "MaxExclusive"
+
         histogram = isis.Histogram(
-            """Total Pixels:    2048000
+            f"""Total Pixels:    2048000
 Null Pixels:     0
 Lis Pixels:      0
 
-DN,Pixels,CumulativePixels,Percent,CumulativePercent
+{col},Pixels,CumulativePixels,Percent,CumulativePercent
 3889,1,1,4.88281e-05,4.88281e-05
 3924,1,2,4.88281e-05,9.76563e-05
 3960,2,4,9.76563e-05,0.000195313
@@ -559,7 +566,7 @@ class TestHiCal(unittest.TestCase):
             bin4=False,
             keep=False,
         )
-        print(db)
+        # print(db)
         self.assertAlmostEqual(
             db["HIGH_PASS_FILTER_CORRECTION_STANDARD_DEVIATION"],
             0.00204738,

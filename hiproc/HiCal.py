@@ -100,6 +100,7 @@ import copy
 import csv
 import json
 import logging
+import math
 import os
 import pkg_resources
 import statistics
@@ -111,6 +112,7 @@ from pathlib import Path
 import numpy as np
 
 import kalasiris as isis
+import kalasiris.version as isisversion
 import pvl
 
 import hiproc.bitflips as bf
@@ -1517,7 +1519,10 @@ def getHistVal(histogram: isis.Histogram, conf: dict) -> tuple:
 
     for row in histogram:
         if float(row.CumulativePercent) > cumper:
-            maxval = float(row.DN)
+            if tuple(isisversion.version_info()[:3]) < (4, 3, 0):
+                maxval = float(row.DN)
+            else:
+                maxval = math.floor(float(row.MaxExclusive))
             break
 
     if maxval is None:
@@ -1899,7 +1904,7 @@ def Hidestripe(
     diff_pvl = pvl.loads(isis.stats(diff_cube).stdout)["Results"]
     try:
         stddev = float(diff_pvl["StandardDeviation"])
-    except KeyError as err:
+    except (KeyError, ValueError) as err:
         if int(diff_pvl["ValidPixels"]) <= 0:
             raise KeyError(
                 "There is no StandardDeviation computed from "
