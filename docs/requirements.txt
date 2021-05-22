@@ -1,6 +1,6 @@
 sphinxcontrib-apidoc
 sphinxcontrib-autoprogram
-gdal==3.2.1
+gdal==2.2.3
 kalasiris>=1.8.0
 matplotlib>=3.2.1
 numpy>=1.18.1
