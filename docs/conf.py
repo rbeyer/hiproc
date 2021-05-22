@@ -40,6 +40,7 @@ except KeyError as err:
 
 import hiproc
 
+autodoc_mock_imports = ["_gdal_array", ]
 
 # -- General configuration ---------------------------------------------
 
