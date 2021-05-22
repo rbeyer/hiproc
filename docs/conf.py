@@ -23,8 +23,6 @@ sys.path.insert(0, os.path.abspath('..'))
 
 import hiproc
 
-autodoc_mock_imports = ['gdal', ]
-
 # -- General configuration ---------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
