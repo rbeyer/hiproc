@@ -69,6 +69,14 @@ These programs have been tested against their upstream Perl counterparts:
 - HiNoProj: not verified
 - HiJACK: not verified
 
+Documentation
+-------------
+For the moment, this README, the `Installation
+<https://github.com/rbeyer/hiproc/blob/main/docs/installation.rst>`_, and
+`Processing <https://github.com/rbeyer/hiproc/blob/main/docs/processing.rst>`_
+documents are a minimal online set.  Each command-line program is self-documenting
+via its `-h` option (and there are lots of docstrings in the code).
+
 
 Contributing
 ------------
