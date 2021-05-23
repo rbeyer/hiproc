@@ -49,12 +49,12 @@ Output Products:
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This Python program is based on EDR_Stats version 2.17.0 (2020/08/11)
-# and on the Perl EDR_Stats program ($Revision: 1.41 $
-#                                    $Date: 2020/08/11 14:28:13 $)
+# This Python program is based on EDR_Stats version 2.18.2 (2021/04/09)
+# and on the Perl EDR_Stats program ($Revision: 1.44 $
+#                                    $Date: 2021/04/09 22:56:18 $
 # and on the check_lut.pm program (2.4, 2020/04/28)
-# by Eric Eliason, Audrie Fennema, and R. King as employees of the University
-# of Arizona.
+# by Eric Eliason, Audrie Fennema, R. King, and Richard Leis as employees of
+# the University of Arizona.
 
 import argparse
 import hashlib
@@ -249,6 +249,7 @@ def parse_histat(pvltext: str) -> dict:
     d["CAL_REVERSE_STANDARD_DEVIATION"] = p["CAL_REVERSE"]["StandardDeviation"]
     d["CAL_REVERSE_MINIMUM"] = p["CAL_REVERSE"]["Minimum"]
     d["CAL_REVERSE_MAXIMUM"] = p["CAL_REVERSE"]["Maximum"]
+    d["CAL_REVERSE_LIS"] = p["CAL_REVERSE"]["LisPixels"]
 
     # Calibration Mask Statistics
     d["CAL_MASK_MEAN"] = p["CAL_MASK"]["Average"]
@@ -275,6 +276,7 @@ def parse_histat(pvltext: str) -> dict:
     ]
     d["IMAGE_BUFFER_MINIMUM"] = p["IMAGE_BUFFER"]["Minimum"]
     d["IMAGE_BUFFER_MAXIMUM"] = p["IMAGE_BUFFER"]["Maximum"]
+    d["IMAGE_BUFFER_LIS"] = p["IMAGE_BUFFER"]["LisPixels"]
 
     # Calibration Image Dark Reference
     d["CAL_DARK_MEAN"] = p["CAL_DARK"]["Average"]
@@ -287,6 +289,7 @@ def parse_histat(pvltext: str) -> dict:
     d["CAL_BUFFER_STANDARD_DEVIATION"] = p["CAL_BUFFER"]["StandardDeviation"]
     d["CAL_BUFFER_MINIMUM"] = p["CAL_BUFFER"]["Minimum"]
     d["CAL_BUFFER_MAXIMUM"] = p["CAL_BUFFER"]["Maximum"]
+    d["CAL_BUFFER_LIS"] = p["CAL_BUFFER"]["LisPixels"]
 
     # Calibration Dark Ramp Area
     d["CAL_DARK_RAMP_MEAN"] = p["CAL_DARK_RAMP"]["Average"]
