@@ -21,9 +21,7 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
 
-autodoc_mock_imports = [
-    "gdal", "kalasiris", "matplotlib", "numpy", "pvl", "scipy"
-]
+autodoc_mock_imports = ["gdal"]
 
 # try:
 #     import kalasiris
