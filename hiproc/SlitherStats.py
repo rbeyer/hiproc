@@ -22,10 +22,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on HiColor version 5.4.3 (2020/04/28),
-# the SlitherStats Perl program ($Revision: 1.8 $ $Date: 2020/04/28 16:56:17 $)
+# This program is based on HiColor version 5.4.5 (2021/03/02),
+# the SlitherStats Perl program ($Revision: 1.9 $ $Date: 2021/03/02 20:21:50 $)
 # and on the Octave program
-# readSlitherPolyfit_octave.m ($Id: v 1.5 2020/02/14 23:35:23 $)
+# readSlitherPolyfit_octave.m ($Id: v 1.6 2021/03/02 21:35:38)
 # by Sarah Sutton and Audrie Fennema as employees of the University of Arizona.
 
 import argparse
