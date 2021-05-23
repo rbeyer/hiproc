@@ -35,8 +35,6 @@ However, it does depend on the following:
 - scipy
 - matplotlib
 
-The HiJACK program also requires the ``resolveJitter`` program that
-is still buggy, and is not working reliably.
 
 Warning !
 ---------
