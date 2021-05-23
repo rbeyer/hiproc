@@ -33,11 +33,18 @@ Added
 - Improved documentation
 - environment.yml for conda development
 
+Changed
++++++++
+- Incorporated changes from upstream to HiCal to make bitflip and lisfix settings
+  on by default.
+
 Fixed
 +++++
 - resolve_jitter output header lines properly commented, now doesn't bomb HiJACK's run
   of hijitter.
 - now, additionally supporting ISIS 4.1.1 through 5.0.0
+- Upstream addressed a bug in analyze_cubenorm_stats() that we had noticed,
+  so now fixed here, too.
 
 0.6.1 (2021-03-23)
 ------------------
