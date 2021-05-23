@@ -52,11 +52,9 @@ These programs have been tested against their upstream Perl counterparts:
 - EDR_Stats: Verified!
     Really just runs ``hi2isis`` so no surprise here.
 
-- HiCal: Verified. (if ``HiGainFx()`` enabled)
-    Upstream is undergoing change.  HiGainFx really shouldn't be
-    applied, so it is commented out here.  We're also working
-    to integrate the bitflip cleaning into the upstream Perl,
-    so this is in flux.
+- HiCal: Verified.
+    Upstream is undergoing change, needs to be re-verified once upstream
+    settles down.
 
 - HiStitch: not verified
 - HiccdStitch: not verified

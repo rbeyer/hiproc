@@ -313,7 +313,8 @@ class TestNeedCubenormStatsFile(unittest.TestCase):
 
     def test_analyze_cubenorm_stats(self):
         self.assertEqual(
-            (3349.2, 9486.4), hc.analyze_cubenorm_stats(self.statsfile, 2)
+            (2901.0, 10491.599999999999),
+            hc.analyze_cubenorm_stats(self.statsfile, 2)
         )
 
     @patch("hiproc.HiCal.isis.cubenormfile.DictWriter")

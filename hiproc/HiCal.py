@@ -6,13 +6,6 @@ reproduced here:
 
 - Perform a radiometric calibration correction and conversion to "I/F" units
   using the ISIS ``hical`` program.
-- As part of the radiometric calibration, the current pipeline implementation
-  applies a separate gain line-drift correction, referred to as HiGainFx.
-  This original line-drift correction is used in lieu of the correction found
-  in the current ISIS "hical" program, but it has been de-activated here,
-  because it was running 'in addition to' and not 'instead of' the correction
-  in ``hical``.  Also, the current ``hical`` does a more rigorous correction
-  than the early HiGainFx.
 - Perform furrow correction. The image columns at the channel join
   are checked for furrows. Pixels in the furrow region (at the channel
   join) whose DN values have gone above a threshold are set to the
@@ -87,11 +80,11 @@ Output Products:
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on HiCal version 3.4.6 (2020/06/02),
-# and on the Perl HiCal program ($Revision: 1.54 $
-#                                $Date: 2020/04/28 17:48:59 $)
-# and on the Perl NoiseFilter program ($Revision: 1.18
-#                                      $Date: 2020/06/02 17:51:26 $)
+# This program is based on HiCal version 4.1.1 (2021/05/03),
+# and on the Perl HiCal program ($Revision: 1.58 $
+#                                $Date: 2021/05/03 22:33:55 $)
+# and on the Perl NoiseFilter program ($Revision: 1.19
+#                                      $Date: 2021/04/22 22:38:39 $)
 # by Eric Eliason and Richard Leis as employees of the University of Arizona.
 
 import argparse
@@ -159,19 +152,26 @@ def arg_parser():
         "--bitflipwidth",
         required=False,
         type=int,
-        default=0,
+        default=None,
         help="The number of medstd widths for bit-flip cleaning. Leaving it "
-             "as zero implies no bit-flip cleaning. Default: %(default)s",
+             "unset will result in the setting being determined by the value "
+             "of LIS_Mask in the configuration file.  Explicitly setting it to "
+             "zero implies no bit-flip cleaning and will use the old "
+             "ANALYZECUBENORMSTATS behavior. Explicitly setting it to 5 is "
+             "identical to the BITFLIPS setting.",
     )
     parser.add_argument(
         "-t",
         "--lis_tolerance",
         type=float,
-        default=1,
+        default=None,
         help="If the fraction of LIS pixels in each of the Reverse-Clock and "
              "Buffer areas are higher than this value, lis-fix processing "
-             "will occur for that area. Leaving it as 1.0 indicates that "
-             "no lis-fix correction will be made. Default: %(default)s",
+             "will occur for that area. Leaving it unset will result in "
+             "the value being determined by the value of LIS_Fix in the "
+             "configuration fie.  Explicitly setting it to 0.4 is the same "
+             "as LIS_Fix = TRUE, and explicitly setting it to 1.0 is the "
+             "same as LIS_Fix = FALSE."
     )
     # parser.add_argument('--hgfconf', required=False, default='HiGainFx.conf')
     parser.add_argument(
@@ -262,6 +262,14 @@ def main():
     except (TypeError, NotADirectoryError, FileNotFoundError) as err:
         logger.critical(err)
         sys.exit()
+
+    if args.bitflipwidth is None:
+        d = {"ANALYZECUBENORMSTATS": 0, "BITFLIPS": 5}
+        args.bitflipwidth = d[conf["LIS_Mask"]]
+
+    if args.lis_tolerance is None:
+        d = {True: 0.4, False: 1.0}
+        args.lis_tolerance = d[conf["LIS_Fix"]]
 
     for c in args.cube:
         # The original Perl Setup02() read from the HiCat.EDR_Products
@@ -1073,7 +1081,7 @@ def mask(
         )
     else:
         # The analyze_cubenorm_stats() function is meant to make sure we
-        # don't blow away valid data, with the philosphy that it is better to
+        # don't blow away valid data, with the philosophy that it is better to
         # let in a little bad data in order to keep the good.  However, in
         # images with a high percentage of LIS%, there is so much bad that it
         # swamps the good, so *this* approach attempts to find the median
@@ -1140,20 +1148,8 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
             min_w_maxvp.append(mi)
             max_w_maxvp.append(ma)
 
-    # The original Perl code sorts these min and max_w_maxvp arrays,
-    # but then ignores this sorting by not using the sorted arrays.
-    # I believe this to be an error:
-    logger.warning(
-        "Original Perl issue: ignores sorting of valid points results in "
-        "masking the wrong range of pixels if noise-filtering."
-    )
-
-    # For example, with test data, this function returns: (3349.2, 9486.4)
-    # If sorted correctly, the result is: (2901.0, 10491.599999999999)
-
-    # To correct this, just uncomment these two lines:
-    # min_w_maxvp.sort()
-    # max_w_maxvp.sort()
+    min_w_maxvp.sort()
+    max_w_maxvp.sort()
 
     mindn = min_w_maxvp[int((len(min_w_maxvp) - 1) * 0.05)]
     maxdn = max_w_maxvp[int((len(max_w_maxvp) - 1) * 0.95)]
