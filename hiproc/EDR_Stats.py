@@ -57,6 +57,7 @@ Output Products:
 # the University of Arizona.
 
 import argparse
+import concurrent.futures
 import hashlib
 import json
 import logging
@@ -64,9 +65,10 @@ import math
 import os
 import pkg_resources
 import sys
+from itertools import repeat
 from pathlib import Path
 
-import pvl
+import pvl.new as pvl  # Need the new PVL objects, which are pickleable.
 import kalasiris as isis
 
 import hiproc.hirise as hirise
@@ -127,6 +129,16 @@ def arg_parser():
              "EDR_Stats_gains_config.pvl distributed with the library.",
     )
     parser.add_argument(
+        "--max_workers",
+        default=None,
+        type=int,
+        help="If more than one image is provided to work on, this program "
+             "will engage multiprocessing to parallelize the work.  This "
+             "multiprocessing will default to the number of processors on the "
+             "machine.  If you want to throttle this to use less resources on "
+             "your machin, indicate the number of processors you want to use."
+    )
+    parser.add_argument(
         "img",
         metavar="some.img-file",
         nargs="+",
@@ -140,33 +152,73 @@ def main():
 
     util.set_logger(args.verbose, args.logfile, args.log)
 
-    if len(args.img) > 1 and not args.output.startswith("."):
-        logger.critical(
-            "With more than one input IMG file, the --output must start with "
-            f"a period, and it does not: {args.output}"
-        )
-        sys.exit()
+    if len(args.img) > 1:
+        if not args.output.startswith("."):
+            logger.critical(
+                "With more than one input IMG file, the --output must start "
+                f"with a period, and it does not: {args.output}"
+            )
+            sys.exit()
+
+        if not args.db.startswith("."):
+            logger.critical(
+                "With more than one input IMG file, the --db must start with "
+                f"a period, and it does not: {args.db}"
+            )
+            sys.exit()
 
     gainsinfo = pvl.load(args.gains)
 
-    for i in args.img:
-        out_p = util.path_w_suffix(args.output, i)
-
-        with util.main_exceptions(args.verbose):
-            histats = EDR_Stats(
-                i, out_p, gainsinfo, args.histmin, args.histmax, keep=args.keep
+    with util.main_exceptions(args.verbose):
+        if len(args.img) == 1:
+            # No need to fire up the multiprocessing for just one image.
+            db_path = write_json(
+                EDR_Stats(
+                    args.img[0],
+                    util.path_w_suffix(args.output, args.img[0]),
+                    gainsinfo,
+                    args.histmin,
+                    args.histmax,
+                    keep=args.keep
+                ),
+                args.db,
+                args.img[0],
             )
-
-        # DB stuff
-        # for k, v in histats.items():
-        #     print(f'{k}: {v}')
-        db_path = util.path_w_suffix(args.db, i)
-
-        with open(db_path, "w") as f:
-            json.dump(histats, f, indent=0, sort_keys=True)
-
-        logger.info(f"Wrote {db_path}")
+            logger.info(f"Wrote {db_path}")
+        else:
+            with concurrent.futures.ProcessPoolExecutor(
+                max_workers=args.max_workers
+            ) as executor:
+                for img, histats, in zip(args.img, executor.map(
+                    EDR_Stats,
+                    args.img,
+                    map(util.path_w_suffix, repeat(args.output), args.img),
+                    repeat(gainsinfo),
+                    repeat(args.histmin),
+                    repeat(args.histmax),
+                    repeat(args.keep),
+                )):
+                    db_path = write_json(histats, args.db, img)
+                    logger.info(f"Wrote {db_path}")
     return
+
+
+def write_json(d: dict, outpath: str, template_path: os.PathLike) -> Path:
+    """
+    Writes out a Python dict as JSON to *outpath*.
+
+    :param d: Python dictionary to serialize to a JSON file.
+    :param outpath: If it starts with a "." assume it is a suffix that
+        should be swapped with the suffix on *img* to get the output filename,
+        otherwise use as an outpath.
+    :param template_path: Pathlike that could have its suffix replaced.
+    """
+    json_path = util.path_w_suffix(outpath, template_path)
+
+    with open(json_path, "w") as f:
+        json.dump(d, f, indent=0, sort_keys=True)
+
+    return json_path
 
 
 def EDR_Stats(
@@ -177,11 +229,17 @@ def EDR_Stats(
     histmax=99.99,
     keep=False,
 ) -> dict:
-    logger.info(f"EDR_Stats start: {img}")
+    cid = hirise.get_ChannelID_fromfile(img)
+
+    logger.info(f"{cid}: EDR_Stats start: {img}")
     try:
-        logger.info("The LUT for this file is: " + str(check_lut(img)))
+        logger.info(
+            f"{cid}: The LUT for this file is: " + str(check_lut(img))
+        )
     except KeyError as err:
-        logger.error("The LUT header area is either corrupted or has a gap.")
+        logger.error(
+            f"{cid}: The LUT header area is either corrupted or has a gap."
+        )
         raise err
 
     # Convert to .cub
@@ -215,17 +273,17 @@ def EDR_Stats(
 
     histats["STD_DN_LEVELS"] = get_dncnt(out_path, histmin, histmax, keep=keep)
     histats["IMAGE_SIGNAL_TO_NOISE_RATIO"] = calc_snr(
-        out_path, gainsinfo, histats
+        out_path, gainsinfo, histats, cid=cid
     )
     histats["GAP_PIXELS_PERCENT"] = (
         histats["GAP_PIXELS"]
         / (int(histats["IMAGE_LINES"]) * int(histats["LINE_SAMPLES"]))
     ) * 100.0
 
-    tdi_bin_check(out_path, histats)
+    tdi_bin_check(out_path, histats, cid=cid)
     lut_check(out_path, histats)
 
-    logger.info(f"EDR_Stats done: {out_path}")
+    logger.info(f"{cid}: EDR_Stats done: {out_path}")
     return histats
 
 
@@ -318,7 +376,7 @@ def get_dncnt(cub: os.PathLike, hmin=0.01, hmax=99.99, keep=False) -> int:
     # that are within the boundaries, not the number of DN.
     # And the # of bins is automatically computed by isis.hist,
     # so could be different for each cube.
-    logger.info(get_dncnt.__doc__)
+    # logger.info(get_dncnt.__doc__)
 
     histfile = Path(cub).with_suffix(".hist")
     if not histfile.is_file():
@@ -336,11 +394,14 @@ def get_dncnt(cub: os.PathLike, hmin=0.01, hmax=99.99, keep=False) -> int:
     return count
 
 
-def calc_snr(cub: os.PathLike, gainsinfo: dict, histats: dict) -> float:
+def calc_snr(
+    cub: os.PathLike, gainsinfo: dict, histats: dict, cid=None
+) -> float:
     """Calculate the signal to noise ratio."""
-    logger.info(calc_snr.__doc__)
+    if cid is None:
+        cid = hirise.get_ChannelID_fromfile(cub)
+    # logger.info(f"{cid}: " + calc_snr.__doc__)
 
-    cid = hirise.get_ChannelID_fromfile(cub)
     ccdchan = f"{cid.get_ccd()}_{cid.channel}"
 
     # gainspvl = pvl.load(str(gainsfile))
@@ -359,12 +420,12 @@ def calc_snr(cub: os.PathLike, gainsinfo: dict, histats: dict) -> float:
     if 0 == lis_pixels and img_mean > 0.0 and buf_mean > 0.0:
         s = (img_mean - buf_mean) * gain
         snr = s / math.sqrt(s + r * r)
-        logger.info("Calculation of Signal/Noise Ratio:")
-        logger.info("\tIMAGE_MEAN:        {}".format(img_mean))
-        logger.info("\tIMAGE_BUFFER_MEAN: {}".format(buf_mean))
-        logger.info("\tR (electrons/DN):  {}".format(r))
-        logger.info("\tGain:              {}".format(gain))
-        logger.info("Signal/Noise ratio: {}".format(snr))
+        logger.info(f"{cid}: Calculation of Signal/Noise Ratio:")
+        logger.info(f"{cid}: \tIMAGE_MEAN:        {img_mean}")
+        logger.info(f"{cid}: \tIMAGE_BUFFER_MEAN: {buf_mean}")
+        logger.info(f"{cid}: \tR (electrons/DN):  {r}")
+        logger.info(f"{cid}: \tGain:              {gain}")
+        logger.info(f"{cid}: Signal/Noise ratio: {snr}")
 
     return snr
 
@@ -372,7 +433,7 @@ def calc_snr(cub: os.PathLike, gainsinfo: dict, histats: dict) -> float:
 def check_lut(img: os.PathLike):
     """Checks whether a stored look up table (LUT) matches a known LUT."""
     # Original author of this function was Robert King, in December 2006.
-    logger.info(check_lut.__doc__)
+    # logger.info(check_lut.__doc__)
 
     img_pvl = pvl.load(str(img))
     lut_type = img_pvl["INSTRUMENT_SETTING_PARAMETERS"][
@@ -482,22 +543,29 @@ def check_lut(img: os.PathLike):
     return None
 
 
-def tdi_bin_check(cube: os.PathLike, histats: dict):
+def tdi_bin_check(cube: os.PathLike, histats: dict, cid=None):
     """This function only logs warnings and returns nothing."""
+
+    if cid is None:
+        try:
+            cid = histats['PRODUCT_ID']
+        except KeyError:
+            cid = hirise.get_ChannelID_fromfile(cube)
 
     # TDI and binning check
     if float(histats["IMAGE_MEAN"]) >= 8000:
         logger.warning(
-            "Channel mean greater than 8000 (TDI or binning too high)."
+            f"{cid}: "
+            f"Channel mean greater than 8000 (TDI or binning too high)."
         )
     elif float(histats["IMAGE_MEAN"]) < 2500:
         tdi = isis.getkey_k(cube, "Instrument", "Tdi")
         if tdi == "32" or tdi == "64":
-            logger.warning("TDI too low.")
+            logger.warning(f"{cid}: TDI too low.")
     return
 
 
-def lut_check(cube: os.PathLike, histats: dict):
+def lut_check(cube: os.PathLike, histats: dict, cid=None):
     # LUT check
     lut = int(isis.getkey_k(cube, "Instrument", "LookupTableNumber"))
     orbit_number = int(isis.getkey_k(cube, "Archive", "OrbitNumber"))
@@ -724,6 +792,9 @@ def lut_check(cube: os.PathLike, histats: dict):
         ccd = hirise.ChannelID(
             isis.getkey_k(cube, "Archive", "ProductId")
         ).get_ccd()
+        if cid is None:
+            cid = ccd
+
         for (th, ex) in threshhold[ccd]:
             if float(histats["IMAGE_MEAN"]) >= th:
                 lut_diff = lut - ex
@@ -733,15 +804,14 @@ def lut_check(cube: os.PathLike, histats: dict):
                     else:
                         direction = "to the left"
                     logger.warning(
-                        f"LUT is {lut_diff} column(s) ({direction}) from "
-                        "ideal settings - image overcompressed."
+                        f"{cid}: LUT is {lut_diff} column(s) ({direction}) "
+                        f"from ideal settings - image overcompressed."
                     )
                 break
         else:
             logger.warning(
-                "DN value, {}, lower than lowest DN value "
-                "with defined LUT for this "
-                "channel.".format(histats["IMAGE_MEAN"])
+                f"{cid}: DN value, {histats['IMAGE_MEAN']}, lower than lowest "
+                f"DN value with defined LUT for this channel."
             )
     return
 

@@ -94,6 +94,8 @@ class TestNeedHiCube(unittest.TestCase):
     def test_tdi_bin_check(self):
         histats = edr.parse_histat(isis.histat(self.hicube).stdout)
         self.assertIsNone(edr.tdi_bin_check(self.hicube, histats))
+        histats["PRODUCT_ID"] = "bogus id"
+        self.assertIsNone(edr.tdi_bin_check(self.hicube, histats))
 
     def test_lut_check(self):
         histats = edr.parse_histat(isis.histat(self.hicube).stdout)

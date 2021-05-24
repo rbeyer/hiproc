@@ -23,6 +23,7 @@ dependencies:
   - gdal>=3.0.1
   - kalasiris>=1.8.0
   - matplotlib
+  - multidict  # needed by pvl.new
   - numpy
   - pvl>=1.0.1
   - scipy
