@@ -28,8 +28,12 @@ for mod_name in (
     "osgeo",
     "matplotlib",
     "numpy",
+    "numpy.polynomial.polynomial",
     "pvl",
     "scipy",
+    "scipy.interpolate",
+    "scipy.signal",
+    "scipy.stats",
     "kalasiris",
     "kalasiris.version"
 ):
