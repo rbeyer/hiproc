@@ -24,7 +24,15 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # This mocking is to minimize the number of modules that the RTD process
 # needs to install, cutting down run-time.
-for mod_name in ("osgeo", "matplotlib", "numpy", "pvl", "scipy", "kalasiris"):
+for mod_name in (
+    "osgeo",
+    "matplotlib",
+    "numpy",
+    "pvl",
+    "scipy",
+    "kalasiris",
+    "kalasiris.version"
+):
     sys.modules[mod_name] = MagicMock()
 
 import hiproc
