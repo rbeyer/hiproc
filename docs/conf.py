@@ -27,6 +27,7 @@ sys.path.insert(0, os.path.abspath('..'))
 for mod_name in (
     "osgeo",
     "matplotlib",
+    "matplotlib.pyplot",
     "numpy",
     "numpy.polynomial.polynomial",
     "pvl",
