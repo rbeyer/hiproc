@@ -2,6 +2,10 @@
 hiproc
 ======
 
+.. image:: https://readthedocs.org/projects/hiproc/badge/?version=latest
+        :target: https://hiproc.readthedocs.io/en/latest/?badge=latest
+        :alt: Documentation Status
+
 .. image:: https://img.shields.io/pypi/v/hiproc.svg
         :target: https://pypi.python.org/pypi/hiproc
         :alt: PyPI version
@@ -69,12 +73,12 @@ These programs have been tested against their upstream Perl counterparts:
 
 Documentation
 -------------
-For the moment, this README, the `Installation
-<https://github.com/rbeyer/hiproc/blob/main/docs/installation.rst>`_, and
-`Processing <https://github.com/rbeyer/hiproc/blob/main/docs/processing.rst>`_
-documents are a minimal online set.  Each command-line program is self-documenting
-via its `-h` option (and there are lots of docstrings in the code).
+Full documentation for hiproc is `available <https://hiproc.readthedocs.io/en/latest/>`,
+including information on the processing flow of the various available programs, and
+each program is self-documenting via their `-h` argument.
 
+Due to the interaction with ISIS and GDAL, please read the installation instructions
+carefully.
 
 Contributing
 ------------
