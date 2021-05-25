@@ -73,7 +73,7 @@ These programs have been tested against their upstream Perl counterparts:
 
 Documentation
 -------------
-Full documentation for hiproc is `available <https://hiproc.readthedocs.io/en/latest/>`,
+Full `documentation for hiproc is available <https://hiproc.readthedocs.io/en/latest/>`_,
 including information on the processing flow of the various available programs, and
 each program is self-documenting via their `-h` argument.
 
