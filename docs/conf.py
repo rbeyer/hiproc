@@ -22,24 +22,10 @@ import sys
 from unittest.mock import MagicMock
 sys.path.insert(0, os.path.abspath('..'))
 
-sys.modules["osgeo"] = MagicMock()
-
-try:
-    import kalasiris
-except KeyError as err:
-    # print(err)
-    if "'ISISROOT'" == str(err):
-        print('Not running in an ISIS enabled environment.')
-        print('Using fakeISISROOT/ to build the docs.')
-        # Use the fake ISISROOT
-        os.environ['ISISROOT'] = 'fakeISISROOT'
-        os.environ['ISISDATA'] = 'fakeISISROOT'
-        # Since we aren't actually going to run the programs in
-        # this case, the code should never need ISIS3DATA, so it
-        # shouldn't matter what it is set to.
-        import kalasiris
-    else:
-        raise
+# This mocking is to minimize the number of modules that the RTD process
+# needs to install, cutting down run-time.
+for mod_name in ("osgeo", "matplotlib", "numpy", "pvl", "scipy", "kalasiris"):
+    sys.modules[mod_name] = MagicMock()
 
 import hiproc
 
