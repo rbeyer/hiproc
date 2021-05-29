@@ -89,6 +89,7 @@ Output Products:
 
 import argparse
 import collections
+import concurrent.futures
 import copy
 import csv
 import json
@@ -96,8 +97,10 @@ import logging
 import math
 import os
 import pkg_resources
+import re
 import statistics
 import sys
+import textwrap
 import warnings
 from datetime import datetime
 from pathlib import Path
@@ -106,7 +109,7 @@ import numpy as np
 
 import kalasiris as isis
 import kalasiris.version as isisversion
-import pvl
+import pvl.new as pvl
 
 import hiproc.bitflips as bf
 import hiproc.lisfix as lisfix
@@ -114,6 +117,8 @@ import hiproc.hirise as hirise
 import hiproc.util as util
 
 logger = logging.getLogger(__name__)
+
+tempfile_re = re.compile(r"HiCal-\d{12}\.")
 
 
 def arg_parser():
@@ -234,6 +239,16 @@ def arg_parser():
              "the program would have done, if it was run regularly."
     )
     parser.add_argument(
+        "--max_workers",
+        default=None,
+        type=int,
+        help="If more than one image is provided to work on, this program "
+             "will engage multiprocessing to parallelize the work.  This "
+             "multiprocessing will default to the number of processors on the "
+             "machine.  If you want to throttle this to use less resources on "
+             "your machin, indicate the number of processors you want to use."
+    )
+    parser.add_argument(
         "cube",
         metavar="cube_file(s)",
         nargs="+",
@@ -265,42 +280,85 @@ def main():
 
     if args.bitflipwidth is None:
         d = {"ANALYZECUBENORMSTATS": 0, "BITFLIPS": 5}
-        args.bitflipwidth = d[conf["LIS_Mask"]]
+        args.bitflipwidth = d[conf["HiCal"]["LIS_Mask"]]
 
     if args.lis_tolerance is None:
         d = {True: 0.4, False: 1.0}
-        args.lis_tolerance = d[conf["LIS_Fix"]]
+        args.lis_tolerance = d[conf["HiCal"]["LIS_Fix"]]
 
-    for c in args.cube:
-        # The original Perl Setup02() read from the HiCat.EDR_Products
-        # table, but we'll just open the json file, if needed:
-        db_path = util.pid_path_w_suffix(args.db, c)
-        with open(db_path, "r") as f:
-            db = json.load(f)
+    with util.main_exceptions(args.verbose, logger=logger):
+        if args.info:
+            for c in args.cube:
+                db_path = util.pid_path_w_suffix(args.db, c)
+                with open(db_path, "r") as f:
+                    db = json.load(f)
 
-        with util.main_exceptions(args.verbose, logger=logger):
-            if args.info:
-                print(f"HiCal Information for {c}:")
-                print("\n".join(norun_info(c, db, conf, args.bin2, args.bin4)))
-            else:
-                out_cube = util.path_w_suffix(args.output, c)
-                db = HiCal(
-                    c,
-                    out_cube,
-                    db,
-                    conf,
-                    args.conf,
-                    args.bin2,
-                    args.bin4,
-                    args.bitflipwidth,
-                    args.lis_tolerance,
-                    keep=args.keep,
-                )
-                with open(db_path, "w") as f:
-                    json.dump(db, f, indent=0, sort_keys=True)
+                if args.info:
+                    print(f"HiCal Information for {c}:")
+                    print(textwrap.indent(
+                        "\n".join(
+                            norun_info(c, db, conf, args.bin2, args.bin4)
+                        ),
+                        "  "
+                    ))
+            return
 
-                logger.info(f"Wrote {db_path}")
+        if len(args.cube) == 1:
+            # No need to fire up the multiprocessing for just one image.
+            db_path = util.pid_path_w_suffix(args.db, args.cube[0])
+            with open(db_path, "r") as f:
+                db = json.load(f)
 
+            out_cube = util.path_w_suffix(args.output, args.cube[0])
+            db = HiCal(
+                args.cube[0],
+                out_cube,
+                db,
+                conf,
+                args.conf,
+                args.bin2,
+                args.bin4,
+                args.bitflipwidth,
+                args.lis_tolerance,
+                keep=args.keep,
+            )
+            with open(db_path, "w") as f:
+                json.dump(db, f, indent=0, sort_keys=True)
+
+            logger.info(f"Wrote {db_path}")
+        else:
+            with concurrent.futures.ProcessPoolExecutor(
+                max_workers=args.max_workers
+            ) as executor:
+                future_dbs = dict()
+                for c in args.cube:
+                    db_path = util.pid_path_w_suffix(args.db, c)
+                    with open(db_path, "r") as f:
+                        db = json.load(f)
+
+                    out_cube = util.path_w_suffix(args.output, c)
+
+                    f = executor.submit(
+                        HiCal,
+                        c,
+                        out_cube,
+                        db,
+                        conf,
+                        args.conf,
+                        args.bin2,
+                        args.bin4,
+                        args.bitflipwidth,
+                        args.lis_tolerance,
+                        keep=args.keep,
+                    )
+                    future_dbs[f] = db_path
+
+                for future in concurrent.futures.as_completed(future_dbs):
+                    db_path = future_dbs[future]
+                    with open(db_path, "w") as f:
+                        json.dump(future.result(), f, indent=0, sort_keys=True)
+
+                    logger.info(f"Wrote {db_path}")
     return
 
 
@@ -434,10 +492,9 @@ def HiCal(
     bin2: bool,
     bin4: bool,
     bitflipwidth=0,
-    lis_tolerance=1,
+    lis_tolerance=1.0,
     keep=False,
 ) -> tuple:
-    logger.info(f"HiCal start: {in_cube}")
     # The original Perl Setup00() builds data structures that we don't
     # need.
     # The original Perl Setup01() set up data routing and did filename
@@ -453,6 +510,7 @@ def HiCal(
     # function, the set_flags() function, and the if statement below that
     # checks HiCal_Bypass_IR10_1
     in_cube, cid, ccdchan, lis_per = setup(in_cube, db, conf)
+    logger.info(f"{cid}: HiCal start: {in_cube}")
 
     destripe = check_destripe(in_cube, int(db["BINNING"]), bin2, bin4)
 
@@ -472,12 +530,12 @@ def HiCal(
     # existing files and also allow for easy clean-up if keep=True
     temp_token = datetime.now().strftime("HiCal-%y%m%d%H%M%S")
 
-    logger.info(f"destripe: {destripe}")
+    logger.info(f"{cid}: destripe: {destripe}")
 
     flags = set_flags(
         hconf, db, ccdchan, b.index(int(db["BINNING"])), bitflipwidth > 0
     )
-    logger.info(flags)
+    logger.info(f"{cid}: {flags}")
 
     # Start processing cube files
     to_delete = isis.PathSet()
@@ -492,9 +550,9 @@ def HiCal(
         next_cube = furrow_cube
     else:
         next_cube = to_delete.add(in_c.with_suffix(f".{temp_token}.cub"))
-        logger.info(f"Symlink {in_c} to {next_cube}")
+        logger.info(f"{cid}: Symlink {in_c} to {next_cube}")
         next_cube.symlink_to(in_c.resolve())
-    logger.info(f"Furrow Fix application: {furrows_found}")
+    logger.info(f"{cid}: Furrow Fix application: {furrows_found}")
 
     # Run hical
     lis_per = (
@@ -621,7 +679,7 @@ def HiCal(
 
     # Create final output file
     to_delete.remove(next_cube)
-    logger.info(f"Rename {next_cube} to {out_cube}.")
+    logger.info(f"{cid}: Rename {next_cube} to {out_cube}.")
     next_cube.rename(out_cube)
 
     if not keep:
@@ -634,7 +692,7 @@ def HiCal(
     # The zapped flag is not in the original code, I'm putting it in
     # to the DB to use in a later step.
 
-    logger.info(f"HiCal done: {out_cube}")
+    logger.info(f"{cid}: HiCal done: {out_cube}")
     return db
 
 
@@ -779,7 +837,7 @@ def check_destripe(
                 f"Expecting to find {powered_count} CCD files, but found"
                 f"{len(binnings)}, as a consequence, cannot determine if the "
                 "missing CCDs might have been bin 2 or bin 4.  "
-                "hidestripe will not be applied to this image."
+                f"hidestripe will not be applied to this image ({cube})."
             )
             warn_message.format(powered_count, len(binnings))
 
@@ -801,6 +859,12 @@ def get_bins_fromfiles(cube: os.PathLike) -> dict:
     bins = dict()
     oid = hirise.get_ObsID_fromfile(cube)
     for path in Path(cube).parent.glob("*.cub"):
+        if tempfile_re.search(str(path)) is not None:
+            # Want to exclude files like "HiCal-%y%m%d%H%M%S"
+            # which during multiprocessing could come and go between
+            # the call to glob() above and the call to getkey_k()
+            # below.
+            continue
         try:
             p = hirise.get_ChannelID_fromfile(path)
             if (oid.phase, oid.orbit_number, oid.target) == (
@@ -894,7 +958,7 @@ def run_hical(
     binning: int,
     noiseclean: bool,
     bitflipwidth=0,
-    lis_tolerance=1,
+    lis_tolerance=1.0,
     keep=False,
 ) -> str:
 
@@ -1049,13 +1113,17 @@ def mask(
     noisefilter_max: float,
     binning: int,
     width=5,
+    cid=None,
     keep=False,
 ) -> None:
     """mask out unwanted pixels"""
-    logger.info(mask.__doc__)
+    logger.debug(mask.__doc__)
     to_del = isis.PathSet()
     out_path = Path(out_cube)
     temp_cube = to_del.add(out_path.with_suffix(".mask_temp.cub"))
+
+    if cid is None:
+        cid = hirise.get_ChannelID_fromfile(in_cube)
 
     isis.mask(
         in_cube,
@@ -1069,7 +1137,9 @@ def mask(
     if width == 0:
         cubenorm_stats_file = to_del.add(temp_cube.with_suffix(".cn.stats"))
         isis.cubenorm(temp_cube, stats=cubenorm_stats_file)
-        (mindn, maxdn) = analyze_cubenorm_stats(cubenorm_stats_file, binning)
+        (mindn, maxdn) = analyze_cubenorm_stats(
+            cubenorm_stats_file, binning, cid=cid
+        )
         isis.mask(
             temp_cube,
             mask=temp_cube,
@@ -1087,7 +1157,9 @@ def mask(
         # swamps the good, so *this* approach attempts to find the median
         # standard deviation that might be an approximation to the 'real'
         # standard devation of the data without the bit-flip noise.
-        logger.info("More severe handling of images with LIS pixels engaged.")
+        logger.info(
+            f"{cid}: More severe handling of images with LIS pixels engaged."
+        )
         bf.clean_cube(temp_cube, out_path, width=width, keep=keep)
 
     if not keep:
@@ -1096,7 +1168,9 @@ def mask(
     return
 
 
-def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
+def analyze_cubenorm_stats(
+    statsfile: os.PathLike, binning: int, cid=None
+) -> tuple:
     with open(statsfile) as csvfile:
         valid_points = list()
         std_devs = list()
@@ -1109,8 +1183,11 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
             mins.append(int(row["Minimum"]))
             maxs.append(int(row["Maximum"]))
 
+    if cid is None:
+        cid = hirise.get_ChannelID_fromfile(statsfile)
+
     maxvp = max(valid_points)
-    logger.info(f"Maximum count of valid pixels: {maxvp}")
+    logger.info(f"{cid}: Maximum count of valid pixels: {maxvp}")
 
     # Original note:
     # # Get the median standard deviation value for all columns that have
@@ -1133,7 +1210,7 @@ def analyze_cubenorm_stats(statsfile: os.PathLike, binning: int) -> tuple:
     std_w_maxvp.sort()
     facstd = std_w_maxvp[int((len(std_w_maxvp) - 1) * 0.95)]
     logger.info(
-        "95th percentile standard deviation of all "
+        f"{cid}: 95th percentile standard deviation of all "
         + "columns ({}) that have the ".format(len(std_w_maxvp))
         + "maximum valid pixel count: {}".format(facstd)
     )
@@ -1262,7 +1339,7 @@ def Cubenorm_Filter(
     value of the ValidPoints in *cubenorm_tab* are at one end or
     the other (depending on *chan*).
     """
-    logger.info(
+    logger.debug(
         "Perform a highpass filter on the cubenorm table output of the "
         "columnar average and median values."
     )
@@ -1390,7 +1467,7 @@ def Cubenorm_Filter_filter(
     divide: bool,
 ) -> list:
     """This performs highpass filtering on the passed list."""
-    logger.info(Cubenorm_Filter_filter.__doc__)
+    logger.debug(Cubenorm_Filter_filter.__doc__)
 
     x = copy.deepcopy(inlist)
     cut = cut_size(chan, len(x))
@@ -1573,7 +1650,7 @@ def NoiseFilter_cubenorm_edit(
     # Pause point locations are 1-based pixel numbers, so -1 to get list index.
     # Width values are the number of pixels to affect, including the pause
     # point pixel.
-    logger.info(
+    logger.debug(
         "Zaps the relevant pixels in the cubenorm output and creates an "
         "edited cubenorm file."
     )
@@ -1644,7 +1721,7 @@ def NoiseFilter_zaptrigger(
                 trigger = True
     if trigger:
         logger.info(f"Fraction of non-valid pixels > {nonvalid_frac}")
-        logger.info("Pause point pixels will be zapped.")
+        logger.info(f"Pause point pixels will be zapped.")
     return trigger
 
 
@@ -1674,7 +1751,7 @@ def NoiseFilter(
     keep=False,
 ) -> None:
     """NoiseFilter: Perform salt/pepper noise removal."""
-    logger.info(NoiseFilter.__doc__)
+    logger.debug(NoiseFilter.__doc__)
     binning = int(isis.getkey_k(in_cube, "Instrument", "Summing"))
     (ccd, chan) = hirise.get_ccdchannel(
         isis.getkey_k(in_cube, "Archive", "ProductId")
