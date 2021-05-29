@@ -92,6 +92,7 @@ class main_exceptions:
                     self.logger.warning(exc_val)
                 return True
             else:
+                print("Error:", file=self.file)
                 print(exc_val, file=self.file)
                 if self.verbose >= 2:
                     return False
