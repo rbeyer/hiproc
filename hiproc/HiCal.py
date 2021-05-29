@@ -494,7 +494,7 @@ def HiCal(
     bitflipwidth=0,
     lis_tolerance=1.0,
     keep=False,
-) -> tuple:
+) -> dict:
     # The original Perl Setup00() builds data structures that we don't
     # need.
     # The original Perl Setup01() set up data routing and did filename
