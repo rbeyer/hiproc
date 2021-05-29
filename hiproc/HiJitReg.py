@@ -201,10 +201,13 @@ class JitterCube(hicolor.HiColorCube, collections.abc.MutableMapping):
 
         if isinstance(config, (Path, str)):
             self.conf = pvl.load(str(config))
-        elif isinstance(config, dict):
+        elif isinstance(config, collections.abc.Mapping):
             self.conf = config
         else:
-            raise Exception
+            raise TypeError(
+                f"The value for *config* was neither an os.PathLike nor a "
+                f"Mapping object, it was a {type(config)}"
+            )
 
         if matchccd is None:
             self.matchccd = hicolor.CCD_Corresponence[self.get_ccd()]
