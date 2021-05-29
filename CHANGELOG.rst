@@ -32,6 +32,8 @@ Added
 +++++
 - Improved documentation
 - environment.yml for conda development
+- Added Python-based multiprocessing capabilities
+  to EDR_Stats, HiCal, and hiproc.
 
 Changed
 +++++++
