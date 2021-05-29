@@ -37,12 +37,14 @@
 
 
 import argparse
+import concurrent.futures
 import itertools
 import logging
+import os
 import pkg_resources
 from pathlib import Path
 
-import pvl
+import pvl.new as pvl
 
 import hiproc.hirise as hirise
 import hiproc.util as util
@@ -92,6 +94,16 @@ def arg_parser():
         help="Do not test if HiJACK is needed, but force HiJACK to run.",
     )
     parser.add_argument(
+        "--max_workers",
+        default=None,
+        type=int,
+        help="This program uses multiprocessing to parallelize some of the "
+             "work.  This multiprocessing will default to use the number of "
+             "processors on the host machine.  If you want to throttle this "
+             "to use less resources on your machine, indicate the number of "
+             "processors you want to use."
+    )
+    parser.add_argument(
         "img",
         metavar="some.img-file",
         nargs="+",
@@ -123,7 +135,12 @@ def main():
         try:
             get_cubes(f"{oid}*balance.cub", parent)
         except FileNotFoundError:
-            chancubes = edr2stitch(imgs, args.conf_dir, keep=args.keep)
+            chancubes = edr2stitch(
+                imgs,
+                args.conf_dir,
+                max_workers=args.max_workers,
+                keep=args.keep
+            )
             db_list = [x.db for x in chancubes]
 
         if args.color:
@@ -159,56 +176,107 @@ def get_cubes(glob: str, parent: Path) -> list:
     return cubes
 
 
-def edr2stitch(images, conf_dir, bitflipwidth=0, lis_tolerance=1, keep=False):
+def edr_cal(
+    img: os.PathLike,
+    out_edr: os.PathLike,
+    out: os.PathLike,
+    edr_conf: dict,
+    hical_conf: dict,
+    hical_conf_path: os.PathLike,
+    bitflipwidth=0,
+    lis_tolerance=1.0,
+    keep=False,
+) -> dict:
+    # EDR_Stats
+    db = EDR_Stats.EDR_Stats(
+        img,
+        out_edr,
+        edr_conf,
+        keep=keep,
+    )
+
+    # HiCal
+    return HiCal.HiCal(
+        out_edr,
+        out,
+        db,
+        hical_conf,
+        hical_conf_path,
+        None,
+        None,
+        bitflipwidth,
+        lis_tolerance,
+        keep=keep,
+    )
+
+
+def edr2stitch(
+    images,
+    conf_dir,
+    bitflipwidth=0,
+    lis_tolerance=1.0,
+    max_workers=None,
+    keep=False,
+):
     chids = list()
-    for i in images:
-        out_edr = util.path_w_suffix(".EDR_Stats.cub", i)
+    edr_conf = pvl.load(conf_dir / "EDR_Stats_gains_config.pvl")
+    hical_conf = HiCal.conf_setup(
+        pvl.load(conf_dir / "HiCal.conf"),
+        pvl.load(conf_dir / "NoiseFilter.conf"),
+    )
+    with concurrent.futures.ProcessPoolExecutor(
+                max_workers=max_workers
+    ) as executor:
+        future_dbs = dict()
+        for i in images:
+            out_edr = util.path_w_suffix(".EDR_Stats.cub", i)
+            out_hical = util.path_w_suffix(".HiCal.cub", out_edr)
 
-        # EDR_Stats
-        db = EDR_Stats.EDR_Stats(
-            i,
-            out_edr,
-            pvl.load(conf_dir / "EDR_Stats_gains_config.pvl"),
-            keep=keep,
-        )
+            f = executor.submit(
+                edr_cal,
+                i,
+                out_edr,
+                out_hical,
+                edr_conf,
+                hical_conf,
+                conf_dir / "HiCal.conf",
+                bitflipwidth=bitflipwidth,
+                lis_tolerance=lis_tolerance,
+                keep=False,
+            )
+            future_dbs[f] = out_hical
 
-        # HiCal
-        out_hical = util.path_w_suffix(".HiCal.cub", out_edr)
-
-        db = HiCal.HiCal(
-            out_edr,
-            out_hical,
-            db,
-            HiCal.conf_setup(
-                pvl.load(conf_dir / "HiCal.conf"),
-                pvl.load(conf_dir / "NoiseFilter.conf"),
-            ),
-            conf_dir / "HiCal.conf",
-            None,
-            None,
-            bitflipwidth,
-            lis_tolerance,
-            keep=keep,
-        )
-
-        chids.append(ChannelCube(out_hical, db))
+        for future in concurrent.futures.as_completed(future_dbs):
+            out_hical = future_dbs[future]
+            chids.append(ChannelCube(out_hical, future.result()))
 
     # HiStitch
     # get Channel pairs
     cids = list()
-    for chid1, chid2 in get_CCDpairs(chids):
-        (db, o_path) = HiStitch.HiStitch(
-            chid1.nextpath,
-            chid2.nextpath,
-            chid1.db,
-            chid2.db,
-            ".HiStitch.cub",
-            pvl.load(conf_dir / "HiStitch.conf"),
-            keep=keep,
-        )
-        cid = HiccdStitch.HiccdStitchCube(o_path)
-        cid.gather_from_db(db)
-        cids.append(cid)
+    stitch_conf = pvl.load(conf_dir / "HiStitch.conf")
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=max_workers
+    ) as executor:
+        future_tuples = list()
+        for chid1, chid2 in get_CCDpairs(chids):
+            f = executor.submit(
+                # (db, o_path) = HiStitch.HiStitch(
+                HiStitch.HiStitch,
+                chid1.nextpath,
+                chid2.nextpath,
+                chid1.db,
+                chid2.db,
+                ".HiStitch.cub",
+                stitch_conf,
+                keep=keep,
+            )
+            future_tuples.append(f)
+
+        for future in concurrent.futures.as_completed(future_tuples):
+            (db, o_path) = future.result()
+            cid = HiccdStitch.HiccdStitchCube(o_path)
+            cid.gather_from_db(db)
+            cids.append(cid)
 
     # HiccdStitch, makes balance cubes
     # need to separate by color:
@@ -249,7 +317,7 @@ def edr2stitch(images, conf_dir, bitflipwidth=0, lis_tolerance=1, keep=False):
     # HiSlither
     #   takes same as HiJitReg (and assumes its products are available.
     #   creates *slither.txt, *slither.cub, and *COLOR[4|5].cub
-    #   Can then run SliterStats on the *slither.txt
+    #   Can then run SlitherStats on the *slither.txt
     HiSlither.HiSlither(for_jitreg)
 
     return chids
@@ -274,7 +342,7 @@ def color(obsid, conf_dir: Path, parent: Path, db_list: list, keep=False):
     #   creates *IRB.cub and *RGB.cub
     for x in colors:
         x.with_suffix(".HiColorNorm.cub")
-    HiBeautify.start(
+    HiBeautify.HiBeautify(
         [x.with_suffix(".HiColorNorm.cub") for x in colors],
         pvl.load(conf_dir / "HiBeautify.conf"),
     )
