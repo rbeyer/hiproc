@@ -140,7 +140,7 @@ def parent_parser() -> argparse.ArgumentParser:
         '--version',
         action='version',
         version=f"hiproc version {hiproc.__version__}",
-        help="Show library version number."
+        help="Show hiproc version number."
     )
     return parent
 
