@@ -112,25 +112,14 @@ class TestResolveJitter(unittest.TestCase):
   316426108.27804720       341       450  316426108.18191683       341       450       340.5045       444.0639  0.738056       0.033717       0.216061  0.772310
   316426108.27804720      1705       450  316426108.18191683      1705       450      1704.6754       444.0586  0.808393       0.026047       0.261489  0.831419
 """
-
-    def test_upper_power_of_two(self):
-        self.assertEqual(rj.upper_power_of_two(5), 8)
-
-    def test_set_file_path(self):
-        loc = Path("foo")
-        path1 = loc / "bar"
-        path2 = Path("bah")
-        self.assertEqual(rj.set_file_path(loc, path1), path1)
-        self.assertEqual(rj.set_file_path(loc, path2), loc / path2)
-
-    def test_create_matrices(self):
-        flat_no_dupes = FlatFile("""#          Hijitreg ISIS Application Results
+        # has altered number of lines to facilitate testing.
+        self.flat_text_no_dupes = """#          Hijitreg ISIS Application Results
 #    Coordinates are (Sample, Line) unless indicated
 #           RunDate:  2012-04-11T20:02:49
 #
 #    ****  Image Input Information ****
 #  FROM:  /HiRISE/Users/audrie/pipe_dev_sandbox/HiRISE/Data/ResolveJitter/ESP/ORB_016200_016299/ESP_016213_2315/ESP_016213_2315_RED4.prehijack.cub
-#    Lines:       70000
+#    Lines:       240
 #    Samples:     2048
 #    FPSamp0:     0
 #    SampOffset:  0
@@ -147,7 +136,7 @@ class TestResolveJitter(unittest.TestCase):
 #    StartTime:   316426108.23449421 <seconds>
 
 #  MATCH: /HiRISE/Users/audrie/pipe_dev_sandbox/HiRISE/Data/ResolveJitter/ESP/ORB_016200_016299/ESP_016213_2315/ESP_016213_2315_BG12.prehijack.cub
-#    Lines:       70000
+#    Lines:       240
 #    Samples:     2048
 #    FPSamp0:     0
 #    SampOffset:  0
@@ -191,7 +180,20 @@ class TestResolveJitter(unittest.TestCase):
   316426108.27416718       341       410  316426108.17803681       341       410       340.5761       403.9824  0.711003       0.039963       0.180518  0.759016
   316426108.27610719       341       430  316426108.17997682       341       430       340.5468       424.0275  0.714079       0.036748       0.198811  0.757016
   316426108.27804720       341       450  316426108.18191683       341       450       340.5045       444.0639  0.738056       0.033717       0.216061  0.772310
-""")
+"""
+
+    def test_upper_power_of_two(self):
+        self.assertEqual(rj.upper_power_of_two(5), 8)
+
+    def test_set_file_path(self):
+        loc = Path("foo")
+        path1 = loc / "bar"
+        path2 = Path("bah")
+        self.assertEqual(rj.set_file_path(loc, path1), path1)
+        self.assertEqual(rj.set_file_path(loc, path2), loc / path2)
+
+    def test_create_matrices(self):
+        flat_no_dupes = FlatFile(self.flat_text_no_dupes)
         nfft = rj.upper_power_of_two(12)
         dt = -0.09613037
         time_list = list()
@@ -385,23 +387,213 @@ class TestResolveJitter(unittest.TestCase):
         self.assertEqual(128, tdi)
         self.assertEqual(70000, lines)
         self.assertEqual(0.000097, line_rate)
-        # Need to test arrays, too
+        npt.assert_allclose(
+            np.array([
+                3.16426108e+08, 3.16426108e+08, 3.16426108e+08, 3.16426108e+08,
+                3.16426108e+08, 3.16426108e+08, 3.16426108e+08, 3.16426108e+08,
+                3.16426108e+08, 3.16426108e+08, 3.16426108e+08, 3.16426108e+08,
+                3.16426108e+08
+            ]),
+            t_arr,
+        )
+        npt.assert_allclose(
+            np.array([
+                0.36726667, 0.34693333, 0.4455, 0.47376667, 0.49986667,
+                0.35125, 0.40816667, 0.41503333, 0.3494, 0.3493,
+                0.3511, 0.3849, 0.41005
+            ]),
+            offx,
+        )
+        npt.assert_allclose(
+            np.array([
+                5.58366667, 5.60056667, 5.60333333, 5.68856667, 5.78896667,
+                 5.8293, 5.75613333, 5.84383333, 5.8301, 6.01325,
+                 6.0136, 5.94855, 5.93875
+            ]),
+            offy,
+        )
 
     def test_mask_frequencies(self):
         (
             t_arr, offx, offy, lines, dt, tdi, line_rate
         ) = rj.parse_file(self.flat_text, 11, 2)
-        nfft = rj.upper_power_of_two(lines / 20)
+        nfft = rj.upper_power_of_two(12)
         tt = np.linspace(0, 1, nfft, endpoint=False)
         nfftime = np.linspace(t_arr[0], t_arr[-1], nfft)
         xinterp, yinterp, x, y, ddt, overxx, overyy = rj.create_matrices(
             t_arr, offx, offy,
             dt, t_arr[-1] - t_arr[0], t_arr[0], nfft, nfftime, tt
         )
-        rj.mask_frequencies(0.01, ddt, overxx, overyy)
-        # Not sure how to test these large arrays :(
+        x_masked, y_masked = rj.mask_frequencies(0.01, ddt, overxx, overyy)
+        npt.assert_allclose(
+            np.ma.masked_array(
+                data=[
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [0.05299864726884389, 0.042550949164161384,
+                     0.025625254774550014, 0.004798347639026385,
+                     -0.016759064427409348, -0.035765060856069356,
+                     -0.04932615098047681, -0.05537778176077876,
+                     -0.05299864726884389, -0.042550949164161384,
+                     -0.02562525477455002, -0.0047983476390264165,
+                     0.01675906442740934, 0.03576506085606937,
+                     0.04932615098047681, 0.05537778176077876],
+                    [0.004228126828219745, 0.011631386957823583,
+                     0.012221138356743901, 0.0056519126539216836,
+                     -0.004228126828219743, -0.011631386957823583,
+                     -0.012221138356743901, -0.005651912653921685,
+                     0.004228126828219742, 0.011631386957823581,
+                     0.012221138356743903, 0.005651912653921696,
+                     -0.004228126828219741, -0.011631386957823587,
+                     -0.012221138356743903, -0.005651912653921698],
+                    [-0.0009548915863846334, 0.01776103611560493,
+                     0.014548600112544666, -0.00662601966125348,
+                     -0.01961993600631877, -0.008390429246109487,
+                     0.013198179480483553, 0.018491878495233365,
+                     0.0009548915863846405, -0.017761036115604922,
+                     -0.014548600112544682, 0.006626019661253482,
+                     0.01961993600631877, 0.008390429246109492,
+                     -0.01319817948048356, -0.018491878495233368],
+                    [-0.006188472558280955, -0.0003546188842025707,
+                     0.006188472558280955, 0.00035461888420257147,
+                     -0.006188472558280955, -0.00035461888420257223,
+                     0.006188472558280955, 0.000354618884202573,
+                     -0.006188472558280955, -0.00035461888420257375,
+                     0.006188472558280955, 0.0003546188842025855,
+                     -0.006188472558280955, -0.00035461888420256426,
+                     0.006188472558280955, 0.00035461888420258703],
+                    [0.009138274039927062, -0.0029535064085242893,
+                     -0.0068777581000743345, 0.008217514561950776,
+                     0.0005883447439194741, -0.008667814133984904,
+                     0.006045712983872482, 0.004040625742459885,
+                     -0.009138274039927062, 0.0029535064085242876,
+                     0.006877758100074333, -0.00821751456195078,
+                     -0.0005883447439194959, 0.008667814133984911,
+                     -0.006045712983872478, -0.00404062574245989],
+                    [0.0025610129110780772, 0.002652162360430795,
+                     -0.0063117368908147484, 0.006273981552690012,
+                     -0.002561012911078075, -0.002652162360430803,
+                     0.006311736890814749, -0.006273981552690013,
+                     0.0025610129110780725, 0.0026521623604308054,
+                     -0.0063117368908147545, 0.006273981552690012,
+                     -0.0025610129110780703, -0.002652162360430808,
+                     0.006311736890814747, -0.0062739815526900115],
+                    [-0.012798132291380496, 0.015135783955520343,
+                     -0.015169149718655444, 0.012893149945809873,
+                     -0.008654284970410044, 0.003097883559553897,
+                     0.00293014254085991, -0.008512081001236117,
+                     0.012798132291380503, -0.015135783955520342,
+                     0.015169149718655437, -0.012893149945809864,
+                     0.008654284970410056, -0.003097883559553884,
+                     -0.002930142540859975, 0.00851208100123608]],
+                mask=[[True, True, True, True, True, True, True, True, True,
+                       True, True, True, True, True, True, True],
+                      [False, False, False, False, False, False, False, False,
+                       False,
+                       False, False, False, False, False, False, False],
+                      [False, False, False, False, False, False, False, False,
+                       False,
+                       False, False, False, False, False, False, False],
+                      [False, False, False, False, False, False, False, False,
+                       False,
+                       False, False, False, False, False, False, False],
+                      [False, False, False, False, False, False, False, False,
+                       False,
+                       False, False, False, False, False, False, False],
+                      [False, False, False, False, False, False, False, False,
+                       False,
+                       False, False, False, False, False, False, False],
+                      [False, False, False, False, False, False, False, False,
+                       False,
+                       False, False, False, False, False, False, False],
+                      [False, False, False, False, False, False, False, False,
+                       False,
+                       False, False, False, False, False, False, False]],
+                fill_value=0.0
+            ),
+            x_masked
+        )
+        npt.assert_allclose(
+            np.ma.masked_array(
+                data=[
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [-0.1524087062948315, -0.08776886909237831,
+                     -0.009767017197390135, 0.06972177452766937,
+                     0.13859605811035114, 0.18637034822212734,
+                     0.2057714422684983, 0.19384569955225955,
+                     0.15240870629483153, 0.08776886909237833,
+                     0.009767017197390149, -0.06972177452766926,
+                     -0.1385960581103511, -0.18637034822212734,
+                     -0.2057714422684983, -0.1938456995522596],
+                    [-0.006072316504751099, 0.04632120823119036,
+                     0.07158039741080875, 0.054908760587231355,
+                     0.006072316504751108, -0.046321208231190354,
+                     -0.07158039741080875, -0.05490876058723136,
+                     -0.006072316504751116, 0.04632120823119035,
+                     0.07158039741080875, 0.05490876058723141,
+                     0.006072316504751125, -0.04632120823119039,
+                     -0.07158039741080875, -0.05490876058723142],
+                    [-0.001717616744529681, 0.004740127793599315,
+                     0.005345553492337172, -0.0006488182769217512,
+                     -0.0058421375027244106, -0.0038225601868610345,
+                     0.0029164765972641725, 0.0060547347361680545,
+                     0.001717616744529683, -0.0047401277935993115,
+                     -0.0053455534923371765, 0.0006488182769217512,
+                     0.00584213750272441, 0.003822560186861036,
+                     -0.0029164765972641746, -0.006054734736168055],
+                    [0.00735117621095209, 0.00695626932617529,
+                     -0.007351176210952089, -0.006956269326175291,
+                     0.007351176210952088, 0.006956269326175292,
+                     -0.0073511762109520875, -0.006956269326175293,
+                     0.007351176210952087, 0.0069562693261752935,
+                     -0.007351176210952086, -0.006956269326175307,
+                     0.007351176210952085, 0.006956269326175282,
+                     -0.007351176210952084, -0.006956269326175309],
+                    [0.02186941749551503, -0.0032488348222594167,
+                     -0.019382866973576114, 0.0180838389473075,
+                     0.005542095856189859, -0.022325575476793653,
+                     0.011545159849780665, 0.013489292679758274,
+                     -0.021869417495515027, 0.0032488348222594124,
+                     0.01938286697357611, -0.018083838947307515,
+                     -0.005542095856189911, 0.022325575476793664,
+                     -0.011545159849780653, -0.013489292679758286],
+                    [0.009369630674332073, -0.017395064312389616,
+                     0.015230705194601539, -0.004144405538322227,
+                     -0.009369630674332078, 0.017395064312389623,
+                     -0.015230705194601535, 0.004144405538322234,
+                     0.009369630674332084, -0.017395064312389626,
+                     0.015230705194601514, -0.004144405538322229,
+                     -0.00936963067433209, 0.017395064312389626,
+                     -0.015230705194601546, 0.004144405538322223],
+                    [0.035519991344600536, -0.04036459762426112,
+                     0.03906405982161658, -0.031816373027715006,
+                     0.01972493185648352, -0.004630548617054942,
+                     -0.011168793673292446, 0.02526778837224794,
+                     -0.03551999134460055, 0.04036459762426112,
+                     -0.03906405982161655, 0.03181637302771499,
+                     -0.019724931856483552, 0.004630548617054911,
+                     0.01116879367329261, -0.025267788372247853]],
+                mask=[[True, True, True, True, True, True, True, True, True,
+                       True, True, True, True, True, True, True],
+                      [False, False, False, False, False, False, False, False,
+                       False, False, False, False, False, False, False, False],
+                      [False, False, False, False, False, False, False, False,
+                       False, False, False, False, False, False, False, False],
+                      [False, False, False, False, False, False, False, False,
+                       False, False, False, False, False, False, False, False],
+                      [False, False, False, False, False, False, False, False,
+                       False, False, False, False, False, False, False, False],
+                      [False, False, False, False, False, False, False, False,
+                       False, False, False, False, False, False, False, False],
+                      [False, False, False, False, False, False, False, False,
+                       False, False, False, False, False, False, False, False],
+                      [False, False, False, False, False, False, False, False,
+                       False, False, False, False, False, False, False, False]],
+                fill_value=0.0
+            ),
+            y_masked
+        )
 
-    @unittest.skip("Slow to run.")
+    # @unittest.skip("Slow to run.")
     @patch('hiproc.resolve_jitter.Path')
     def test_pixel_smear(self, m_path):
         # This test is now slow because it basically engages the whole
@@ -426,11 +618,11 @@ class TestResolveJitter(unittest.TestCase):
             jitterchecky,
             rh0,
         ) = rj.resolve_jitter(
-            self.flat_text,
+            self.flat_text_no_dupes,
             True,
-            self.flat_text,
+            self.flat_text_no_dupes,
             True,
-            self.flat_text,
+            self.flat_text_no_dupes,
             True,
             20,
         )
@@ -446,9 +638,249 @@ class TestResolveJitter(unittest.TestCase):
             nfftime, sample, line, linerate, tdi
         )
 
-        self.assertAlmostEqual(-0.8419796875685424, max_smear_s)
-        self.assertAlmostEqual(-9.052314552452234, max_smear_l)
-        self.assertAlmostEqual(9.09026020017119, max_smear_mag)
+        self.assertAlmostEqual(-0.07825789632912006, max_smear_s)
+        self.assertAlmostEqual(-0.1189362761138173, max_smear_l)
+        self.assertAlmostEqual(0.14143222349779858, max_smear_mag)
+
+    def test_jitterxy(self):
+        (
+            t_arr, offx, offy, lines, dt, tdi, line_rate
+        ) = rj.parse_file(self.flat_text, 11, 2)
+        nfft = rj.upper_power_of_two(12)
+        tt = np.linspace(0, 1, nfft, endpoint=False)
+        nfftime = np.linspace(t_arr[0], t_arr[-1], nfft)
+        xinterp, yinterp, x, y, ddt, overxx, overyy = rj.create_matrices(
+            t_arr, offx, offy,
+            dt, t_arr[-1] - t_arr[0], t_arr[0], nfft, nfftime, tt
+        )
+        x, y = rj.jitterxy(
+            0.01,
+            (ddt, ddt, ddt),
+            (overxx, overxx, overxx),
+            (overyy, overyy, overyy)
+        )
+        npt.assert_allclose(
+            np.ma.masked_array(
+                data=[
+                    0.0, 0.037438628648791494, -0.01875974351944766,
+                    -0.017421059035674855, -0.10640711756982013,
+                    -0.1133481534910895, -0.07585760949493173,
+                    -0.10191319845875342, -0.09676779486201162,
+                    -0.10754989700473322, -0.055013637656177505,
+                    -0.05598704400674196, -0.01751723624938277,
+                    -0.013897312137869752, -0.021553377544410092,
+                    -0.01919848141011022
+                ],
+                mask=[
+                    False, False, False, False, False, False, False, False,
+                    False, False, False, False, False, False, False, False
+                ],
+                fill_value = 1e+20
+            ),
+            x
+        )
+        npt.assert_allclose(
+            np.ma.masked_array(
+                data=[
+                    0.0, -0.00467133668161096, 0.18080807935615825,
+                    0.18523693171178648, 0.24816323418038375,
+                    0.21971021316750483, 0.20099043004460088,
+                    0.267025314784062, 0.19347382839849123,
+                    0.24861301080898807, 0.15028862107018326,
+                    0.07455608737110639, -0.06787866246021648,
+                    -0.09147311471533065, -0.21713814003990042,
+                    -0.21028971589680576
+                ],
+                mask=[
+                    False, False, False, False, False, False, False, False,
+                    False, False, False, False, False, False, False, False
+                ],
+                fill_value=1e+20
+            ),
+            y
+        )
+
+    def test_jitter_error(self):
+        (
+            t_arr, offx, offy, lines, dt, tdi, line_rate
+        ) = rj.parse_file(self.flat_text, 11, 2)
+        nfft = rj.upper_power_of_two(12)
+        tt = np.linspace(0, 1, nfft, endpoint=False)
+        nfftime = np.linspace(t_arr[0], t_arr[-1], nfft)
+        xinterp, yinterp, x, y, ddt, overxx, overyy = rj.create_matrices(
+            t_arr, offx, offy,
+            dt, t_arr[-1] - t_arr[0], t_arr[0], nfft, nfftime, tt
+        )
+
+        error = rj.jitter_error(
+            5,
+            0.01,
+            tt,
+            t_arr[-1] - t_arr[0],
+            dict(
+                x1=np.real(x[0]) / 2.0,
+                x2=np.real(x[0]) / 2.0,
+                x3=np.real(x[0]) / 2.0,
+                y1=np.real(y[0]) / 2.0,
+                y2=np.real(y[0]) / 2.0,
+                y3=np.real(y[0]) / 2.0,
+            ),
+            (dt, dt, dt),
+            xinterp,
+            yinterp,
+            (ddt, ddt, ddt),
+            (overxx, overxx, overxx),
+            (overyy, overyy, overyy)
+        )
+        self.assertEqual(0.10813503841921471, error)
+
+    def test_resolve_jitter(self):
+        (
+            nfftime,
+            sample,
+            line,
+            linerate,
+            tdi,
+            t0,
+            t1,
+            t2,
+            t3,
+            offx_filtered,
+            offy_filtered,
+            xinterp,
+            yinterp,
+            min_avg_error,
+            min_k,
+            min_jitter_check_x,
+            min_jitter_check_y,
+            rh0,
+        ) = rj.resolve_jitter(
+            self.flat_text_no_dupes,
+            True,
+            self.flat_text_no_dupes,
+            True,
+            self.flat_text_no_dupes,
+            True,
+            20,
+        )
+
+        self.assertEqual(21, min_k)
+        npt.assert_allclose(
+            np.array([
+                316426108.254767, 316426108.256319, 316426108.257871,
+                316426108.259423, 316426108.260975, 316426108.262527,
+                316426108.264079, 316426108.265631, 316426108.267183,
+                316426108.268735, 316426108.270287, 316426108.271839,
+                316426108.273391, 316426108.274943, 316426108.276495,
+                316426108.278047
+            ]),
+            nfftime,
+            atol=1e-6
+        )
+        npt.assert_allclose(
+            np.array([
+                0.000000, 0.004640, 0.008904, 0.012594, 0.015454, 0.017205,
+                0.017569, 0.016312, 0.013276, 0.008413, 0.001817, -0.006258,
+                -0.015407, -0.025097, -0.034713, -0.043630
+            ]),
+            sample,
+            rtol=1e-3
+        )
+        npt.assert_allclose(
+            np.array([
+                0.000000, 0.008405, 0.016945, 0.025033, 0.031891, 0.036667,
+                0.038574, 0.037042, 0.031837, 0.023129, 0.011482, -0.002224,
+                -0.016920, -0.031499, -0.044958, -0.056499
+            ]),
+            line,
+            rtol=1e-3
+        )
+        self.assertEqual(9.7e-5, linerate)
+        self.assertEqual(128, tdi)
+        self.assertEqual(316426108.2547672, t0)
+        npt.assert_allclose(
+            np.array([
+                316426108.254767, 316426108.256707, 316426108.258647,
+                316426108.260587, 316426108.262527, 316426108.264467,
+                316426108.266407, 316426108.268347, 316426108.272227,
+                316426108.274167, 316426108.276107, 316426108.278047
+            ]),
+            t1
+        )
+        npt.assert_allclose(t1, t2)
+        npt.assert_allclose(t2, t3)
+        npt.assert_allclose(
+            np.array([
+                0.323826, 0.315053, 0.341403, 0.377331, 0.390783, 0.382794,
+                0.382345, 0.384638, 0.394290, 0.421757, 0.455142, 0.482476
+            ]),
+            offx_filtered[0],
+            rtol=1e-5
+        )
+        npt.assert_allclose(offx_filtered[0], offx_filtered[1])
+        npt.assert_allclose(offx_filtered[1], offx_filtered[2])
+        npt.assert_allclose(
+            np.array([
+                5.809059, 5.860861, 5.883753, 5.860255, 5.828635, 5.836648,
+                5.879040, 5.948108, 6.001984, 6.004514, 5.975415, 5.947985
+            ]),
+            offy_filtered[0]
+        )
+        npt.assert_allclose(offy_filtered[0], offy_filtered[1])
+        npt.assert_allclose(offy_filtered[1], offy_filtered[2])
+        npt.assert_allclose(
+            np.array([
+                0.323826, 0.315123, 0.327750, 0.356548, 0.381235, 0.390783,
+                0.383733, 0.382421, 0.382865, 0.385233, 0.387986, 0.392632,
+                0.408604, 0.434963, 0.461054, 0.482476
+            ]),
+            xinterp[0],
+            rtol=1e-5
+        )
+        npt.assert_allclose(xinterp[0], xinterp[1])
+        npt.assert_allclose(xinterp[1], xinterp[2])
+        npt.assert_allclose(
+            np.array([
+                5.809059, 5.853529, 5.878744, 5.878070, 5.853516, 5.828635,
+                5.834090, 5.857847, 5.907006, 5.956141, 5.984173, 6.000522,
+                6.004030, 5.996982, 5.969798, 5.947985
+            ]),
+            yinterp[0]
+        )
+        npt.assert_allclose(yinterp[0], yinterp[1])
+        npt.assert_allclose(yinterp[1], yinterp[2])
+        self.assertEqual(0.03508792293750406, min_avg_error)
+        npt.assert_allclose(
+            np.array([
+                0.000000, -0.004640, -0.008904, -0.012594, -0.015454, -0.017205,
+                -0.017569, -0.016312, -0.013276, -0.008413, -0.001817, 0.006258,
+                0.015407, 0.025097, 0.034713, 0.043630
+            ]),
+            min_jitter_check_x[0],
+            rtol=1e-3
+        )
+        npt.assert_allclose(min_jitter_check_x[0], min_jitter_check_x[1])
+        npt.assert_allclose(min_jitter_check_x[1], min_jitter_check_x[2])
+        npt.assert_allclose(
+            np.array([
+                0.000000, -0.008405, -0.016945, -0.025033, -0.031891, -0.036667,
+                -0.038574, -0.037042, -0.031837, -0.023129, -0.011482, 0.002224,
+                0.016920, 0.031499, 0.044958, 0.056499
+            ]),
+            min_jitter_check_y[0],
+            rtol=1e-3
+        )
+        npt.assert_allclose(min_jitter_check_y[0], min_jitter_check_y[1])
+        npt.assert_allclose(min_jitter_check_y[1], min_jitter_check_y[2])
+        rh0x = 0.3873269951170747
+        rh0y = 5.910007949089218
+        self.assertEqual(
+            {
+                'x1': rh0x, 'x2': rh0x, 'x3': rh0x,
+                'y1': rh0y, 'y2': rh0y, 'y3': rh0y
+            },
+            rh0
+        )
 
     # def test_write_data_for_plotting(self):
     #     m = mock_open()

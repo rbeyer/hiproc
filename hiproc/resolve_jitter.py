@@ -65,6 +65,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import medfilt
 from scipy.interpolate import PchipInterpolator
+from scipy.optimize import minimize_scalar
 
 import pvl
 
@@ -150,6 +151,11 @@ def arg_parser():
         "file will be relative to the MATCH cube, rather than the FROM "
         "cube.",
     )
+    # parser.add_argument(
+    #     "--optimize",
+    #     action="store_true",
+    #     help="Will run experimental optimizer."
+    # )
     parser.add_argument(
         "files",
         nargs="*",
@@ -221,6 +227,7 @@ def main():
             plotshow=args.plot,
             plotsave=args.saveplot,
             writecsv=args.csv,
+            opt=args.optimize
         )
     return
 
@@ -238,6 +245,7 @@ def start(
     plotshow=False,
     plotsave=False,
     writecsv=False,
+    opt=False
 ):
     oid1 = hirise.get_ObsID_fromfile(file_path1)
     oid2 = hirise.get_ObsID_fromfile(file_path2)
@@ -278,6 +286,7 @@ def start(
         file_path3,
         whichfrom3,
         line_interval,
+        optimize=opt
     )
 
     # The outputs
@@ -447,6 +456,7 @@ def resolve_jitter(
     line_interval: float,
     window_size=11,
     window_width=2,
+    optimize=False
 ):
     """
     Returns a large tuple of information that is the result of solving for
@@ -619,6 +629,9 @@ def resolve_jitter(
     # strategies to divide and conquer the phasetol parameter space.
     # A better understanding of the error behavior could allow us to speed
     # these loops up.
+    #
+    # Tests with scipy.optimize.minimize_scalar() indicate that this
+    # data is not convex, and local minima confuse the minimizers.
 
     # int      k           = 0;
     # double   minAvgError = numeric_limits<double>::max();
@@ -648,79 +661,64 @@ def resolve_jitter(
         y2=np.real(y2[0]) / 2.0,
         y3=np.real(y3[0]) / 2.0,
     )
-    while error >= error_tol and k < repetitions:
-        k += 1
 
-        # setting the phase tolerance
-        phasetol = k * tolcoef
-
-        # null the frequencies that cause a problem (really zero them out)
-        overxxx1, overyyy1 = mask_frequencies(phasetol, ddt1, overxx1, overyy1)
-        overxxx2, overyyy2 = mask_frequencies(phasetol, ddt2, overxx2, overyy2)
-        overxxx3, overyyy3 = mask_frequencies(phasetol, ddt3, overxx3, overyy3)
-
-        # Adding all frequencies together
-        stackedx = np.ma.stack((overxxx1, overxxx2, overxxx3))
-        stackedy = np.ma.stack((overyyy1, overyyy2, overyyy3))
-
-        overxxx = np.ma.mean(stackedx, axis=0)
-        overyyy = np.ma.mean(stackedy, axis=0)
-
-        # take the sum of each row
-        overx = np.ma.sum(overxxx, axis=0)
-        overy = np.ma.sum(overyyy, axis=0)
-
-        jitterx = overx - overx[0]
-        jittery = overy - overy[0]
-
-        # checking
-        jittercheckx1 = (
-            np.interp(tt + dt1 / duration, tt, jitterx, left=0, right=0)
-            - jitterx
+    if optimize:
+        # the scipy.optimize.minimize_scaler() methods got distracted by
+        # a local minima
+        opt_res = minimize_scalar(
+            jitter_error,
+            args=(
+                tolcoef,
+                tt,
+                duration,
+                rh0,
+                (dt1, dt2, dt3),
+                xinterp,
+                yinterp,
+                (ddt1, ddt2, ddt3),
+                (overxx1, overxx2, overxx3),
+                (overyy1, overyy2, overyy3)
+            ),
+            method="Brent",
+            bracket=(0, 50),
+            # method="bounded",
+            # bounds=(0, 50),
+            tol=error_tol,
+            options=dict(maxiter=repetitions, disp=True)
         )
-        jitterchecky1 = (
-            np.interp(tt + dt1 / duration, tt, jittery, left=0, right=0)
-            - jittery
-        )
+        logger.info(opt_res)
+        min_k = opt_res.x
+    else:
+        while error >= error_tol and k < repetitions:
+            k += 1
 
-        jittercheckx2 = (
-            np.interp(tt + dt2 / duration, tt, jitterx, left=0, right=0)
-            - jitterx
-        )
-        jitterchecky2 = (
-            np.interp(tt + dt2 / duration, tt, jittery, left=0, right=0)
-            - jittery
-        )
+            error = jitter_error(
+                k,
+                tolcoef,
+                tt,
+                duration,
+                rh0,
+                (dt1, dt2, dt3),
+                xinterp,
+                yinterp,
+                (ddt1, ddt2, ddt3),
+                (overxx1, overxx2, overxx3),
+                (overyy1, overyy2, overyy3)
+            )
 
-        jittercheckx3 = (
-            np.interp(tt + dt3 / duration, tt, jitterx, left=0, right=0)
-            - jitterx
-        )
-        jitterchecky3 = (
-            np.interp(tt + dt3 / duration, tt, jittery, left=0, right=0)
-            - jittery
-        )
+            if error < min_avg_error:
+                min_avg_error = error
+                min_k = k
+        logger.info(f"Minimum Error after phase filtering: {min_avg_error}")
 
-        error_vec = (
-            np.abs(xinterp[0] - (jittercheckx1 + rh0["x1"]))
-            + np.abs(xinterp[1] - (jittercheckx2 + rh0["x2"]))
-            + np.abs(xinterp[2] - (jittercheckx3 + rh0["x3"]))
-            + np.abs(yinterp[0] - (jitterchecky1 + rh0["y1"]))
-            + np.abs(yinterp[1] - (jitterchecky2 + rh0["y2"]))
-            + np.abs(yinterp[2] - (jitterchecky3 + rh0["y3"]))
-        ) / 6.0
+        # end while
 
-        error = error_vec.mean()
-        logger.info(f"Error for phasetol {phasetol}: {error}")
-
-        if error < min_avg_error:
-            min_avg_error = error
-            # min_k = k
-            min_jitterx = jitterx
-            min_jittery = jittery
-
-    # end while
-    logger.info(f"Minimum Error after phase filtering: {min_avg_error}")
+    min_jitterx, min_jittery = jitterxy(
+        min_k * tolcoef,
+        (ddt1, ddt2, ddt3),
+        (overxx1, overxx2, overxx3),
+        (overyy1, overyy2, overyy3),
+    )
 
     logger.info("Searching for correct filter size.")
     k = 0
@@ -826,6 +824,92 @@ def resolve_jitter(
         [min_jitter_check_y1, min_jitter_check_y2, min_jitter_check_y3],
         rh0,
     )
+
+
+def jitterxy(phasetol, ddt, overxx, overyy):
+    # it = iter((ddt, overxx, overyy))
+    # the_len = len(next(it))
+    # if not all(len(l) == the_len for l in it):
+    #     raise ValueError('Not all lists have same length!')
+
+    # null the frequencies that cause a problem (really zero them out)
+    masked_overxx = list()
+    masked_overyy = list()
+    for (d, x, y) in zip(ddt, overxx, overyy):
+        xxx, yyy = mask_frequencies(phasetol, d, x, y)
+        masked_overxx.append(xxx)
+        masked_overyy.append(yyy)
+
+    # Adding all frequencies together
+    stackedx = np.ma.stack(masked_overxx)
+    stackedy = np.ma.stack(masked_overyy)
+
+    overxxx = np.ma.mean(stackedx, axis=0)
+    overyyy = np.ma.mean(stackedy, axis=0)
+
+    # take the sum of each row
+    overx = np.ma.sum(overxxx, axis=0)
+    overy = np.ma.sum(overyyy, axis=0)
+
+    jitterx = overx - overx[0]
+    jittery = overy - overy[0]
+
+    return jitterx, jittery
+
+
+def jitter_error(
+    k, tolcoef, tt, duration, rh0, dt, xinterp, yinterp, ddt, overxx, overyy
+):
+    # setting the phase tolerance
+    phasetol = k * tolcoef
+
+    jitterx, jittery = jitterxy(
+        phasetol,
+        ddt,
+        overxx,
+        overyy,
+    )
+
+    # checking
+    jittercheckx1 = (
+        np.interp(tt + dt[0] / duration, tt, jitterx, left=0, right=0)
+        - jitterx
+    )
+    jitterchecky1 = (
+        np.interp(tt + dt[0] / duration, tt, jittery, left=0, right=0)
+        - jittery
+    )
+
+    jittercheckx2 = (
+        np.interp(tt + dt[1] / duration, tt, jitterx, left=0, right=0)
+        - jitterx
+    )
+    jitterchecky2 = (
+        np.interp(tt + dt[1] / duration, tt, jittery, left=0, right=0)
+        - jittery
+    )
+
+    jittercheckx3 = (
+        np.interp(tt + dt[2] / duration, tt, jitterx, left=0, right=0)
+        - jitterx
+    )
+    jitterchecky3 = (
+        np.interp(tt + dt[2] / duration, tt, jittery, left=0, right=0)
+        - jittery
+    )
+
+    error_vec = (
+                    np.abs(xinterp[0] - (jittercheckx1 + rh0["x1"]))
+                    + np.abs(xinterp[1] - (jittercheckx2 + rh0["x2"]))
+                    + np.abs(xinterp[2] - (jittercheckx3 + rh0["x3"]))
+                    + np.abs(yinterp[0] - (jitterchecky1 + rh0["y1"]))
+                    + np.abs(yinterp[1] - (jitterchecky2 + rh0["y2"]))
+                    + np.abs(yinterp[2] - (jitterchecky3 + rh0["y3"]))
+                ) / 6.0
+
+    error = error_vec.mean()
+    logger.info(f"Error for phasetol {phasetol}: {error}")
+    return error
 
 
 def create_matrices(
