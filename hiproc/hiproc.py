@@ -114,6 +114,9 @@ def arg_parser():
         required=False,
         type=Path,
         default=Path(pkg_resources.resource_filename(__name__, "data/")),
+        help="Directory where configuration files for each of the hiproc "
+             "algorithms are.  Defaults to the configuration files "
+             "distributed with the library."
     )
     return parser
 
