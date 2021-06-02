@@ -31,6 +31,7 @@ for mod_name in (
     "numpy",
     "numpy.polynomial.polynomial",
     "pvl",
+    "pvl.new",
     "scipy",
     "scipy.interpolate",
     "scipy.signal",
