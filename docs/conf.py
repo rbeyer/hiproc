@@ -34,6 +34,7 @@ for mod_name in (
     "pvl.new",
     "scipy",
     "scipy.interpolate",
+    "scipy.optimize",
     "scipy.signal",
     "scipy.stats",
     "kalasiris",
