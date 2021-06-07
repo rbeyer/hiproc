@@ -1595,7 +1595,7 @@ def getHistVal(histogram: isis.Histogram, conf: dict) -> tuple:
             if tuple(isisversion.version_info()[:3]) < (4, 3, 0):
                 maxval = float(row.DN)
             else:
-                maxval = math.floor(float(row.MaxExclusive))
+                maxval = float(row.MaxExclusive)
             break
 
     if maxval is None:
