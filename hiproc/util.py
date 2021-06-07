@@ -167,23 +167,23 @@ def set_logger(verblvl=None, filename=None, loglvl=0) -> None:
 
     if lvl < 20:  # less than INFO
         formatter = logging.Formatter("%(name)s - %(levelname)s: %(message)s")
+        # kalasiris logger
+        k_logger = logging.getLogger("kalasiris")
+        k_logger.setLevel(lvl)
+        k_logger.addHandler(ch)
     else:
         formatter = logging.Formatter("%(levelname)s: %(message)s")
 
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    # # kalasiris logger
-    # k_logger = logging.getLogger("kalasiris")
-    # k_logger.setLevel(lvl)
-    # k_logger.addHandler(ch)
-
     if filename is not None:
         fh = logging.FileHandler(filename)
         fh.setLevel(lvl)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
-        # k_logger.addHandler(fh)
+        if lvl < 20:
+            k_logger.addHandler(fh)
 
     return
 
