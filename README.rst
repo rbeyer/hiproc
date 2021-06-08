@@ -10,6 +10,10 @@ hiproc
         :target: https://pypi.python.org/pypi/hiproc
         :alt: PyPI version
 
+.. image:: https://anaconda.org/conda-forge/hiproc/badges/version.svg
+        :target: https://anaconda.org/conda-forge/hiproc
+        :alt: Conda version
+
 
 A library to help process HiRISE EDRs with ISIS.
 
