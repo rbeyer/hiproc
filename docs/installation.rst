@@ -21,7 +21,8 @@ page on `ISIS Interaction`_ to ensure that you can get everything
 working.
 
 At any rate, create the *isis* conda environment, run the init script,
-install the data directories that you need, etc.
+install the data directories that you need, etc.  Odds are good that you
+probably already have an *isis* environment, so maybe you're already good.
 
 Since you've already got conda installed, the remainder of these instructions
 are going to use conda (you could also use pip or something else).
@@ -29,22 +30,16 @@ are going to use conda (you could also use pip or something else).
 Make a new conda (or other kind of virtual) environment, let's call it
 *hiproc*.
 
-This package depends on the Python gdal implementation, which has a C library
-requirement, and may not install properly if it is not present, and doesn't always
-smoothly install via pip alone, so we encourage conda installation of gdal in this
-*hiproc* environment.
-
-Now, you're finally ready to install hiproc.  Eventually, there will be a conda
-install available, but for now, we'll just pip install:
+Now, you're finally ready to install hiproc (make sure the conda-forge channel is
+available):
 
     .. code-block:: console
 
-        $ pip install hiproc
+        $ conda install hiproc
 
-If you don't have `pip`_ installed, this `Python installation guide`_ can guide
-you through the process.  You could also install `from sources`_ at this point.
+You could also install `from sources`_ at this point, instead.
 
-So now we have gdal and hiproc in the *hiproc* environment, but a separate *isis* environment.
+So now we have hiproc in the *hiproc* environment, but a separate *isis* environment.
 
 The easiest thing to do is exit out of all conda envrionments, and then:
 
