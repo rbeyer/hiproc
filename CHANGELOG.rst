@@ -28,6 +28,13 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+Fixed
++++++
+- The new-in-0.7.0 multiprocessing requires that the multidict package be installed
+  (for pvl to use), and it wasn't included in the requirements.  If you have 0.7.0,
+  a simple "conda install multidict" should get you working.
+
+
 0.7.0 (2021-06-15)
 ------------------
 
