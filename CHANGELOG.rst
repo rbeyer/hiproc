@@ -28,6 +28,9 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+0.7.0 (2021-06-15)
+------------------
+
 Added
 +++++
 - Improved documentation
@@ -47,6 +50,7 @@ Fixed
 - now, additionally supporting ISIS 4.1.1 through 5.0.0
 - Upstream addressed a bug in analyze_cubenorm_stats() that we had noticed,
   so now fixed here, too.
+- MANIFEST.in did not properly include the "data" directory, so that was a problem.
 
 0.6.1 (2021-03-23)
 ------------------

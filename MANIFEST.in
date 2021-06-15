@@ -3,6 +3,7 @@ include CHANGELOG.rst
 include CONTRIBUTING.rst
 include LICENSE
 include README.rst
+include hiproc/data/*
 
 recursive-include tests *
 recursive-exclude * __pycache__
