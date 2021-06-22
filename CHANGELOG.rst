@@ -28,6 +28,9 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+0.7.1 (2021-06-21)
+------------------
+
 Fixed
 +++++
 - The new-in-0.7.0 multiprocessing requires that the multidict package be installed
