@@ -1812,7 +1812,7 @@ def pick_index(
         if consider_end and (
             (
                 counts[end_idx] < count_thresh
-                and span_left <= dn[end_idx] <= span_right
+                # and span_left <= dn[end_idx] <= span_right
             )
             or new_i[m] == minima_i[-1 * m]
         ):
