@@ -134,10 +134,10 @@ class TestArrays(unittest.TestCase):
     #     )
 
     def test_min_max_ex(self):
-        self.assertEqual(bf.min_max_ex(5, 2, 2), (1, 9, 16))
-        self.assertEqual(bf.min_max_ex(5, 20, 2), (-35, 45, 20))
-        self.assertEqual(bf.min_max_ex(100, 400, 2), (-700, 900, 400))
-        self.assertEqual(bf.min_max_ex(100, 401, 2), (-28, 228, 16))
+        self.assertEqual(bf.min_max_ex(5, 2, 2, 400, 64), (1, 9, 16))
+        self.assertEqual(bf.min_max_ex(5, 20, 2, 400, 64), (-35, 45, 20))
+        self.assertEqual(bf.min_max_ex(100, 400, 2, 400, 64), (-700, 900, 400))
+        self.assertEqual(bf.min_max_ex(100, 401, 2, 400, 64), (-28, 228, 16))
 
     # Need to upgrade: find_smart_window got complicated, this test is not.
     # def test_find_smart_window_from_ma(self):

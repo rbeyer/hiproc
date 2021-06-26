@@ -840,6 +840,12 @@ def find_smart_window_from_ma(
     value of *medstd_limit* and *medstd_fallback* are passed along
     to min_max_ex(), please see that documentation for more information.
     """
+    # It makes sense for defaults for medstd_limit and medstd_fallback to
+    # only be in one place, rather than two, so we'll put them here.
+    # The value of medstd_limit is reasonably arbitrary and lightly based
+    # on testing.  May need refining.  The medstd_fallback of 64
+    # is a complete guess.
+
     # For some reason, I appear to have built this median_limit()
     # function, but in practice it doesn't seem to help, as there
     # doesn't seem to be a problem with letting the median be whatever
@@ -931,7 +937,7 @@ def median_std(valid_points: np.ma, std_devs: np.ma):
 
 
 def min_max_ex(
-    central, medstd, width, medstd_limit=400, medstd_fallback=64
+    central, medstd, width, medstd_limit, medstd_fallback
 ) -> tuple:
     """Return a minimum, maximum, and exclusion value based on the
     provided *central* value, and adding and subtracting the result
@@ -945,8 +951,6 @@ def min_max_ex(
     # we define it rigorously?  I'm not entirely sure, and I wish there
     # was a better way to determine this, or, alternately an even more robust
     # way to find 'medstd' in the first place.
-    # I am going to select an abitrary value based on my experience (300)
-    # and then also pick a replacement of 64 which is a complete guess.
     # Finally, in this case, since the 'statistics' are completely broken,
     # I'm also going to set the exclusion to be arbitrary, and lower than
     # the enforced medstd.
@@ -1218,10 +1222,10 @@ def find_prominence_boundaries(
     max_prom_idx = np.argmax(maxprops["prominences"])
     max_prom_left = maxprops["left_ips"][max_prom_idx]
     max_prom_right = maxprops["right_ips"][max_prom_idx]
-    # print(f"max_prom_idx: {max_prom_idx}")
-    # print(
-    #   f"initial max_prom_left/right: {max_prom_left}, {max_prom_right}"
-    # )
+    logger.debug(f"max_prom_idx: {max_prom_idx}")
+    logger.debug(
+        f"initial max_prom_left/right: {max_prom_left}, {max_prom_right}"
+    )
 
     # If there's only one prominence, then that's it
     if len(maxprops["prominences"]) == 1:
@@ -1239,7 +1243,7 @@ def find_prominence_boundaries(
     # garbage.  If it is outside the mindn / maxdn range, reject it,
     # and pick the next best.
     # print(f"mode index: {maxima_i[max_prom_idx]}")
-    # print(f"mindn_i, maxdn_i: {mindn_i}, {maxdn_i}")
+    logger.debug(f"mindn_i, maxdn_i: {mindn_i}, {maxdn_i}")
     if not mindn_i <= maxima_i[max_prom_idx] <= maxdn_i:
         sorted_prom_idxs = np.argsort(maxprops["prominences"])
         # print(f"sorted_prom_idxs: {sorted_prom_idxs}")
@@ -1294,7 +1298,7 @@ def find_prominence_boundaries(
         except ValueError:
             pass
 
-    # print(f"max_prom_left/right: {max_prom_left}, {max_prom_right}")
+    logger.debug(f"max_prom_left/right: {max_prom_left}, {max_prom_right}")
     # print(
     #     f"DN edges of prominence envelope: {dn[int(max_prom_left)]}, "
     #     f"{dn[int(max_prom_right)]}"
@@ -1458,10 +1462,10 @@ def find_smart_window(
         )
 
         # print(f"max_prom_left/right: {max_prom_left}, {max_prom_right}")
-        # print(
-        #     f"DN edges of prominence envelope: {dn[int(max_prom_left)]}, "
-        #     f"{dn[int(max_prom_right)]}"
-        # )
+        logger.debug(
+            f"DN edges of prominence envelope: {dn[int(max_prom_left)]}, "
+            f"{dn[int(max_prom_right)]}"
+        )
 
         # if max_prom_left <= central_min_i:
         if np.argmax(counts) == 0:
@@ -1496,8 +1500,8 @@ def find_smart_window(
     # print(f"min_prom, max_prom: {min_prom}, {max_prom}")
     # print(f"min_in, max_in: {min_in}, {max_in}")
     # print(f"min_i_ips, max_i_ips: {min_i_ips}, {max_i_ips}")
-    # print(f"min_indices: {min_indices}")
-    # print(f"max_indices: {max_indices}")
+    logger.debug(f"min_indices: {min_indices}")
+    logger.debug(f"max_indices: {max_indices}")
 
     # new_min_i, new_max_i = pick_index(
     min_i, max_i = pick_index(
@@ -1709,7 +1713,7 @@ def pick_index(
     :return: two-tuple of ints which represent the minimum and maximum indices.
 
     """
-    # logger = logger.getLogger(f"{__name__}.pick_index")
+    logger = logging.getLogger(f"{__name__}.pick_index")
     # print(f"min_indices: {min_indices}")
     # print(f"max_indices: {max_indices}")
     # print(f"minima_i: {minima_i}")
@@ -1800,7 +1804,10 @@ def pick_index(
 
         end_idx = 0 if m == 0 else len(dn) - 1
         logger.debug(
-            f"Consider: {consider_end} {counts[end_idx]} {dn[end_idx]} "
+            f"Consider: {consider_end} and ("
+            f"{counts[end_idx]} < {count_thresh} and "
+            f"{span_left} <= {dn[end_idx]} <= {span_right} ) or "
+            f"{new_i[m]} == {minima_i[-1 * m]}"
         )
         if consider_end and (
             (
