@@ -28,6 +28,15 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+0.8.0 (2021-06-30)
+------------------
+
+Changed
++++++++
+- bitflips.py: Removed the span check when considering end values, which may affect how
+  the algorithm deals with "mostly good" DN histograms, such that it should now correctly
+  handle mesa-shaped DN histograms and not chop them in the middle.
+
 0.7.1 (2021-06-21)
 ------------------
 
