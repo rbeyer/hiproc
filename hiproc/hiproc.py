@@ -228,7 +228,7 @@ def edr2stitch(
         pvl.load(conf_dir / "NoiseFilter.conf"),
     )
     with concurrent.futures.ProcessPoolExecutor(
-                max_workers=max_workers
+        max_workers=max_workers
     ) as executor:
         future_dbs = dict()
         for i in images:

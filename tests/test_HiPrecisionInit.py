@@ -55,7 +55,6 @@ class TestMock(unittest.TestCase):
         )):
             self.assertIsNone(hpi.main())
 
-
     @patch("hiproc.HiPrecisionInit.sstats.Polyfit", return_value=("_", 5, "_"))
     def test_needs_HiJACK(self, sstats):
         need, avediff = hpi.needs_HiJACK("dummy_path", 1)

@@ -899,13 +899,13 @@ def jitter_error(
     )
 
     error_vec = (
-                    np.abs(xinterp[0] - (jittercheckx1 + rh0["x1"]))
-                    + np.abs(xinterp[1] - (jittercheckx2 + rh0["x2"]))
-                    + np.abs(xinterp[2] - (jittercheckx3 + rh0["x3"]))
-                    + np.abs(yinterp[0] - (jitterchecky1 + rh0["y1"]))
-                    + np.abs(yinterp[1] - (jitterchecky2 + rh0["y2"]))
-                    + np.abs(yinterp[2] - (jitterchecky3 + rh0["y3"]))
-                ) / 6.0
+        np.abs(xinterp[0] - (jittercheckx1 + rh0["x1"]))
+        + np.abs(xinterp[1] - (jittercheckx2 + rh0["x2"]))
+        + np.abs(xinterp[2] - (jittercheckx3 + rh0["x3"]))
+        + np.abs(yinterp[0] - (jitterchecky1 + rh0["y1"]))
+        + np.abs(yinterp[1] - (jitterchecky2 + rh0["y2"]))
+        + np.abs(yinterp[2] - (jitterchecky3 + rh0["y3"]))
+    ) / 6.0
 
     error = error_vec.mean()
     logger.info(f"Error for phasetol {phasetol}: {error}")

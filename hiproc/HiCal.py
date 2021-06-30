@@ -94,7 +94,6 @@ import copy
 import csv
 import json
 import logging
-import math
 import os
 import pkg_resources
 import re
@@ -1721,7 +1720,7 @@ def NoiseFilter_zaptrigger(
                 trigger = True
     if trigger:
         logger.info(f"Fraction of non-valid pixels > {nonvalid_frac}")
-        logger.info(f"Pause point pixels will be zapped.")
+        logger.info("Pause point pixels will be zapped.")
     return trigger
 
 

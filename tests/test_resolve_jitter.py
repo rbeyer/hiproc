@@ -407,8 +407,8 @@ class TestResolveJitter(unittest.TestCase):
         npt.assert_allclose(
             np.array([
                 5.58366667, 5.60056667, 5.60333333, 5.68856667, 5.78896667,
-                 5.8293, 5.75613333, 5.84383333, 5.8301, 6.01325,
-                 6.0136, 5.94855, 5.93875
+                5.8293, 5.75613333, 5.84383333, 5.8301, 6.01325,
+                6.0136, 5.94855, 5.93875
             ]),
             offy,
         )
@@ -675,7 +675,7 @@ class TestResolveJitter(unittest.TestCase):
                     False, False, False, False, False, False, False, False,
                     False, False, False, False, False, False, False, False
                 ],
-                fill_value = 1e+20
+                fill_value=1e+20
             ),
             x
         )
