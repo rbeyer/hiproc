@@ -158,9 +158,13 @@ def main():
 
                 # HiPrecisionInit to determine if you need to HiNoProj or
                 # HiJACK takes *slither.txt
-                (HiJACK_flags, _, _) = HiPrecisionInit.check(
+                (HiJACK_flags, averages, thresh) = HiPrecisionInit.check(
                     slithers, pvl.load(args.conf_dir / "HiPrecisionInit.conf")
                 )
+
+                logger.info(HiPrecisionInit.message(
+                    HiJACK_flags, averages, thresh, slithers
+                ))
 
                 if any(HiJACK_flags):
                     jack = True

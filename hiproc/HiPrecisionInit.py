@@ -90,17 +90,7 @@ def main():
             args.slither_text, pvl.load(args.conf)
         )
 
-    print(f"Mean_Jitter_Magnitude_Threshold: {thresh}")
-    print("Average\tProcess \tFile Name")
-    for a, j, s in zip(averages, hijack, args.slither_text):
-        print("{:.2}\t{}\t{}".format(
-            a, "HiJACK  " if j else "HiNoProj", s
-        ))
-
-    if any(hijack):
-        print("Probably should run HiJACK.")
-    else:
-        print("Can safely run NoProj.")
+    print("\n".join(message(hijack, averages, thresh, args.slither_text)))
 
     return
 
@@ -127,3 +117,20 @@ def needs_HiJACK(slither_path: os.PathLike, threshold: float):
         need = False
 
     return need, avediff
+
+
+def message(yes_hijack: list, averages: list, thresh: float, paths: list):
+    lines = list()
+    lines.append(f"Mean_Jitter_Magnitude_Threshold: {thresh}")
+    lines.append("Average\tProcess \tFile Name")
+    for a, j, s in zip(averages, yes_hijack, paths):
+        lines.append("{:.2}\t{}\t{}".format(
+            a, "HiJACK  " if j else "HiNoProj", s
+        ))
+
+    if any(yes_hijack):
+        lines.append("Probably should run HiJACK.")
+    else:
+        lines.append("Can safely run NoProj.")
+
+    return lines

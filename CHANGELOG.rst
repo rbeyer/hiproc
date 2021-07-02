@@ -28,6 +28,11 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+Added
++++++
+- Additional logging of the HiPrecisionInit output during a hiproc run, which was previously
+  obscured.
+
 0.8.0 (2021-06-30)
 ------------------
 
