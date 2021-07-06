@@ -294,76 +294,82 @@ def parse_histat(pvltext: str) -> dict:
     d = dict()
 
     # Image Area Statistics
-    d["IMAGE_MEAN"] = p["IMAGE"]["Average"]
-    d["IMAGE_STANDARD_DEVIATION"] = p["IMAGE"]["StandardDeviation"]
-    d["IMAGE_MINIMUM"] = p["IMAGE"]["Minimum"]
-    d["IMAGE_MAXIMUM"] = p["IMAGE"]["Maximum"]
-    d["GAP_PIXELS"] = p["IMAGE"]["NullPixels"]
-    d["LOW_SATURATED_PIXELS"] = p["IMAGE"]["LisPixels"]
-    d["HIGH_SATURATED_PIXELS"] = p["IMAGE"]["HisPixels"]
+    d["IMAGE_MEAN"] = p["IMAGE"].get("Average")
+    d["IMAGE_STANDARD_DEVIATION"] = p["IMAGE"].get("StandardDeviation")
+    d["IMAGE_MINIMUM"] = p["IMAGE"].get("Minimum")
+    d["IMAGE_MAXIMUM"] = p["IMAGE"].get("Maximum")
+    d["GAP_PIXELS"] = p["IMAGE"].get("NullPixels")
+    d["LOW_SATURATED_PIXELS"] = p["IMAGE"].get("LisPixels")
+    d["HIGH_SATURATED_PIXELS"] = p["IMAGE"].get("HisPixels")
 
     # Calibration Reverse-readout Statistics
-    d["CAL_REVERSE_MEAN"] = p["CAL_REVERSE"]["Average"]
-    d["CAL_REVERSE_STANDARD_DEVIATION"] = p["CAL_REVERSE"]["StandardDeviation"]
-    d["CAL_REVERSE_MINIMUM"] = p["CAL_REVERSE"]["Minimum"]
-    d["CAL_REVERSE_MAXIMUM"] = p["CAL_REVERSE"]["Maximum"]
-    d["CAL_REVERSE_LIS"] = p["CAL_REVERSE"]["LisPixels"]
+    d["CAL_REVERSE_MEAN"] = p["CAL_REVERSE"].get("Average")
+    d["CAL_REVERSE_STANDARD_DEVIATION"] = p["CAL_REVERSE"].get(
+        "StandardDeviation"
+    )
+    d["CAL_REVERSE_MINIMUM"] = p["CAL_REVERSE"].get("Minimum")
+    d["CAL_REVERSE_MAXIMUM"] = p["CAL_REVERSE"].get("Maximum")
+    d["CAL_REVERSE_LIS"] = p["CAL_REVERSE"].get("LisPixels")
 
     # Calibration Mask Statistics
-    d["CAL_MASK_MEAN"] = p["CAL_MASK"]["Average"]
-    d["CAL_MASK_STANDARD_DEVIATION"] = p["CAL_MASK"]["StandardDeviation"]
-    d["CAL_MASK_MINIMUM"] = p["CAL_MASK"]["Minimum"]
-    d["CAL_MASK_MAXIMUM"] = p["CAL_MASK"]["Maximum"]
+    d["CAL_MASK_MEAN"] = p["CAL_MASK"].get("Average")
+    d["CAL_MASK_STANDARD_DEVIATION"] = p["CAL_MASK"].get("StandardDeviation")
+    d["CAL_MASK_MINIMUM"] = p["CAL_MASK"].get("Minimum")
+    d["CAL_MASK_MAXIMUM"] = p["CAL_MASK"].get("Maximum")
 
     # Calibration Ramp Statistics
-    d["CAL_RAMP_MEAN"] = p["CAL_RAMP"]["Average"]
-    d["CAL_RAMP_STANDARD_DEVIATION"] = p["CAL_RAMP"]["StandardDeviation"]
-    d["CAL_RAMP_MINIMUM"] = p["CAL_RAMP"]["Minimum"]
-    d["CAL_RAMP_MAXIMUM"] = p["CAL_RAMP"]["Maximum"]
+    d["CAL_RAMP_MEAN"] = p["CAL_RAMP"].get("Average")
+    d["CAL_RAMP_STANDARD_DEVIATION"] = p["CAL_RAMP"].get("StandardDeviation")
+    d["CAL_RAMP_MINIMUM"] = p["CAL_RAMP"].get("Minimum")
+    d["CAL_RAMP_MAXIMUM"] = p["CAL_RAMP"].get("Maximum")
 
     # Image Dark Reference Statistics
-    d["IMAGE_DARK_MEAN"] = p["IMAGE_DARK"]["Average"]
-    d["IMAGE_DARK_STANDARD_DEVIATION"] = p["IMAGE_DARK"]["StandardDeviation"]
-    d["IMAGE_DARK_MINIMUM"] = p["IMAGE_DARK"]["Minimum"]
-    d["IMAGE_DARK_MAXIMUM"] = p["IMAGE_DARK"]["Maximum"]
+    d["IMAGE_DARK_MEAN"] = p["IMAGE_DARK"].get("Average")
+    d["IMAGE_DARK_STANDARD_DEVIATION"] = p["IMAGE_DARK"].get(
+        "StandardDeviation"
+    )
+    d["IMAGE_DARK_MINIMUM"] = p["IMAGE_DARK"].get("Minimum")
+    d["IMAGE_DARK_MAXIMUM"] = p["IMAGE_DARK"].get("Maximum")
 
     # Image Buffer Area
-    d["IMAGE_BUFFER_MEAN"] = p["IMAGE_BUFFER"]["Average"]
-    d["IMAGE_BUFFER_STANDARD_DEVIATION"] = p["IMAGE_BUFFER"][
+    d["IMAGE_BUFFER_MEAN"] = p["IMAGE_BUFFER"].get("Average")
+    d["IMAGE_BUFFER_STANDARD_DEVIATION"] = p["IMAGE_BUFFER"].get(
         "StandardDeviation"
-    ]
-    d["IMAGE_BUFFER_MINIMUM"] = p["IMAGE_BUFFER"]["Minimum"]
-    d["IMAGE_BUFFER_MAXIMUM"] = p["IMAGE_BUFFER"]["Maximum"]
-    d["IMAGE_BUFFER_LIS"] = p["IMAGE_BUFFER"]["LisPixels"]
+    )
+    d["IMAGE_BUFFER_MINIMUM"] = p["IMAGE_BUFFER"].get("Minimum")
+    d["IMAGE_BUFFER_MAXIMUM"] = p["IMAGE_BUFFER"].get("Maximum")
+    d["IMAGE_BUFFER_LIS"] = p["IMAGE_BUFFER"].get("LisPixels")
 
     # Calibration Image Dark Reference
-    d["CAL_DARK_MEAN"] = p["CAL_DARK"]["Average"]
-    d["CAL_DARK_STANDARD_DEVIATION"] = p["CAL_DARK"]["StandardDeviation"]
-    d["CAL_DARK_MINIMUM"] = p["CAL_DARK"]["Minimum"]
-    d["CAL_DARK_MAXIMUM"] = p["CAL_DARK"]["Maximum"]
+    d["CAL_DARK_MEAN"] = p["CAL_DARK"].get("Average")
+    d["CAL_DARK_STANDARD_DEVIATION"] = p["CAL_DARK"].get("StandardDeviation")
+    d["CAL_DARK_MINIMUM"] = p["CAL_DARK"].get("Minimum")
+    d["CAL_DARK_MAXIMUM"] = p["CAL_DARK"].get("Maximum")
 
     # Calibration Image Buffer Area
-    d["CAL_BUFFER_MEAN"] = p["CAL_BUFFER"].get("Average", None)
-    d["CAL_BUFFER_STANDARD_DEVIATION"] = p["CAL_BUFFER"].get("StandardDeviation", None)
-    d["CAL_BUFFER_MINIMUM"] = p["CAL_BUFFER"].get("Minimum", None)
-    d["CAL_BUFFER_MAXIMUM"] = p["CAL_BUFFER"].get("Maximum", None)
-    d["CAL_BUFFER_LIS"] = p["CAL_BUFFER"]["LisPixels"]
+    d["CAL_BUFFER_MEAN"] = p["CAL_BUFFER"].get("Average")
+    d["CAL_BUFFER_STANDARD_DEVIATION"] = p["CAL_BUFFER"].get(
+        "StandardDeviation"
+    )
+    d["CAL_BUFFER_MINIMUM"] = p["CAL_BUFFER"].get("Minimum")
+    d["CAL_BUFFER_MAXIMUM"] = p["CAL_BUFFER"].get("Maximum")
+    d["CAL_BUFFER_LIS"] = p["CAL_BUFFER"].get("LisPixels")
 
     # Calibration Dark Ramp Area
-    d["CAL_DARK_RAMP_MEAN"] = p["CAL_DARK_RAMP"]["Average"]
-    d["CAL_DARK_RAMP_STANDARD_DEVIATION"] = p["CAL_DARK_RAMP"][
+    d["CAL_DARK_RAMP_MEAN"] = p["CAL_DARK_RAMP"].get("Average")
+    d["CAL_DARK_RAMP_STANDARD_DEVIATION"] = p["CAL_DARK_RAMP"].get(
         "StandardDeviation"
-    ]
-    d["CAL_DARK_RAMP_MINIMUM"] = p["CAL_DARK_RAMP"]["Minimum"]
-    d["CAL_DARK_RAMP_MAXIMUM"] = p["CAL_DARK_RAMP"]["Maximum"]
+    )
+    d["CAL_DARK_RAMP_MINIMUM"] = p["CAL_DARK_RAMP"].get("Minimum")
+    d["CAL_DARK_RAMP_MAXIMUM"] = p["CAL_DARK_RAMP"].get("Maximum")
 
     # Image Post Ramp Area
-    d["IMAGE_POST_RAMP_MEAN"] = p["IMAGE_POSTRAMP"]["Average"]
-    d["IMAGE_POST_RAMP_STANDARD_DEVIATION"] = p["IMAGE_POSTRAMP"][
+    d["IMAGE_POST_RAMP_MEAN"] = p["IMAGE_POSTRAMP"].get("Average")
+    d["IMAGE_POST_RAMP_STANDARD_DEVIATION"] = p["IMAGE_POSTRAMP"].get(
         "StandardDeviation"
-    ]
-    d["IMAGE_POST_RAMP_MINIMUM"] = p["IMAGE_POSTRAMP"]["Minimum"]
-    d["IMAGE_POST_RAMP_MAXIMUM"] = p["IMAGE_POSTRAMP"]["Maximum"]
+    )
+    d["IMAGE_POST_RAMP_MINIMUM"] = p["IMAGE_POSTRAMP"].get("Minimum")
+    d["IMAGE_POST_RAMP_MAXIMUM"] = p["IMAGE_POSTRAMP"].get("Maximum")
 
     return d
 
