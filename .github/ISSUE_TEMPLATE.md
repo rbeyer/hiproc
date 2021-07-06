@@ -1,4 +1,4 @@
-* pyrise version:
+* hiproc version:
 * Python version:
 * Operating System:
 
