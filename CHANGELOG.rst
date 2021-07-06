@@ -28,10 +28,20 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+0.8.1 (2021-07-06)
+------------------
+
 Added
 +++++
 - Additional logging of the HiPrecisionInit output during a hiproc run, which was previously
   obscured.
+
+Fixed
++++++
+- In some legitimate cases, some elements returned from ISIS histat would be missing (e.g. in the
+  case of no valid pixels in the CAL_BUFFER area, there is no returned value of "Average"), but
+  were not handled properly (Issue #3).  More robust handling was added.
+
 
 0.8.0 (2021-06-30)
 ------------------
