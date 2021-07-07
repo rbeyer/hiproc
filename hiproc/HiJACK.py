@@ -71,6 +71,7 @@ import hiproc.util as util
 import hiproc.HiJitReg as hjr
 import hiproc.HiNoProj as hnp
 import hiproc.resolve_jitter as rj
+from hiproc.FlatFile import FlatFile
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +117,14 @@ def arg_parser():
              "parameters for the resulting image. Default: %(default)s"
     )
     parser.add_argument(
+        "--plotflats",
+        action="store_true",
+        help="If given, HiJACK will expect two file paths which should be "
+             "the prehijack and posthijack flat files created by a previous "
+             "run of HiJACK.  This only makes a plot, it does not engage any "
+             "HiJACK processing again."
+    )
+    parser.add_argument(
         "cubes",
         metavar="balance.cub-files",
         nargs="+",
@@ -130,14 +139,17 @@ def main():
     util.set_logger(args.verbose, args.logfile, args.log)
 
     with util.main_exceptions(args.verbose):
-        HiJACK(
-            args.cubes,
-            args.conf_dir,
-            args.out_dir,
-            args.base_ccd_number,
-            plot=args.plot,
-            keep=args.keep,
-        )
+        if args.plotflats:
+            plot_flats(args.cubes[0], args.cubes[1])
+        else:
+            HiJACK(
+                args.cubes,
+                args.conf_dir,
+                args.out_dir,
+                args.base_ccd_number,
+                plot=args.plot,
+                keep=args.keep,
+            )
     return
 
 
@@ -466,28 +478,13 @@ def mosaic_dejittered(cubes: list, out_p: os.PathLike, prodid: str):
 
 
 def flat_reader(flat_path: os.PathLike):
-    dialect = csv.Dialect
-    dialect.delimiter = " "
-    dialect.skipinitialspace = True
-    dialect.quoting = csv.QUOTE_NONE
-    dialect.lineterminator = "\n"
-
-    with open(flat_path, "r") as f:
-        flat_data = f.read()
-
+    """Reads a flat file and returns some columns as numpy arrays."""
     fromtime = list()
     fromsamp = list()
     fromline = list()
     regsamp = list()
     regline = list()
-    reader = csv.DictReader(
-        itertools.filterfalse(
-            lambda x: x.startswith("#") or x.isspace() or len(x) == 0,
-            flat_data.splitlines(),
-        ),
-        dialect=dialect,
-    )
-    for row in reader:
+    for row in FlatFile(flat_path):
         fromtime.append(float(row["FromTime"]))
         fromsamp.append(int(row["FromSamp"]))
         fromline.append(int(row["FromLine"]))
@@ -557,8 +554,8 @@ def HiJACK(
             )
         )
 
-    flat_path = outdir_p / "{}.{}.{}".format(
-        cubes[0].get_obsid(), temp_token, "RED5-RED4_prehijack.flat.tab"
+    flat_path = outdir_p / "{}.{}".format(
+        cubes[0].get_obsid(), "RED5-RED4_prehijack.flat.tab"
     )
     match_red(cubes, base_cube, flat_path)
 
@@ -701,15 +698,18 @@ def HiJACK(
     with isis.fromlist.temp([ir_p, center_red_p, bg_p]) as f:
         isis.cubeit(fromlist=f, to=irb_p, proplab=center_red_p)
 
+    dejit_54 = list(
+        filter(lambda x: x.match("*RED5-RED4*"), red_flat_files)
+    )[0]
+    dejit_flat = flat_path.with_name(
+        flat_path.name.replace("prehijack", "posthijack")
+    )
+    shutil.copyfile(dejit_54, dejit_flat)
     if plot:
         # Make plot of before and after flat.tab results
-        dejit_flat = list(
-            filter(lambda x: x.match("*RED5-RED4*"), red_flat_files)
-        )[0]
         plot_flats(flat_path, dejit_flat)
 
     if not keep:
-        flat_path.unlink()
         red_flat_files.unlink()
         to_del.unlink()
 

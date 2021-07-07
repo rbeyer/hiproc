@@ -28,6 +28,12 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+Added
++++++
+- HiJACK now retains pre- and post-HiJACK flat files by default.
+- HiJACK now has a --plotflats argument that can be used to plot the new flat files *after*
+  a run of HiJACK.
+
 0.8.1 (2021-07-06)
 ------------------
 

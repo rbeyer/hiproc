@@ -276,12 +276,13 @@ class TestHiJACK(unittest.TestCase):
     ):
         confd = "confdir"
         outd = "outdir"
+        prehijack_flat = Path("RED5-RED4flat1")
         with patch(
             "hiproc.HiNoProj.add_offsets",
             side_effect=[
                 (
                     [self.r4, self.r5],
-                    [Path("RED5-RED4flat1"), Path("RED3-RED4flat2")],
+                    [prehijack_flat, Path("RED3-RED4flat2")],
                 ),
                 ([self.i1, self.r3], ["irflat1", "irflat2"]),
                 ([self.i1, self.r3], ["bgflat1", "bgflat2"]),
@@ -330,6 +331,7 @@ class TestHiJACK(unittest.TestCase):
             r45np = Path(f"{outd}/{oid}_RED4-5.NOPROJ.cub")
             irnp = Path(f"{outd}/{oid}_IR.NOPROJ.cub")
             bgnp = Path(f"{outd}/{oid}_BG.NOPROJ.cub")
+            phjf = Path(f"{outd}/{oid}.RED5-RED4_posthijack.flat.tab")
             self.assertEqual(
                 m_copy.call_args_list,
                 [
@@ -337,6 +339,7 @@ class TestHiJACK(unittest.TestCase):
                     call(None, r45np),
                     call(None, irnp),
                     call(None, bgnp),
+                    call(prehijack_flat, phjf),
                 ],
             )
 
