@@ -33,6 +33,8 @@ Added
 - HiJACK now retains pre- and post-HiJACK flat files by default.
 - HiJACK now has a --plotflats argument that can be used to plot the new flat files *after*
   a run of HiJACK.
+- Added new rjplot program to plot the contents of the jitter and smear output files created
+  by resolve_jitter.
 
 0.8.1 (2021-07-06)
 ------------------

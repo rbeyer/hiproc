@@ -35,7 +35,8 @@ setup(
             'hiproc=hiproc.hiproc:main',
             'lisfix=hiproc.lisfix:main',
             'mdr2cub=hiproc.mdr2cub:main',
-            'resolve_jitter=hiproc.resolve_jitter:main'
+            'resolve_jitter=hiproc.resolve_jitter:main',
+            'rjplot=hiproc.rjplot:main'
         ],
     },
     install_requires=requirements,
