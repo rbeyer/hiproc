@@ -28,6 +28,9 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+0.9.0 (2021-07-08)
+------------------
+
 Added
 +++++
 - HiJACK now retains pre- and post-HiJACK flat files by default.
@@ -35,6 +38,11 @@ Added
   a run of HiJACK.
 - Added new rjplot program to plot the contents of the jitter and smear output files created
   by resolve_jitter.
+
+Fixed
++++++
+- In certain conditions an array can have zero length, and when it does, one shouldn't try and
+  index it in a logging statement.
 
 0.8.1 (2021-07-06)
 ------------------
