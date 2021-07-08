@@ -1747,10 +1747,10 @@ def pick_index(
         logger.debug(f"counts[indices[0]]: {counts[indices[0]]}")
         consider_end = False
         if len(set(indices)) == 1 and counts[indices[0]] < count_thresh:
-            # logging.info(
-            #     f"Input indices for {message} are all the same and below "
-            #     f"the count threshold."
-            # )
+            logger.debug(
+                f"Input indices for {message} are all the same and below "
+                f"the count threshold."
+            )
             new_i[m] = indices[0]
         else:
             left = min(indices)
@@ -1803,12 +1803,14 @@ def pick_index(
             )
 
         end_idx = 0 if m == 0 else len(dn) - 1
-        logger.debug(
-            f"Consider: {consider_end} and ("
-            f"{counts[end_idx]} < {count_thresh} and "
-            f"{span_left} <= {dn[end_idx]} <= {span_right} ) or "
-            f"{new_i[m]} == {minima_i[-1 * m]}"
-        )
+        logger.debug(f"Consider end: {consider_end}")
+        if consider_end:
+            logger.debug(
+                f" and ("
+                f"{counts[end_idx]} < {count_thresh} and "
+                f"{span_left} <= {dn[end_idx]} <= {span_right} ) or "
+                f"{new_i[m]} == {minima_i[-1 * m]}"
+            )
         if consider_end and (
             (
                 counts[end_idx] < count_thresh
