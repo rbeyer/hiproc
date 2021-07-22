@@ -32,6 +32,7 @@ setup(
             'JitPlot=hiproc.JitPlot:main',
             'SlitherStats=hiproc.SlitherStats:main',
             'bitflips=hiproc.bitflips:main',
+            'fft_clean=hiproc.fft_clean:main',
             'hiproc=hiproc.hiproc:main',
             'lisfix=hiproc.lisfix:main',
             'mdr2cub=hiproc.mdr2cub:main',

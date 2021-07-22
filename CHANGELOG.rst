@@ -28,6 +28,11 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+Added
++++++
+- fft_clean functionality added for more testing, but not integrated with HiCal
+  or hiproc.
+
 0.9.0 (2021-07-08)
 ------------------
 
