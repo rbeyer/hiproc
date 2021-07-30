@@ -33,6 +33,13 @@ Added
 - fft_clean functionality added for more testing, but not integrated with HiCal
   or hiproc.
 
+Fixed
++++++
+- EDR_Stats was failing when some histats return values were None.  Now properly
+  just saves a "None" for SNR.
+
+
+
 0.9.0 (2021-07-08)
 ------------------
 

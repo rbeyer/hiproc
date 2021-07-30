@@ -272,9 +272,15 @@ def EDR_Stats(
     histats["BINNING"] = int(isis.getkey_k(out_path, "Instrument", "Summing"))
 
     histats["STD_DN_LEVELS"] = get_dncnt(out_path, histmin, histmax, keep=keep)
-    histats["IMAGE_SIGNAL_TO_NOISE_RATIO"] = calc_snr(
-        out_path, gainsinfo, histats, cid=cid
-    )
+    try:
+        histats["IMAGE_SIGNAL_TO_NOISE_RATIO"] = calc_snr(
+            out_path, gainsinfo, histats, cid=cid
+        )
+    except TypeError:
+        # One of the elements in hitstats needed to calculate SNR was None,
+        # so it is not calculable.
+        histats["IMAGE_SIGNAL_TO_NOISE_RATIO"] = None
+
     histats["GAP_PIXELS_PERCENT"] = (
         histats["GAP_PIXELS"]
         / (int(histats["IMAGE_LINES"]) * int(histats["LINE_SAMPLES"]))
