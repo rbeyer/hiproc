@@ -395,7 +395,7 @@ def norun_info(cube: os.PathLike, db: dict, conf: dict, bin2: bool, bin4: bool):
                 lines.append(f"Would have warned: {wa.message}")
 
     lines.append(
-        f'Image LIS: {db["LOW_SATURATED_PIXELS"]} pixels, '
+        f'Image LIS:                {db["LOW_SATURATED_PIXELS"]} pixels, '
         f'{lis_per:.2f}%'
     )
 
@@ -413,7 +413,7 @@ def norun_info(cube: os.PathLike, db: dict, conf: dict, bin2: bool, bin4: bool):
     revclk_liscount = np.ma.count_masked(cal_image[:20, :])
     revclk_lisfrac = revclk_liscount / cal_image[:20, :].size
     lines.append(
-        f"Reverse-Clock LIS: {revclk_liscount} pixels, "
+        f"Reverse-Clock LIS:        {revclk_liscount} pixels, "
         f"{revclk_lisfrac:.2%}"
     )
 
@@ -437,7 +437,7 @@ def norun_info(cube: os.PathLike, db: dict, conf: dict, bin2: bool, bin4: bool):
     buffer_liscount = np.ma.count_masked(buffer)
     buffer_lisfrac = buffer_liscount / buffer.size
     lines.append(
-        f"Buffer LIS: {buffer_liscount} pixels, "
+        f"Buffer LIS:               {buffer_liscount} pixels, "
         f"{buffer_lisfrac:.2%}"
     )
 
