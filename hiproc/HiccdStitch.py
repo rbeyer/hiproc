@@ -899,12 +899,23 @@ def get_group_i(cubes: list) -> list:
 
 def get_stats(cubes: list) -> list:
     for i, c in enumerate(cubes):
-        cubes[i].lstats = float(
-            pvl.loads(isis.stats(c.lm_path).stdout)["Results"]["Average"]
-        )
-        cubes[i].rstats = float(
-            pvl.loads(isis.stats(c.rm_path).stdout)["Results"]["Average"]
-        )
+        try:
+            cubes[i].lstats = float(
+                pvl.loads(
+                    isis.stats(c.lm_path).stdout
+                )["Results"].get("Average")
+            )
+        except ValueError:
+            cubes[i].lstats = None
+
+        try:
+            cubes[i].rstats = float(
+                pvl.loads(
+                    isis.stats(c.rm_path).stdout
+                )["Results"].get("Average")
+            )
+        except ValueError:
+            cubes[i].rstats = None
 
     return cubes
 
