@@ -273,9 +273,9 @@ def edr2stitch(
                 # (db, o_path) = HiStitch.HiStitch(
                 HiStitch.HiStitch,
                 chid1.nextpath,
-                chid2.nextpath,
+                chid2.nextpath if chid2 is not None else None,
                 chid1.db,
-                chid2.db,
+                chid2.db if chid2 is not None else None,
                 ".HiStitch.cub",
                 stitch_conf,
                 keep=keep,
@@ -392,7 +392,17 @@ def get_CCDpairs(chids: list) -> list:
     chids.sort()
     pairs = list()
     for k, g in itertools.groupby(chids, lambda x: x.ccdnumber):
-        pairs.append(list(g))
+        g_list = list(g)
+        if len(g_list) > 2:
+            raise ValueError(
+                f"The list of channel IDs ({chids}) has more than two channels "
+                f"from the same CCD, which shouldn't be possible, are they "
+                f"from different observations?"
+            )
+        elif len(g_list) == 1:
+            g_list.append(None)
+
+        pairs.append(g_list)
 
     return pairs
 

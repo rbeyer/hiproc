@@ -159,8 +159,8 @@ def main():
         (db, outcub_path) = HiStitch(
             args.cube0,
             args.cube1,
-            get_db(util.pid_path_w_suffix(args.db, args.cube0)),
-            get_db(util.pid_path_w_suffix(args.db2, args.cube1)),
+            get_db(args.db, args.cube0),
+            get_db(args.db2, args.cube1),
             args.output,
             pvl.load(args.conf),
             keep=args.keep,
@@ -177,9 +177,11 @@ def main():
     return
 
 
-def get_db(db_path: os.PathLike) -> dict:
-    if db_path is None:
+def get_db(db: str, cube_path: os.PathLike) -> dict:
+    if cube_path is None:
         return None
+
+    db_path = util.pid_path_w_suffix(db, cube_path)
 
     with open(db_path) as f:
         db = json.load(f)
@@ -242,8 +244,8 @@ def sort_databases(dbs: list, chids: tuple) -> tuple:
 
     if len(dbs) != len(chids):
         raise IndexError(
-            f"The number of databases {len(dbs)}  does not "
-            "match the number of Product IDs {chids}"
+            f"The number of databases ({len(dbs)})  does not "
+            f"match the number of Product IDs ({chids})"
         )
 
     chid_db_map = dict()
@@ -254,7 +256,7 @@ def sort_databases(dbs: list, chids: tuple) -> tuple:
                 break
     if len(chid_db_map) != len(chids):
         raise LookupError(
-            "The Product IDs in the databases " f"do not match {chids}"
+            f"The Product IDs in the databases do not match {chids}"
         )
     return tuple(map(chid_db_map.get, chids))
 
@@ -276,8 +278,10 @@ def HiStitch(
     # GetProductFiles()
     if not cube1:
         cubes = (Path(cube0),)
+        db_list = [db0, ]
     else:
         cubes = sort_input_cubes(Path(cube0), Path(cube1))
+        db_list = [db0, db1]
 
     chids = get_chids(cubes)
 
@@ -290,7 +294,7 @@ def HiStitch(
     if len(cubes) == 2:
         db_paths.append(db1)
 
-    dbs = sort_databases([db0, db1], chids)
+    dbs = sort_databases(db_list, chids)
     ccd_number = int(chids[0].ccdnumber)
 
     # Allows for indexing in lists ordered by bin value.
