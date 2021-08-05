@@ -28,6 +28,9 @@ and the release date, in year-month-day format (see examples below).
 Unreleased
 ----------
 
+0.10.0 (2021-08-05)
+------------------
+
 Added
 +++++
 - fft_clean functionality added for more testing, but not integrated with HiCal
@@ -37,7 +40,11 @@ Fixed
 +++++
 - EDR_Stats was failing when some histats return values were None.  Now properly
   just saves a "None" for SNR.
-
+- HiCal multiprocessing approach was failing when a Channel was bypassed, essentially breaking the whole run.
+- When the HiStitch function was called externally, a missing channel wasn't handled properly. When called from the
+  HiStitch console script, it was fine.
+- hiproc adjusted to take advantage of the above two fixes to HiCal and HiStitch.
+- HiccdStitch now tolerant against the new ISIS stats return of the "N/A" string for missing values.
 
 
 0.9.0 (2021-07-08)
