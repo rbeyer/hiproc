@@ -353,11 +353,14 @@ def main():
                     future_dbs[f] = db_path
 
                 for future in concurrent.futures.as_completed(future_dbs):
-                    db_path = future_dbs[future]
-                    with open(db_path, "w") as f:
-                        json.dump(future.result(), f, indent=0, sort_keys=True)
+                    if future.exception() is None:
+                        db_path = future_dbs[future]
+                        with open(db_path, "w") as f:
+                            json.dump(future.result(), f, indent=0, sort_keys=True)
 
-                    logger.info(f"Wrote {db_path}")
+                        logger.info(f"Wrote {db_path}")
+                    elif isinstance(future.exception(), UserWarning):
+                        logger.warning(future.exception())
     return
 
 
@@ -475,8 +478,8 @@ def setup(cube: os.PathLike, db: dict, conf: dict):
     if lis_per > conf["HiCal"]["HiCal_Bypass"]:
         raise UserWarning(
             f"The image area has a LIS percent ({lis_per}) greater than "
-            f"{conf['HiCal']['HiCal_Bypass']}, so this image will not be "
-            f"processed through HiCal."
+            f"{conf['HiCal']['HiCal_Bypass']}, so this image ({cube}) will not "
+            f"be processed through HiCal."
         )
 
     return in_cube, cid, ccdchan, lis_per

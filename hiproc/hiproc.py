@@ -254,8 +254,11 @@ def edr2stitch(
             future_dbs[f] = out_hical
 
         for future in concurrent.futures.as_completed(future_dbs):
-            out_hical = future_dbs[future]
-            chids.append(ChannelCube(out_hical, future.result()))
+            if future.exception() is None:
+                out_hical = future_dbs[future]
+                chids.append(ChannelCube(out_hical, future.result()))
+            elif isinstance(future.exception(), UserWarning):
+                logger.warning(future.exception())
 
     # HiStitch
     # get Channel pairs
