@@ -14,6 +14,9 @@ to the user to easily execute HiRISE processing procedures.
 .. autoprogram:: hiproc.EDR_Stats:arg_parser()
    :prog: EDR_Stats
 
+.. autoprogram:: hiproc.fft_clean:arg_parser()
+   :prog: fft_clean
+
 .. autoprogram:: hiproc.HiBeautify:arg_parser()
    :prog: HiBeautify
 
