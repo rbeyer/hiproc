@@ -365,7 +365,7 @@ def precision(obsid, conf_dir: Path, parent: Path, hijack=False, keep=False):
         bal_cubs = get_cubes(f"{obsid}*balance.cub", parent)
         # HiJACK - starts with balance cubes, needs all the colors
         #   takes all color balance.cubs
-        #   creates a whole slow of files in HiJACK/
+        #   creates a whole slew of files in HiJACK/
         HiJACK.HiJACK(
             bal_cubs,
             conf_dir,
