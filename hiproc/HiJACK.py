@@ -52,12 +52,12 @@ Output Products:
 # Arizona.
 
 import argparse
-import csv
 import itertools
 import logging
 import os
 import pkg_resources
 import shutil
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -430,37 +430,41 @@ def ResolveJitter(
     # keep_regdefs() writes 'KEEP' into the files status of the regdef files.
     # Not sure that this is required, so skipping.
 
-    # # run resolveJitter3HiJACK.m or resolveJitter4HiJACK.cc
-    # rj_args = [
-    #     resolve_jitter_path,
-    #     str(jitter_path.parent),
-    #     str(common_cube.get_obsid()),
-    #     str(conf["AutoRegistration"]["ControlNet"]["Control_Lines"]),
-    # ]
+    if "_cpp" in jitter_path.stem:
+        # run resolveJitter3HiJACK.m or resolveJitter4HiJACK.cc
+        rj_args = [
+            resolve_jitter_path,
+            str(jitter_path.parent),
+            str(common_cube.get_obsid()),
+            str(conf["AutoRegistration"]["ControlNet"]["Control_Lines"]),
+        ]
 
-    # for f in flats:
-    #     rj_args.append(f.relative_to(jitter_path.parent))
-    #     rj_args.append("-1")
+        for f in flats:
+            rj_args.append(f.relative_to(jitter_path.parent))
+            rj_args.append("-1")
 
-    # logger.info(rj_args)
-    # subprocess.run(rj_args, check=True)
+        logger.info(rj_args)
+        subprocess.run(rj_args, check=True)
 
-    # print(jitter_path)
-    # print(flats[1])
-    rj.start(
-        flats[0],
-        False,
-        flats[1],
-        False,
-        flats[2],
-        False,
-        line_interval=conf["AutoRegistration"]["ControlNet"]["Control_Lines"],
-        outdir=jitter_path.parent,
-        outprefix=common_cube.get_obsid(),
-        plotshow=False,
-        plotsave=True,
-        writecsv=False
-    )
+    else:
+        # print(jitter_path)
+        # print(flats[1])
+        rj.start(
+            flats[0],
+            False,
+            flats[1],
+            False,
+            flats[2],
+            False,
+            line_interval=conf[
+                "AutoRegistration"
+            ]["ControlNet"]["Control_Lines"],
+            outdir=jitter_path.parent,
+            outprefix=common_cube.get_obsid(),
+            plotshow=False,
+            plotsave=True,
+            writecsv=False
+        )
 
     # Just double-check that the file we expect was created:
     if not jitter_path.exists():
@@ -559,6 +563,8 @@ def HiJACK(
     )
     match_red(cubes, base_cube, flat_path)
 
+    # To run Oleg's program, change which of the following two lines
+    # is commented out.
     # jitter_path = outdir_p / (str(cubes[0].get_obsid()) + "_jitter_cpp.txt")
     jitter_path = outdir_p / (str(cubes[0].get_obsid()) + "_jitter_py.txt")
     if not jitter_path.exists():
