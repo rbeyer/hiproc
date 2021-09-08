@@ -49,10 +49,10 @@ Output Products:
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This Python program is based on EDR_Stats version 2.18.2 (2021/04/09)
-# and on the Perl EDR_Stats program ($Revision: 1.44 $
-#                                    $Date: 2021/04/09 22:56:18 $
-# and on the check_lut.pm program (2.4, 2020/04/28)
+# This Python program is based on EDR_Stats version 2.18.4 (2021/08/30)
+# and on the Perl EDR_Stats program ($Revision: 1.46 $
+#                                    $Date: 2021/08/30 23:26:57 $
+# and on the check_lut.pm program (2.5, 2020/04/28)
 # by Eric Eliason, Audrie Fennema, R. King, and Richard Leis as employees of
 # the University of Arizona.
 
@@ -456,6 +456,36 @@ def check_lut(img: os.PathLike):
         # dec.28.06 zero-filled LUT (ie, the image was not LUT'ed)
         lut["897256b6709e1a4da9daba92b6bde39ccfccd8c1"] = None
 
+        # may.17.21 build
+        lut["92a774a83040300ec10889b3be1fbe550324d68b"] = 400
+        lut["b6e82f9219b3d1bcbafdbf383ec3165163ef0092"] = 401
+        lut["334c7152900814094bab3e355d52f5dc75aa0297"] = 402
+        lut["14c8b4533aea45da533c2ef08ba47f01d041d83a"] = 403
+        lut["7f3b55db329a8c5e748d2191d139320170eec656"] = 404
+        lut["aa209d7d286b87195d9ec19c2c22b12d1b8d76ae"] = 405
+        lut["2d608dcf1a086fcda83ca012e7d6a8f82c5bd6b3"] = 406
+        lut["072ab69ae2637e3a894e35a52558bffdd7bbb1d3"] = 407
+        lut["cc2bd7c72c8f2c2ae700ce81d6aac111e9ba7720"] = 408
+        lut["5d93555b8f66d56ddb8539245380df9483139541"] = 409
+        lut["7b62cb6532f062a8ed5071a5e0a5cea2e1db1241"] = 410
+        lut["364848d51500ea530389080a58a96f4d04932948"] = 411
+        lut["65602457c797c7115339f1d985bb3bb36faeac1f"] = 412
+        lut["7f6199592d27e6df83b612a8074794d9b0536ff4"] = 413
+        lut["a9f4a0f9fee6fed6c6ca645442a9188a9b36513c"] = 414
+        lut["e570f9b8a01e299f25f7896a277cee2ce9dcdf34"] = 415
+        lut["3e8361378a362dacecc6d7778a0bf28b6b835d4e"] = 416
+        lut["f133acfad3c5f367bd77da80c34352fc2e4ee391"] = 417
+        lut["04e0c5e7f972fe9578e556b09ca878ec52bbc937"] = 418
+        lut["31e539ba53be7a5a1fc9bd2398e9eb796df46160"] = 419
+        lut["c12976afcf135780e42a1544d82e9bd83a94f820"] = 420
+        lut["13e5d909fbe462b0c745771d9b15686b66f34eab"] = 421
+        lut["f117285737a3324cc3427345293a698cc062ab18"] = 422
+        lut["b1818d3013c14f427c86f572bca559baf44cb1d4"] = 423
+        lut["ce0a8aec436632ffec431075ceb402fcc29c3204"] = 424
+        lut["dafaf6a08c6fd47e02f8db07baebd7b2ddcb18c3"] = 425
+        lut["83ee414adcadb074c2e37d0fe5b7e50fdccdac60"] = 426
+        lut["2e048c82a51c9a68e085b1da92a7e525459cb5e8"] = 427
+
         # dec.19.06 build
         lut["35c8318042da3c30949f3ecb9f3876de524f158f"] = 300
         lut["874f6c26fe21577bc88f8986ec5643ff43747908"] = 301
@@ -583,7 +613,81 @@ def lut_check(cube: os.PathLike, histats: dict, cid=None):
     orbit_number = int(isis.getkey_k(cube, "Archive", "OrbitNumber"))
     threshhold = dict()
     if lut != -9998:
-        if orbit_number > 65881:
+        if orbit_number > 70914:
+            # After orbit 70914, 2021 onboard LUT update w/ Alfred's LUT
+            # ranges change
+            threshhold["RED0"] = (
+                (7454, 23),
+                (5965, 24),
+                (4476, 25),
+                (2988, 26),
+                (0, 27),
+            )
+            threshhold["RED1"] = (
+                (8692, 8),
+                (7152, 9),
+                (5615, 10),
+                (4076, 11),
+                (2538, 12),
+                (0, 13),
+            )
+            threshhold["RED2"] = threshhold["RED1"]
+            threshhold["RED3"] = threshhold["RED1"]
+            threshhold["RED4"] = (
+                (8817, 15),
+                (7303, 16),
+                (5789, 17),
+                (4276, 18),
+                (2763, 19),
+                (0, 20),
+            )
+            threshhold["RED5"] = threshhold["RED0"]
+            threshhold["RED6"] = threshhold["RED4"]
+            threshhold["RED7"] = threshhold["RED4"]
+            threshhold["RED8"] = threshhold["RED0"]
+            # RED9
+            threshhold["IR10"] = threshhold["RED4"]
+            threshhold["IR11"] = threshhold["RED4"]
+            threshhold["BG12"] = threshhold["RED4"]
+            threshhold["BG13"] = threshhold["RED1"]
+        elif orbit_number > 70375:
+            # After orbit 70375, 2021 oboard LUT update
+
+            threshhold["RED0"] = (
+                (8251, 23),
+                (6750, 24),
+                (5250, 25),
+                (3750, 26),
+                (0, 27)
+            )
+            threshhold["RED1"] = (
+                (9251, 8),
+                (7750, 9),
+                (6250, 10),
+                (4750, 11),
+                (3250, 12),
+                (0, 13),
+            )
+            threshhold["RED2"] = threshhold["RED1"]
+            threshhold["RED3"] = threshhold["RED1"]
+            threshhold["RED4"] = (
+                (9501, 15),
+                (8000, 16),
+                (6500, 17),
+                (5000, 18),
+                (3500, 19),
+                (0, 20),
+            )
+            threshhold["RED5"] = threshhold["RED0"]
+            threshhold["RED6"] = threshhold["RED4"]
+            threshhold["RED7"] = threshhold["RED4"]
+            threshhold["RED8"] = threshhold["RED0"]
+            # RED9 is no longer listed, because it is no longer powered.
+            threshhold["IR10"] = threshhold["RED4"]
+            threshhold["IR11"] = threshhold["RED4"]
+            threshhold["BG12"] = threshhold["RED4"]
+            threshhold["BG13"] = threshhold["RED1"]
+        elif orbit_number > 65881:
             # After orbit 65881, RED1 RED2 RED3 moved to to DN 900-1000 offset
 
             threshhold["RED0"] = (

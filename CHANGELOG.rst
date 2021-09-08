@@ -25,8 +25,14 @@ underlined with dashes under Unreleased_ with the version number
 and the release date, in year-month-day format (see examples below).
 
 
-Unreleased
-----------
+Not Yet Released
+----------------
+
+Changed
++++++++
+- Updated EDR_Stats to be consistent with upstream EDR_Stats Pipeline version 2.18.4 (2021/08/30).
+  This handles the new LUT settings.
+
 
 0.10.0 (2021-08-05)
 -------------------
