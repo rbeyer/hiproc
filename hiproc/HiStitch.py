@@ -58,9 +58,9 @@ Output Products:
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on HiStitch version 2.21.1 (2021/01/01),
-# and on the Perl HiStitch program ($Revision: 1.26 $
-#                                   $Date: 2020/04/28 17:52:53 $)
+# This program is based on HiStitch version 2.21.2 (2021/09/09),
+# and on the Perl HiStitch program ($Revision: 1.27 $
+#                                   $Date: 2021/09/09 19:19:02 $
 # and on the Perl HiFurrow_Fix program ($Revision: 1.12 $
 #                                       $Date: 2020/10/30 00:48:28 $)
 # by Eric Eliason as an employee of the University of Arizona.
@@ -391,20 +391,10 @@ def set_flags(
     if conf["HiStitch_Balance"] or conf["HiStitch_Equalize"]:
         if int(conf["HiStitch_Balance_Processing"][ccdnum]) == 0 or (
             max_lis < int(conf["HiStitch_LIS_Pixels"])
-            # The original Perl had these two following conditions written
-            # this way, but I think the lists need to be indexed by bindex:
-            and max_std < float(conf["HiStitch_Balance_Bin_Mask_STD"][binning])
+            and max_std < float(conf["HiStitch_Balance_Bin_Mask_STD"][bindex])
             and max_dstd
-            < float(conf["HiStitch_Balance_Bin_DarkPixel_STD"][binning])
+            < float(conf["HiStitch_Balance_Bin_DarkPixel_STD"][bindex])
         ):
-            logger.warning(
-                "Original Perl issue: conf file arrays are being "
-                "indexed incorrectly, may affect setting of "
-                "equalize and balance flags."
-            )
-            # To correct, change the indexing of the conf lists above with
-            # 'bindex' instead of 'binning'.
-
             # equalize and balance can't both be true
             if conf["HiStitch_Equalize"] and max_gper < float(
                 conf["HiStitch_Gap_Percent"]

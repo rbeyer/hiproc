@@ -8,7 +8,7 @@ The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
 When updating this file, please add an entry for your change under
-Unreleased_ and one of the following headings:
+`Not Yet Released`_ and one of the following headings:
 
 - Added - for new features.
 - Changed - for changes in existing functionality.
@@ -17,11 +17,11 @@ Unreleased_ and one of the following headings:
 - Fixed - for any bug fixes.
 - Security - in case of vulnerabilities.
 
-If the heading does not yet exist under Unreleased_, then add it
+If the heading does not yet exist under `Not Yet Released`_, then add it
 as a 3rd level heading, underlined with pluses (see examples below).
 
 When preparing for a public release add a new 2nd level heading,
-underlined with dashes under Unreleased_ with the version number
+underlined with dashes under `Not Yet Released`_ with the version number
 and the release date, in year-month-day format (see examples below).
 
 
@@ -32,6 +32,8 @@ Changed
 +++++++
 - Updated EDR_Stats to be consistent with upstream EDR_Stats Pipeline version 2.18.4 (2021/08/30).
   This handles the new LUT settings.
+- Updated HiStitch to be consistent with upstream HiStitch Pipeline version 2.21.2 (2021/09/09).
+  This change defaults to balance processing for all CCDs and corrects an indexing bug.
 
 
 0.10.0 (2021-08-05)
