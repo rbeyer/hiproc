@@ -371,7 +371,10 @@ def fit_ramp(col: np.ma.array):
 
 
 def get_ramp_slope(col: np.ma.array):
-    return fit_ramp(col)[0]
+    if np.all(col.mask):
+        return np.ma.masked
+    else:
+        return fit_ramp(col)[0]
 
 
 def get_ramp_intercept(col: np.ma.array):
@@ -525,7 +528,7 @@ def revclock_model(
 
     else:
         raise KeyError(
-            f"Do not have a model for {adc}."
+            f"Do not have a reverse-clock model for ADC {adc}."
         )
 
     return temperature * slope + intercept
@@ -535,11 +538,24 @@ def flatten(arr: np.array, chan: int):
     # The idea here is to flatten the zero_correction array between the pause
     # points
     sos = signal.butter(1, 0.5, output="sos")
+
+    # If the image is binned, the pause points need to be adjusted
+    if arr.size == 1024:
+        binning = 1
+    elif arr.size == 512:
+        binning = 2
+    elif arr.size == 256:
+        binning = 4
+    else:
+        raise ValueError(
+            "Could not determine the binning level from the array."
+        )
+
     pl = list()
     for samp, width in zip(util.ch_pause[chan], util.ch_width[chan]):
         sl = util.pause_slicer(samp, width)
-        pl.append(sl.start)
-        pl.append(sl.stop)
+        pl.append(int(sl.start / binning))
+        pl.append(int(sl.stop / binning))
 
     # # Supports debug plotting below, 2 lines
     # fixed = np.copy(arr)
