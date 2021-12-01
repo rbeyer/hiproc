@@ -563,13 +563,16 @@ def HiCal(
         * 100.0
     )
     hical_file = to_delete.add(next_cube.with_suffix(".hical.cub"))
+    ibm = 0.0 if db["IMAGE_BUFFER_MEAN"] is None else float(
+        db["IMAGE_BUFFER_MEAN"]
+    )
     hical_status = run_hical(
         next_cube,
         hical_file,
         conf,
         conf_path,
         lis_per,
-        float(db["IMAGE_BUFFER_MEAN"]),
+        ibm,
         int(db["BINNING"]),
         flags.noise_filter,
         bitflipwidth=bitflipwidth,
