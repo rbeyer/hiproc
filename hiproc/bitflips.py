@@ -314,6 +314,15 @@ def clean_cube(
     )
 
     logger.info("Bit-flip cleaning Image area.")
+    if np.all(image.mask):
+        if not keep:
+            to_del.unlink()
+        raise ValueError(
+            f"All of the values in the image area of {in_p} are ISIS special "
+            "pixels. If bitflips was run by HiCal, it is possible that the "
+            "NoiseFilter_Raw_Min and NoiseFilter_Raw_Max values in "
+            "NoiseFilter.conf are what is causing this."
+        )
     # These four lines are just informational.
     img_mean = np.ma.mean(image)
     img_mode = mstats.mode(image, axis=None)[0][0]
