@@ -1228,6 +1228,9 @@ def find_prominence_boundaries(
     # The second guess is based on the width of the largest prominence
     # in the data, and we need to do some pre-conditioning.
 
+    if maxprops["prominences"].size == 0:
+        raise ValueError("There do not appear to be any prominences.")
+
     max_prom_idx = np.argmax(maxprops["prominences"])
     max_prom_left = maxprops["left_ips"][max_prom_idx]
     max_prom_right = maxprops["right_ips"][max_prom_idx]
