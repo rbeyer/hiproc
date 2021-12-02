@@ -1801,7 +1801,10 @@ def pick_index(
                 in_span = below_thresh[dn[below_thresh] <= span_right]
             logger.debug(f"in_span: {in_span}")
             if np.size(in_span) == 0:
-                in_span = below_thresh
+                if below_thresh.size > 1:
+                    in_span = np.squeeze(below_thresh)
+                else:
+                    in_span = below_thresh
                 logger.debug(f"fixed in_span: {in_span}")
 
             new_i[m] = best_index(
