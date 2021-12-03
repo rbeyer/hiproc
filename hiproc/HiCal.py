@@ -80,9 +80,9 @@ Output Products:
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This program is based on HiCal version 4.2.0 (2021/09/08),
-# and on the Perl HiCal program ($Revision: 1.61 $
-#                                $Date: 2021/09/08 20:23:23 $
+# This program is based on HiCal version 4.2.3 (2021/11/17),
+# and on the Perl HiCal program ($Revision: 1.62 $
+#                                $Date: 2021/09/22 20:01:50 $
 # and on the Perl NoiseFilter program ($Revision: 1.19
 #                                      $Date: 2021/04/22 22:38:39 $)
 # by Eric Eliason and Richard Leis as employees of the University of Arizona.
