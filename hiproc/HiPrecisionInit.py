@@ -29,8 +29,8 @@ that.
 # limitations under the License.
 #
 # This program is based on HiPrecision version 3.2.3 (2020/06/23),
-# and on the Perl HiPrecisionInit program ($Revision: 1.28 $
-#                                          $Date: 2020/02/15 00:36:20 $)
+# and on the Perl HiPrecisionInit program ($Revision: 1.29 $
+#                                          $Date: 2021/09/15 17:54:57 $)
 # by Audrie Fennema and Sarah Mattson as employees of the University of
 # Arizona.
 
