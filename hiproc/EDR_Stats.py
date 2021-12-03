@@ -49,9 +49,9 @@ Output Products:
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# This Python program is based on EDR_Stats version 2.18.4 (2021/08/30)
-# and on the Perl EDR_Stats program ($Revision: 1.46 $
-#                                    $Date: 2021/08/30 23:26:57 $
+# This Python program is based on EDR_Stats version 3.0.0 (2021/09/08)
+# and on the Perl EDR_Stats program ($Revision: 1.47 $
+#                                    $Date: 2021/09/08 22:42:37 $
 # and on the check_lut.pm program (2.5, 2020/04/28)
 # by Eric Eliason, Audrie Fennema, R. King, and Richard Leis as employees of
 # the University of Arizona.
