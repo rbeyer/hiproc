@@ -1516,20 +1516,25 @@ def find_smart_window(
     logger.debug(f"max_indices: {max_indices}")
 
     # new_min_i, new_max_i = pick_index(
-    min_i, max_i = pick_index(
-        min_indices,
-        max_indices,
-        maxima_i[max_prom_idx],
-        minprops["prominences"],
-        maxprops["prominences"],
-        counts,
-        minima_i,
-        maxima_i,
-        dn,
-        centraldn,
-        mindn,
-        maxdn,
-    )
+    try:
+        min_i, max_i = pick_index(
+            min_indices,
+            max_indices,
+            maxima_i[max_prom_idx],
+            minprops["prominences"],
+            maxprops["prominences"],
+            counts,
+            minima_i,
+            maxima_i,
+            dn,
+            centraldn,
+            mindn,
+            maxdn,
+        )
+    except ValueError:
+        raise ValueError(
+            "There is only one DN minima, a window cannot be found."
+        )
 
     logger.info(f"indexes: {min_i}, {max_i}")
     logger.info(f"DN window: {dn[min_i]}, {dn[max_i]}")
@@ -1729,6 +1734,8 @@ def pick_index(
     # print(f"min_indices: {min_indices}")
     # print(f"max_indices: {max_indices}")
     # print(f"minima_i: {minima_i}")
+    if len(counts) == 1:
+        raise ValueError("Can't evaluate minima when there is only one.")
     scaled = np.log10(counts[minima_i] + prominences) - np.log10(
         counts[minima_i]
     )
