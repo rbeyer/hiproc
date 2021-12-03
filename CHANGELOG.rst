@@ -28,12 +28,27 @@ and the release date, in year-month-day format (see examples below).
 Not Yet Released
 ----------------
 
+
+0.11.0 (2021-12-02)
+-------------------
+
+Added
++++++
+- fft_clean was added to the console programs list.  Still very experimental.
+
 Changed
 +++++++
-- Updated EDR_Stats to be consistent with upstream EDR_Stats Pipeline version 2.18.4 (2021/08/30).
+- Updated EDR_Stats to be consistent with upstream EDR_Stats Pipeline version 3.0.0 (2021/09/08).
   This handles the new LUT settings.
+- Updated HiCal to be consistent with upstream HiCal Pipeline version 4.2.3 (2021/11/17).
 - Updated HiStitch to be consistent with upstream HiStitch Pipeline version 2.21.2 (2021/09/09).
   This change defaults to balance processing for all CCDs and corrects an indexing bug.
+
+Fixed
++++++
+- HiCal now deals with missing fields in the output of histats.
+- lisfix now does not try to fit a slope to a column with masked values.
+- bitflips now raises more descriptive exceptions when given poor data.
 
 
 0.10.0 (2021-08-05)
